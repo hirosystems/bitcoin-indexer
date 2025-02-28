@@ -230,7 +230,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            hirosystems/ordhook
+            hirosystems/bitcoin-indexer
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -251,7 +251,7 @@ jobs:
           context: .
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          file: ./dockerfiles/components/ordhook.dockerfile
+          file: ./dockerfiles/components/bitcoin-indexer.dockerfile
           build-args: |
             GIT_COMMIT=${{ env.GITHUB_SHA_SHORT }}
           cache-from: type=gha
