@@ -148,14 +148,14 @@ impl ObserverSidecar {
 /// ### Examples
 /// ```
 /// use chainhook_sdk::observer::EventObserverBuilder;
-/// use chainhook_sdk::observer::EventObserverConfig;
 /// use chainhook_sdk::observer::ObserverCommand;
 /// use chainhook_sdk::utils::Context;
+/// use config::BitcoindConfig;
 /// use std::error::Error;
 /// use std::sync::mpsc::{Receiver, Sender};
 ///
 /// fn start_event_observer(
-///     config: EventObserverConfig,
+///     config: BitcoindConfig,
 ///     observer_commands_tx: &Sender<ObserverCommand>,
 ///     observer_commands_rx: Receiver<ObserverCommand>,
 ///     ctx: &Context,
