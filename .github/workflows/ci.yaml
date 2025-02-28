@@ -195,7 +195,7 @@ jobs:
 
           ### Clippy Errors
           \`\`\`
-          $(echo $CLIPPY_OUTPUT | grep -E 'error|warning')
+          $(echo -e $CLIPPY_OUTPUT | grep -E 'error|warning')
           \`\`\`
 
           ### How to fix
