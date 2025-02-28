@@ -190,21 +190,55 @@ jobs:
 
           To see and fix these issues, run:
           \`\`\`bash
-          cargo clippy --workspace --all-targets --all-features
+          cargo bitcoin-indexer-clippy
           \`\`\`
 
           ### Clippy Errors
           \`\`\`
           $(cat /tmp/clippy_output.log | grep -E '(error\:)|(warning\:)')
-          \`\`\`
-
-          ### How to fix
-          " >> $GITHUB_STEP_SUMMARY
+          \`\`\`" >> $GITHUB_STEP_SUMMARY
           fi
 
           # Enable immediate exit on error again
           set -e
           exit $CLIPPY_EXIT_CODE
+
+  doc-test:
+    name: doc-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run doctests
+        id: doctest
+        run: |
+          # Disable immediate exit on error
+          set +e
+
+          # Run doctests and capture output
+          cargo test --doc --workspace 2>&1 | tee /tmp/doctest_output.log
+          DOCTEST_EXIT_CODE=${PIPESTATUS[0]}
+
+          # Print output if doctest failed
+          if [ $DOCTEST_EXIT_CODE -ne 0 ]; then
+            echo "## ❌ Doc Tests Failed
+
+          To see and fix these issues, run:
+          \`\`\`bash
+          cargo test --doc --workspace
+          \`\`\`
+
+          ### Doctest Errors
+          \`\`\`
+          $(cat /tmp/doctest_output.log | grep -E '(error\:)|(warning\:)')
+          \`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Enable immediate exit on error again
+          set -e
+          exit $DOCTEST_EXIT_CODE
 
   test:
     strategy:
