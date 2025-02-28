@@ -183,36 +183,28 @@ jobs:
           # Run clippy and capture output
           CLIPPY_OUTPUT=$(cargo bitcoin-indexer-clippy-cli 2>&1)
           CLIPPY_EXIT_CODE=$?
-          
-          # Store the output for later steps
-          echo "$CLIPPY_OUTPUT" > clippy_output.txt
-          
-          # Set output variables for next steps
+
+          # Print output if clippy failed
           if [ $CLIPPY_EXIT_CODE -ne 0 ]; then
-            echo "status=failed" >> $GITHUB_OUTPUT
-          else
-            echo "status=success" >> $GITHUB_OUTPUT
+            echo "## ❌ Clippy Check Failed
+
+          To see and fix these issues, run:
+          \`\`\`bash
+          cargo clippy --workspace --all-targets --all-features
+          \`\`\`
+
+          ### Clippy Errors
+          \`\`\`
+          $CLIPPY_OUTPUT
+          \`\`\`
+
+          ### How to fix
+          " >> $GITHUB_STEP_SUMMARY
           fi
 
           # Enable immediate exit on error again
           set -e
-
-      - name: Create error summary
-        if: steps.clippy.outputs.status == 'failed'
-        run: |
-          echo "## ❌ Clippy Check Failed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "To see and fix these issues, run:" >> $GITHUB_STEP_SUMMARY
-          echo "```bash" >> $GITHUB_STEP_SUMMARY
-          echo "cargo bitcoin-indexer-clippy" >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
-          echo "### Clippy Errors" >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
-          cat clippy_output.txt >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### How to fix" >> $GITHUB_STEP_SUMMARY
-          exit 1
+          exit $CLIPPY_EXIT_CODE
 
   test:
     strategy:
