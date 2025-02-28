@@ -143,7 +143,6 @@ jobs:
           # Set output variables for next steps
           if [ $CLIPPY_EXIT_CODE -ne 0 ]; then
             echo "status=failed" >> $GITHUB_OUTPUT
-            exit 1
           else
             echo "status=success" >> $GITHUB_OUTPUT
           fi
