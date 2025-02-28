@@ -181,7 +181,7 @@ jobs:
           set +e
 
           # Run clippy and capture output
-          cargo bitcoin-indexer-clippy-cli 2>&1 | tee /tmp/clippy_output.log | grep -E "error|warning"
+          cargo bitcoin-indexer-clippy-cli 2>&1 | tee /tmp/clippy_output.log
           CLIPPY_EXIT_CODE=${PIPESTATUS[0]}
 
           # Print output if clippy failed
@@ -195,7 +195,7 @@ jobs:
 
           ### Clippy Errors
           \`\`\`
-          $(cat /tmp/clippy_output.log)
+          $(cat /tmp/clippy_output.log | grep -E '(error\:)|(warning\:)')
           \`\`\`
 
           ### How to fix
