@@ -1,15 +1,17 @@
 [package]
-name = "ordhook-cli"
+name = "cli"
 version.workspace = true
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
-name = "ordhook"
+name = "bitcoin-indexer"
 path = "src/main.rs"
 
 [dependencies]
+config = { path = "../config" }
 ordhook = { path = "../ordhook-core" }
+runes = { path = "../runes" }
 chainhook-types = { path = "../chainhook-types-rs" }
 chainhook-sdk = { path = "../chainhook-sdk" }
 hex = "0.4.3"

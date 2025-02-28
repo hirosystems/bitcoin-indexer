@@ -8,13 +8,12 @@ use chainhook_types::{
     BlockIdentifier, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
     TransactionIdentifier,
 };
+use config::Config;
 use deadpool_postgres::GenericClient;
 use lru::LruCache;
 use maplit::hashmap;
 
-use crate::{
-    config::Config, core::protocol::satoshi_tracking::parse_output_and_offset_from_satpoint,
-};
+use crate::core::protocol::satoshi_tracking::parse_output_and_offset_from_satpoint;
 
 use super::{
     brc20_pg,
@@ -24,11 +23,13 @@ use super::{
 
 /// If the given `config` has BRC-20 enabled, returns a BRC-20 memory cache.
 pub fn brc20_new_cache(config: &Config) -> Option<Brc20MemoryCache> {
-    if config.meta_protocols.brc20 {
-        Some(Brc20MemoryCache::new(config.resources.brc20_lru_cache_size))
-    } else {
-        None
+    let Some(brc20) = config.ordinals_brc20_config() else {
+        return None;
+    };
+    if !brc20.enabled {
+        return None;
     }
+    Some(Brc20MemoryCache::new(brc20.lru_cache_size))
 }
 
 /// Keeps BRC20 DB rows before they're inserted into Postgres. Use `flush` to insert.

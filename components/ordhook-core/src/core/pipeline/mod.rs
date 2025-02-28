@@ -1,15 +1,14 @@
 pub mod processors;
 
-use chainhook_sdk::observer::BitcoinConfig;
 use chainhook_sdk::utils::Context;
-use chainhook_types::BitcoinBlockData;
+use chainhook_types::{BitcoinBlockData, BitcoinNetwork};
+use config::Config;
 use crossbeam_channel::bounded;
 use std::collections::{HashMap, VecDeque};
 use std::thread::{sleep, JoinHandle};
 use std::time::Duration;
 use tokio::task::JoinSet;
 
-use crate::config::Config;
 use crate::db::cursor::BlockBytesCursor;
 use crate::{try_debug, try_info};
 
@@ -44,20 +43,12 @@ pub async fn bitcoind_download_blocks(
     speed: usize,
     ctx: &Context,
 ) -> Result<(), String> {
-    let bitcoin_config = BitcoinConfig {
-        username: config.network.bitcoind_rpc_username.clone(),
-        password: config.network.bitcoind_rpc_password.clone(),
-        rpc_url: config.network.bitcoind_rpc_url.clone(),
-        network: config.network.bitcoin_network.clone(),
-        bitcoin_block_signaling: config.network.bitcoin_block_signaling.clone(),
-    };
-
     let number_of_blocks_to_process = blocks.len() as u64;
 
     let (block_compressed_tx, block_compressed_rx) = crossbeam_channel::bounded(speed);
     let http_client = build_http_client();
 
-    let moved_config = bitcoin_config.clone();
+    let moved_config = config.bitcoind.clone();
     let moved_ctx = ctx.clone();
     let moved_http_client = http_client.clone();
 
@@ -99,7 +90,7 @@ pub async fn bitcoind_download_blocks(
     }
 
     let moved_ctx: Context = ctx.clone();
-    let moved_bitcoin_network = bitcoin_config.network.clone();
+    let moved_bitcoin_network = config.bitcoind.network.clone();
 
     let mut tx_thread_pool = vec![];
     let mut rx_thread_pool = vec![];
@@ -127,7 +118,7 @@ pub async fn bitcoind_download_blocks(
                     let block_data = if block_height >= start_sequencing_blocks_at_height {
                         let block = standardize_bitcoin_block(
                             raw_block_data,
-                            &moved_bitcoin_network,
+                            &BitcoinNetwork::from_network(moved_bitcoin_network),
                             &moved_ctx,
                         )
                         .expect("unable to deserialize block");

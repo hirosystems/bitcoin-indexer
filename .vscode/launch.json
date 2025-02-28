@@ -20,7 +20,7 @@
       "request": "launch",
       "name": "run: ordhook service",
       "cargo": {
-        "args": ["build", "--bin=ordhook", "--package=ordhook-cli"],
+        "args": ["build", "--bin=ordhook", "--package=cli"],
         "filter": {
           "name": "ordhook",
           "kind": "bin"
@@ -29,7 +29,7 @@
       "args": [
         "service",
         "start",
-        "--config-path=${workspaceFolder}/.vscode/ordhook.toml",
+        "--config-path=${workspaceFolder}/.vscode/Indexer.toml",
       ],
       "cwd": "${workspaceFolder}"
     },
@@ -38,7 +38,7 @@
       "request": "launch",
       "name": "Debug unit tests in executable 'ordhook'",
       "cargo": {
-        "args": ["test", "--no-run", "--bin=ordhook", "--package=ordhook-cli"],
+        "args": ["test", "--no-run", "--bin=ordhook", "--package=cli"],
         "filter": {
           "name": "ordhook",
           "kind": "bin"

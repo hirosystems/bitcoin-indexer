@@ -6,32 +6,39 @@ pub mod ordinals_pg;
 use chainhook_postgres::pg_connect_with_retry;
 
 use chainhook_sdk::utils::Context;
+use config::Config;
 
-use crate::{config::Config, core::meta_protocols::brc20::brc20_pg, try_info, try_warn};
+use crate::{core::meta_protocols::brc20::brc20_pg, try_info, try_warn};
 
 pub async fn migrate_dbs(config: &Config, ctx: &Context) -> Result<(), String> {
+    let Some(ordinals) = &config.ordinals else {
+        unreachable!()
+    };
     {
         try_info!(ctx, "Running ordinals DB migrations");
-        let mut pg_client = pg_connect_with_retry(&config.ordinals_db).await;
+        let mut pg_client = pg_connect_with_retry(&ordinals.db).await;
         ordinals_pg::migrate(&mut pg_client).await?;
     }
-    if let (Some(brc20_db), true) = (&config.brc20_db, config.meta_protocols.brc20) {
+    if let Some(brc20) = config.ordinals_brc20_config() {
         try_info!(ctx, "Running brc20 DB migrations");
-        let mut pg_client = pg_connect_with_retry(&brc20_db).await;
+        let mut pg_client = pg_connect_with_retry(&brc20.db).await;
         brc20_pg::migrate(&mut pg_client).await?;
     }
     Ok(())
 }
 
 pub async fn reset_dbs(config: &Config, ctx: &Context) -> Result<(), String> {
+    let Some(ordinals) = &config.ordinals else {
+        unreachable!()
+    };
     {
         try_warn!(ctx, "Resetting ordinals DB");
-        let mut pg_client = pg_connect_with_retry(&config.ordinals_db).await;
+        let mut pg_client = pg_connect_with_retry(&ordinals.db).await;
         pg_reset_db(&mut pg_client).await?;
     }
-    if let (Some(brc20_db), true) = (&config.brc20_db, config.meta_protocols.brc20) {
+    if let Some(brc20) = config.ordinals_brc20_config() {
         try_warn!(ctx, "Resetting brc20 DB");
-        let mut pg_client = pg_connect_with_retry(&brc20_db).await;
+        let mut pg_client = pg_connect_with_retry(&brc20.db).await;
         pg_reset_db(&mut pg_client).await?;
     }
     Ok(())
@@ -62,8 +69,8 @@ pub async fn pg_reset_db(pg_client: &mut tokio_postgres::Client) -> Result<(), S
 }
 
 #[cfg(test)]
-pub fn pg_test_config() -> chainhook_postgres::PgConnectionConfig {
-    chainhook_postgres::PgConnectionConfig {
+pub fn pg_test_config() -> config::PgDatabaseConfig {
+    config::PgDatabaseConfig {
         dbname: "postgres".to_string(),
         host: "localhost".to_string(),
         port: 5432,

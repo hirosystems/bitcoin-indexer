@@ -8,6 +8,7 @@ use std::{
 use chainhook_postgres::{pg_begin, pg_pool_client};
 use chainhook_sdk::utils::Context;
 use chainhook_types::{BitcoinBlockData, TransactionIdentifier};
+use config::Config;
 use crossbeam_channel::TryRecvError;
 
 use dashmap::DashMap;
@@ -25,8 +26,9 @@ use crate::{
         protocol::{
             inscription_parsing::parse_inscriptions_in_standardized_block,
             inscription_sequencing::{
-                update_block_inscriptions_with_consensus_sequence_data, get_bitcoin_network, get_jubilee_block_height,
+                get_bitcoin_network, get_jubilee_block_height,
                 parallelize_inscription_data_computations,
+                update_block_inscriptions_with_consensus_sequence_data,
             },
             satoshi_numbering::TraversalResult,
             satoshi_tracking::augment_block_with_transfers,
@@ -39,12 +41,9 @@ use crate::{
     utils::monitoring::PrometheusMonitoring,
 };
 
-use crate::{
-    config::Config,
-    core::{
-        new_traversals_lazy_cache,
-        pipeline::{PostProcessorCommand, PostProcessorController, PostProcessorEvent},
-    },
+use crate::core::{
+    new_traversals_lazy_cache,
+    pipeline::{PostProcessorCommand, PostProcessorController, PostProcessorEvent},
 };
 
 pub fn start_inscription_indexing_processor(
@@ -224,8 +223,14 @@ pub async fn index_block(
             ctx,
         )?;
         if has_inscription_reveals {
-            update_block_inscriptions_with_consensus_sequence_data(block, sequence_cursor, cache_l1, &ord_tx, ctx)
-                .await?;
+            update_block_inscriptions_with_consensus_sequence_data(
+                block,
+                sequence_cursor,
+                cache_l1,
+                &ord_tx,
+                ctx,
+            )
+            .await?;
         }
         augment_block_with_transfers(block, &ord_tx, ctx).await?;
 
@@ -274,7 +279,7 @@ pub async fn index_block(
 
 pub async fn rollback_block(
     block_height: u64,
-    config: &Config,
+    _config: &Config,
     pg_pools: &PgConnectionPools,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -286,7 +291,7 @@ pub async fn rollback_block(
         ordinals_pg::rollback_block(block_height, &ord_tx).await?;
 
         // BRC-20
-        if let (true, Some(brc20_pool)) = (config.meta_protocols.brc20, &pg_pools.brc20) {
+        if let Some(brc20_pool) = &pg_pools.brc20 {
             let mut brc20_client = pg_pool_client(brc20_pool).await?;
             let brc20_tx = pg_begin(&mut brc20_client).await?;
 

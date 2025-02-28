@@ -1,6 +1,7 @@
 pub mod types;
 pub mod utils;
 
+use config::PgDatabaseConfig;
 use deadpool_postgres::{Manager, ManagerConfig, Object, Pool, RecyclingMethod, Transaction};
 use tokio_postgres::{Client, Config, NoTls, Row};
 
@@ -9,21 +10,9 @@ use tokio_postgres::{Client, Config, NoTls, Row};
 /// vary depending on column counts. Queries should use other custom chunk sizes as needed.
 pub const BATCH_QUERY_CHUNK_SIZE: usize = 500;
 
-/// A Postgres configuration for a single database.
-#[derive(Clone, Debug)]
-pub struct PgConnectionConfig {
-    pub dbname: String,
-    pub host: String,
-    pub port: u16,
-    pub user: String,
-    pub password: Option<String>,
-    pub search_path: Option<String>,
-    pub pool_max_size: Option<usize>,
-}
-
 /// Creates a Postgres connection pool based on a single database config. You can then use this pool to create ad-hoc clients and
 /// transactions for interacting with the database.
-pub fn pg_pool(config: &PgConnectionConfig) -> Result<Pool, String> {
+pub fn pg_pool(config: &PgDatabaseConfig) -> Result<Pool, String> {
     let mut pg_config = Config::new();
     pg_config
         .dbname(&config.dbname)
@@ -69,7 +58,7 @@ pub async fn pg_begin(client: &mut Object) -> Result<Transaction<'_>, String> {
 }
 
 /// Connects to postgres directly (without a Pool) and returns an open client.
-pub async fn pg_connect(config: &PgConnectionConfig) -> Result<Client, String> {
+pub async fn pg_connect(config: &PgDatabaseConfig) -> Result<Client, String> {
     let mut pg_config = Config::new();
     pg_config
         .dbname(&config.dbname)
@@ -93,7 +82,7 @@ pub async fn pg_connect(config: &PgConnectionConfig) -> Result<Client, String> {
 }
 
 /// Connects to postgres with infinite retries and returns an open client.
-pub async fn pg_connect_with_retry(config: &PgConnectionConfig) -> Client {
+pub async fn pg_connect_with_retry(config: &PgDatabaseConfig) -> Client {
     loop {
         match pg_connect(config).await {
             Ok(client) => return client,
@@ -154,11 +143,13 @@ pub async fn pg_test_roll_back_migrations(pg_client: &mut tokio_postgres::Client
 
 #[cfg(test)]
 mod test {
+    use config::PgDatabaseConfig;
+
     use crate::{pg_begin, pg_pool, pg_pool_client};
 
     #[tokio::test]
     async fn test_pg_connection_and_transaction() -> Result<(), String> {
-        let pool = pg_pool(&crate::PgConnectionConfig {
+        let pool = pg_pool(&PgDatabaseConfig {
             dbname: "postgres".to_string(),
             host: "localhost".to_string(),
             port: 5432,

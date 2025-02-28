@@ -6,11 +6,11 @@ use chainhook_types::{
     OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,
     OrdinalOperation,
 };
+use config::Config;
 use serde_json::json;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use crate::config::Config;
 use crate::core::meta_protocols::brc20::brc20_activation_height;
 use crate::core::meta_protocols::brc20::parser::{parse_brc20_operation, ParsedBrc20Operation};
 use crate::try_warn;
@@ -132,18 +132,19 @@ pub fn parse_inscriptions_from_standardized_tx(
             tx.transaction_identifier.get_hash_bytes_str(),
         ) {
             for (reveal, inscription) in inscriptions.into_iter() {
-                if config.meta_protocols.brc20
-                    && block_identifier.index >= brc20_activation_height(&network)
-                {
-                    match parse_brc20_operation(&inscription) {
-                        Ok(Some(op)) => {
-                            brc20_operation_map.insert(reveal.inscription_id.clone(), op);
-                        }
-                        Ok(None) => {}
-                        Err(e) => {
-                            try_warn!(ctx, "Error parsing BRC-20 operation: {}", e);
-                        }
-                    };
+                if let Some(brc20) = config.ordinals_brc20_config() {
+                    if brc20.enabled && block_identifier.index >= brc20_activation_height(&network)
+                    {
+                        match parse_brc20_operation(&inscription) {
+                            Ok(Some(op)) => {
+                                brc20_operation_map.insert(reveal.inscription_id.clone(), op);
+                            }
+                            Ok(None) => {}
+                            Err(e) => {
+                                try_warn!(ctx, "Error parsing BRC-20 operation: {}", e);
+                            }
+                        };
+                    }
                 }
                 operations.push(OrdinalOperation::InscriptionRevealed(reveal));
             }
@@ -176,11 +177,9 @@ mod test {
 
     use chainhook_sdk::utils::Context;
     use chainhook_types::OrdinalOperation;
+    use config::Config;
 
-    use crate::{
-        config::Config,
-        core::test_builders::{TestBlockBuilder, TestTransactionBuilder, TestTxInBuilder},
-    };
+    use crate::core::test_builders::{TestBlockBuilder, TestTransactionBuilder, TestTxInBuilder};
 
     use super::parse_inscriptions_in_standardized_block;
 

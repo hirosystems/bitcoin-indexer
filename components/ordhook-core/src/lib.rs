@@ -9,9 +9,7 @@ extern crate lazy_static;
 
 extern crate serde;
 
-pub mod config;
 pub mod core;
 pub mod db;
-pub mod download;
 pub mod service;
 pub mod utils;

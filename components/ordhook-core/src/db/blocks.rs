@@ -1,10 +1,11 @@
 use std::{path::PathBuf, thread::sleep, time::Duration};
 
 use chainhook_sdk::utils::Context;
+use config::Config;
 use rand::{rng, Rng};
 use rocksdb::{DBPinnableSlice, Options, DB};
 
-use crate::{config::Config, try_error, try_warn};
+use crate::{try_error, try_warn};
 
 fn get_default_blocks_db_path(base_dir: &PathBuf) -> PathBuf {
     let mut destination_path = base_dir.clone();

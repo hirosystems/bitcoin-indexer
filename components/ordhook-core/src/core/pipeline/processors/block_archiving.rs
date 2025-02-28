@@ -1,5 +1,6 @@
 use chainhook_sdk::utils::Context;
 use chainhook_types::BitcoinBlockData;
+use config::Config;
 use crossbeam_channel::{Sender, TryRecvError};
 use rocksdb::DB;
 use std::{
@@ -8,7 +9,6 @@ use std::{
 };
 
 use crate::{
-    config::Config,
     core::pipeline::{PostProcessorCommand, PostProcessorController, PostProcessorEvent},
     db::blocks::{insert_entry_in_blocks, open_blocks_db_with_retry},
     try_error, try_info,

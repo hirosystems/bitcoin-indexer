@@ -20,7 +20,7 @@ components/chainhook-types-js/dist
 *.rdb
 /Ordhook.toml
 
-cache/
+/cache/
 ./tests
 tmp/
 data

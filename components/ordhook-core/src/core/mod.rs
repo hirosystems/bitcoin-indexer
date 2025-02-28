@@ -4,17 +4,17 @@ pub mod protocol;
 #[cfg(test)]
 pub mod test_builders;
 
+use bitcoin::Network;
 use chainhook_postgres::pg_pool_client;
+use config::Config;
 use dashmap::DashMap;
 use fxhash::{FxBuildHasher, FxHasher};
 use std::hash::BuildHasherDefault;
 use std::ops::Div;
 
 use chainhook_sdk::utils::Context;
-use chainhook_types::BitcoinNetwork;
 
 use crate::{
-    config::Config,
     db::{
         blocks::{
             find_last_block_inserted, find_pinned_block_bytes_at_block_height,
@@ -23,16 +23,18 @@ use crate::{
         cursor::TransactionBytesCursor,
         ordinals_pg,
     },
-    service::PgConnectionPools
+    service::PgConnectionPools,
 };
 use chainhook_sdk::utils::bitcoind::bitcoind_get_block_height;
 
 pub fn first_inscription_height(config: &Config) -> u64 {
-    match config.network.bitcoin_network {
-        BitcoinNetwork::Mainnet => 767430,
-        BitcoinNetwork::Regtest => 1,
-        BitcoinNetwork::Testnet => 2413343,
-        BitcoinNetwork::Signet => 112402,
+    match config.bitcoind.network {
+        Network::Bitcoin => 767430,
+        Network::Regtest => 1,
+        Network::Testnet => 2413343,
+        Network::Testnet4 => 0,
+        Network::Signet => 112402,
+        _ => unreachable!(),
     }
 }
 
@@ -164,7 +166,7 @@ pub async fn should_sync_ordinals_db(
     };
 
     // TODO: Gracefully handle Regtest, Testnet and Signet
-    let end_block = bitcoind_get_block_height(&config.network, ctx);
+    let end_block = bitcoind_get_block_height(&config.bitcoind, ctx);
     let (mut end_block, speed) = if start_block < 200_000 {
         (end_block.min(200_000), 10_000)
     } else if start_block < 550_000 {

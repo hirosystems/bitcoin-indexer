@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::core::meta_protocols::brc20::cache::{brc20_new_cache, Brc20MemoryCache};
 use crate::core::pipeline::bitcoind_download_blocks;
 use crate::core::pipeline::processors::block_archiving::start_block_archiving_processor;
@@ -10,9 +9,7 @@ use crate::core::{
     first_inscription_height, new_traversals_lazy_cache, should_sync_ordinals_db,
     should_sync_rocks_db,
 };
-use crate::db::blocks::{
-    self, find_missing_blocks, open_blocks_db_with_retry, run_compaction,
-};
+use crate::db::blocks::{self, find_missing_blocks, open_blocks_db_with_retry, run_compaction};
 use crate::db::cursor::{BlockBytesCursor, TransactionBytesCursor};
 use crate::db::ordinals_pg;
 use crate::utils::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring};
@@ -24,6 +21,7 @@ use chainhook_sdk::observer::{
 use chainhook_sdk::utils::bitcoind::bitcoind_wait_for_chain_tip;
 use chainhook_sdk::utils::{BlockHeights, Context};
 use chainhook_types::BlockIdentifier;
+use config::{Config, OrdinalsMetaProtocolsConfig};
 use crossbeam_channel::select;
 use dashmap::DashMap;
 use deadpool_postgres::Pool;
@@ -49,14 +47,22 @@ pub struct Service {
 
 impl Service {
     pub fn new(config: &Config, ctx: &Context) -> Self {
+        let Some(ordinals_config) = &config.ordinals else {
+            unreachable!();
+        };
         Self {
             prometheus: PrometheusMonitoring::new(),
             config: config.clone(),
             ctx: ctx.clone(),
             pg_pools: PgConnectionPools {
-                ordinals: pg_pool(&config.ordinals_db).unwrap(),
-                brc20: match (config.meta_protocols.brc20, &config.brc20_db) {
-                    (true, Some(brc20_db)) => Some(pg_pool(&brc20_db).unwrap()),
+                ordinals: pg_pool(&ordinals_config.db).unwrap(),
+                brc20: match &ordinals_config.meta_protocols {
+                    Some(OrdinalsMetaProtocolsConfig {
+                        brc20: Some(brc20), ..
+                    }) => match brc20.enabled {
+                        true => Some(pg_pool(&brc20.db).unwrap()),
+                        false => None,
+                    },
                     _ => None,
                 },
             },
@@ -85,16 +91,19 @@ impl Service {
 
     pub async fn run(&mut self, check_blocks_integrity: bool) -> Result<(), String> {
         // 1: Initialize Prometheus monitoring server.
-        if let Some(port) = self.config.network.prometheus_monitoring_port {
-            let registry_moved = self.prometheus.registry.clone();
-            let ctx_cloned = self.ctx.clone();
-            let _ = std::thread::spawn(move || {
-                let _ = hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
-                    port,
-                    registry_moved,
-                    ctx_cloned,
-                ));
-            });
+        if let Some(metrics) = &self.config.metrics {
+            if metrics.enabled {
+                let registry_moved = self.prometheus.registry.clone();
+                let ctx_cloned = self.ctx.clone();
+                let port = metrics.prometheus_port;
+                let _ = std::thread::spawn(move || {
+                    let _ = hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
+                        port,
+                        registry_moved,
+                        ctx_cloned,
+                    ));
+                });
+            }
         }
         let (max_inscription_number, chain_tip) = {
             let ord_client = pg_pool_client(&self.pg_pools.ordinals).await?;
@@ -122,15 +131,10 @@ impl Service {
         let zmq_observer_sidecar = self.set_up_bitcoin_zmq_observer_sidecar()?;
         let (observer_command_tx, observer_command_rx) = channel();
         let (observer_event_tx, observer_event_rx) = crossbeam_channel::unbounded();
-        let inner_ctx = if self.config.logs.chainhook_internals {
-            self.ctx.clone()
-        } else {
-            Context::empty()
-        };
+        let inner_ctx = self.ctx.clone();
 
-        let event_observer_config = self.config.get_event_observer_config();
         let _ = start_event_observer(
-            event_observer_config,
+            self.config.bitcoind.clone(),
             observer_command_tx.clone(),
             observer_command_rx,
             Some(observer_event_tx),
@@ -224,7 +228,7 @@ impl Service {
     }
 
     pub async fn check_blocks_db_integrity(&mut self) -> Result<(), String> {
-        bitcoind_wait_for_chain_tip(&self.config.network, &self.ctx);
+        bitcoind_wait_for_chain_tip(&self.config.bitcoind, &self.ctx);
         let (tip, missing_blocks) = {
             let blocks_db = open_blocks_db_with_retry(false, &self.config, &self.ctx);
             let ord_client = pg_pool_client(&self.pg_pools.ordinals).await?;
@@ -263,7 +267,7 @@ impl Service {
     /// Synchronizes and indexes all databases until their block height matches bitcoind's block height.
     pub async fn catch_up_to_bitcoin_chain_tip(&self) -> Result<(), String> {
         // 0: Make sure bitcoind is synchronized.
-        bitcoind_wait_for_chain_tip(&self.config.network, &self.ctx);
+        bitcoind_wait_for_chain_tip(&self.config.bitcoind, &self.ctx);
 
         // 1: Catch up blocks DB so it is at least at the same height as the ordinals DB.
         if let Some((start_block, end_block)) =

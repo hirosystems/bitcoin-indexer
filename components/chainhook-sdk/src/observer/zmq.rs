@@ -1,4 +1,4 @@
-use chainhook_types::BitcoinBlockSignaling;
+use config::BitcoindConfig;
 use hiro_system_kit::slog;
 use std::sync::mpsc::Sender;
 use zmq::Socket;
@@ -13,7 +13,7 @@ use crate::{
 };
 use std::collections::VecDeque;
 
-use super::{EventObserverConfig, ObserverCommand};
+use super::ObserverCommand;
 
 fn new_zmq_socket() -> Socket {
     let context = zmq::Context::new();
@@ -32,14 +32,11 @@ fn new_zmq_socket() -> Socket {
 }
 
 pub async fn start_zeromq_runloop(
-    config: &EventObserverConfig,
+    config: &BitcoindConfig,
     observer_commands_tx: Sender<ObserverCommand>,
     ctx: &Context,
 ) {
-    let BitcoinBlockSignaling::ZeroMQ(ref bitcoind_zmq_url) = config.bitcoin_block_signaling;
-
-    let bitcoind_zmq_url = bitcoind_zmq_url.clone();
-    let bitcoin_config = config.get_bitcoin_config();
+    let bitcoind_zmq_url = config.zmq_url.clone();
     let http_client = build_http_client();
 
     try_info!(
@@ -88,7 +85,7 @@ pub async fn start_zeromq_runloop(
             let block = match download_and_parse_block_with_retry(
                 &http_client,
                 &block_hash,
-                &bitcoin_config,
+                &config,
                 ctx,
             )
             .await

@@ -3,9 +3,8 @@ pub mod fork_scratch_pad;
 
 use crate::utils::{AbstractBlock, Context};
 
-use chainhook_types::{
-    BitcoinBlockSignaling, BitcoinNetwork, BlockHeader, BlockIdentifier, BlockchainEvent,
-};
+use chainhook_types::{BlockHeader, BlockIdentifier, BlockchainEvent};
+use config::BitcoindConfig;
 use hiro_system_kit::slog;
 
 use std::collections::VecDeque;
@@ -32,24 +31,14 @@ impl BitcoinChainContext {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct IndexerConfig {
-    pub bitcoin_network: BitcoinNetwork,
-    pub bitcoind_rpc_url: String,
-    pub bitcoind_rpc_username: String,
-    pub bitcoind_rpc_password: String,
-    pub bitcoin_block_signaling: BitcoinBlockSignaling,
-    pub prometheus_monitoring_port: Option<u16>,
-}
-
 pub struct Indexer {
-    pub config: IndexerConfig,
+    pub config: BitcoindConfig,
     bitcoin_blocks_pool: ForkScratchPad,
     pub bitcoin_context: BitcoinChainContext,
 }
 
 impl Indexer {
-    pub fn new(config: IndexerConfig) -> Indexer {
+    pub fn new(config: BitcoindConfig) -> Indexer {
         let bitcoin_blocks_pool = ForkScratchPad::new();
         let bitcoin_context = BitcoinChainContext::new();
 

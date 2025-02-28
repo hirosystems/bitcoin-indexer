@@ -1,11 +1,7 @@
-#[macro_use]
-extern crate serde_derive;
+pub mod cli;
 
 #[macro_use]
 extern crate hiro_system_kit;
-
-pub mod cli;
-pub mod config;
 
 #[cfg(feature = "tcmalloc")]
 #[global_allocator]

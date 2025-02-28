@@ -5,8 +5,8 @@ use fxhash::FxHasher;
 use std::hash::BuildHasherDefault;
 use std::sync::Arc;
 
-use crate::config::Config;
 use crate::db::blocks::find_pinned_block_bytes_at_block_height;
+use config::Config;
 
 use crate::db::cursor::{BlockBytesCursor, TransactionBytesCursor};
 use crate::try_error;
@@ -319,7 +319,6 @@ mod test {
     use fxhash::FxHasher;
 
     use crate::{
-        config::Config,
         core::{
             new_traversals_lazy_cache,
             test_builders::{TestBlockBuilder, TestTransactionBuilder, TestTxInBuilder},
@@ -330,6 +329,7 @@ mod test {
             drop_all_dbs,
         },
     };
+    use config::Config;
 
     use super::compute_satoshi_number;
 

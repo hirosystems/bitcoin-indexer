@@ -7,9 +7,10 @@ use crate::indexer::bitcoin::{
 use crate::utils::Context;
 
 use chainhook_types::{
-    BitcoinBlockData, BitcoinBlockSignaling, BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData,
+    BitcoinBlockData, BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData,
     BitcoinChainUpdatedWithReorgData, BitcoinNetwork, BlockIdentifier, BlockchainEvent,
 };
+use config::BitcoindConfig;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use rocket::serde::Deserialize;
@@ -30,153 +31,6 @@ pub struct NewTransaction {
 #[derive(Clone, Debug)]
 pub enum Event {
     BitcoinChainEvent(BitcoinChainEvent),
-}
-
-#[derive(Debug, Clone)]
-pub struct EventObserverConfig {
-    pub bitcoind_rpc_username: String,
-    pub bitcoind_rpc_password: String,
-    pub bitcoind_rpc_url: String,
-    pub bitcoin_block_signaling: BitcoinBlockSignaling,
-    pub bitcoin_network: BitcoinNetwork,
-}
-
-/// A builder that is used to create a general purpose [EventObserverConfig].
-///
-/// ## Examples
-/// ```
-/// use chainhook_sdk::observer::EventObserverConfig;
-/// use chainhook_sdk::observer::EventObserverConfigBuilder;
-///
-/// fn get_config() -> Result<EventObserverConfig, String> {
-///     EventObserverConfigBuilder::new()
-///         .bitcoind_rpc_password("my_password")
-///         .bitcoin_network("mainnet")
-///         .finish()
-/// }
-/// ```
-#[derive(Deserialize, Debug, Clone)]
-pub struct EventObserverConfigBuilder {
-    pub bitcoind_rpc_username: Option<String>,
-    pub bitcoind_rpc_password: Option<String>,
-    pub bitcoind_rpc_url: Option<String>,
-    pub bitcoind_zmq_url: Option<String>,
-    pub bitcoin_network: Option<String>,
-}
-
-impl Default for EventObserverConfigBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EventObserverConfigBuilder {
-    pub fn new() -> Self {
-        EventObserverConfigBuilder {
-            bitcoind_rpc_username: None,
-            bitcoind_rpc_password: None,
-            bitcoind_rpc_url: None,
-            bitcoind_zmq_url: None,
-            bitcoin_network: None,
-        }
-    }
-
-    /// Sets the bitcoind node's RPC username.
-    pub fn bitcoind_rpc_username(&mut self, username: &str) -> &mut Self {
-        self.bitcoind_rpc_username = Some(username.to_string());
-        self
-    }
-
-    /// Sets the bitcoind node's RPC password.
-    pub fn bitcoind_rpc_password(&mut self, password: &str) -> &mut Self {
-        self.bitcoind_rpc_password = Some(password.to_string());
-        self
-    }
-
-    /// Sets the bitcoind node's RPC url.
-    pub fn bitcoind_rpc_url(&mut self, url: &str) -> &mut Self {
-        self.bitcoind_rpc_url = Some(url.to_string());
-        self
-    }
-
-    /// Sets the bitcoind node's ZMQ url, used by the observer to receive new block events from bitcoind.
-    pub fn bitcoind_zmq_url(&mut self, url: &str) -> &mut Self {
-        self.bitcoind_zmq_url = Some(url.to_string());
-        self
-    }
-
-    /// Sets the Bitcoin network. Must be a valid bitcoin network string according to [BitcoinNetwork::from_str].
-    pub fn bitcoin_network(&mut self, network: &str) -> &mut Self {
-        self.bitcoin_network = Some(network.to_string());
-        self
-    }
-
-    /// Attempts to convert a [EventObserverConfigBuilder] instance into an [EventObserverConfig], filling in
-    /// defaults as necessary according to [EventObserverConfig::default].
-    ///
-    /// This function will return an error if the `bitcoin_network` or `stacks_network` strings are set and are not a valid [BitcoinNetwork] or [StacksNetwork].
-    ///
-    pub fn finish(&self) -> Result<EventObserverConfig, String> {
-        EventObserverConfig::new_using_overrides(Some(self))
-    }
-}
-
-impl EventObserverConfig {
-    pub fn default() -> Self {
-        EventObserverConfig {
-            bitcoind_rpc_username: "devnet".into(),
-            bitcoind_rpc_password: "devnet".into(),
-            bitcoind_rpc_url: "http://localhost:18443".into(),
-            bitcoin_block_signaling: BitcoinBlockSignaling::ZeroMQ(
-                "tcp://localhost:18543".to_string(),
-            ),
-            bitcoin_network: BitcoinNetwork::Regtest,
-        }
-    }
-
-    pub fn get_bitcoin_config(&self) -> BitcoinConfig {
-        BitcoinConfig {
-            username: self.bitcoind_rpc_username.clone(),
-            password: self.bitcoind_rpc_password.clone(),
-            rpc_url: self.bitcoind_rpc_url.clone(),
-            network: self.bitcoin_network.clone(),
-            bitcoin_block_signaling: self.bitcoin_block_signaling.clone(),
-        }
-    }
-
-    /// Helper to allow overriding some default fields in creating a new EventObserverConfig.
-    ///
-    /// *Note: This is used by external crates, so it should not be removed, even if not used internally by Chainhook.*
-    pub fn new_using_overrides(
-        overrides: Option<&EventObserverConfigBuilder>,
-    ) -> Result<EventObserverConfig, String> {
-        let bitcoin_network =
-            if let Some(network) = overrides.and_then(|c| c.bitcoin_network.as_ref()) {
-                BitcoinNetwork::from_str(network)?
-            } else {
-                BitcoinNetwork::Regtest
-            };
-
-        let config = EventObserverConfig {
-            bitcoind_rpc_username: overrides
-                .and_then(|c| c.bitcoind_rpc_username.clone())
-                .unwrap_or_else(|| "devnet".to_string()),
-            bitcoind_rpc_password: overrides
-                .and_then(|c| c.bitcoind_rpc_password.clone())
-                .unwrap_or_else(|| "devnet".to_string()),
-            bitcoind_rpc_url: overrides
-                .and_then(|c| c.bitcoind_rpc_url.clone())
-                .unwrap_or_else(|| "http://localhost:18443".to_string()),
-            bitcoin_block_signaling: overrides
-                .and_then(|c| c.bitcoind_zmq_url.as_ref())
-                .map(|url| BitcoinBlockSignaling::ZeroMQ(url.clone()))
-                .unwrap_or_else(|| {
-                    BitcoinBlockSignaling::ZeroMQ("tcp://localhost:18543".to_string())
-                }),
-            bitcoin_network,
-        };
-        Ok(config)
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -218,15 +72,6 @@ pub struct BitcoinRPCRequest {
     pub id: serde_json::Value,
     /// jsonrpc field, MUST be "2.0"
     pub jsonrpc: serde_json::Value,
-}
-
-#[derive(Debug, Clone)]
-pub struct BitcoinConfig {
-    pub username: String,
-    pub password: String,
-    pub rpc_url: String,
-    pub network: BitcoinNetwork,
-    pub bitcoin_block_signaling: BitcoinBlockSignaling,
 }
 
 #[derive(Debug, Clone)]
@@ -303,14 +148,14 @@ impl ObserverSidecar {
 /// ### Examples
 /// ```
 /// use chainhook_sdk::observer::EventObserverBuilder;
-/// use chainhook_sdk::observer::EventObserverConfig;
 /// use chainhook_sdk::observer::ObserverCommand;
 /// use chainhook_sdk::utils::Context;
+/// use config::BitcoindConfig;
 /// use std::error::Error;
 /// use std::sync::mpsc::{Receiver, Sender};
 ///
 /// fn start_event_observer(
-///     config: EventObserverConfig,
+///     config: BitcoindConfig,
 ///     observer_commands_tx: &Sender<ObserverCommand>,
 ///     observer_commands_rx: Receiver<ObserverCommand>,
 ///     ctx: &Context,
@@ -325,7 +170,7 @@ impl ObserverSidecar {
 /// }
 /// ```
 pub struct EventObserverBuilder {
-    config: EventObserverConfig,
+    config: BitcoindConfig,
     observer_commands_tx: Sender<ObserverCommand>,
     observer_commands_rx: Receiver<ObserverCommand>,
     ctx: Context,
@@ -335,7 +180,7 @@ pub struct EventObserverBuilder {
 
 impl EventObserverBuilder {
     pub fn new(
-        config: EventObserverConfig,
+        config: BitcoindConfig,
         observer_commands_tx: &Sender<ObserverCommand>,
         observer_commands_rx: Receiver<ObserverCommand>,
         ctx: &Context,
@@ -382,54 +227,54 @@ impl EventObserverBuilder {
 
 /// Spawns a thread to observe blockchain events. Use [EventObserverBuilder] to configure easily.
 pub fn start_event_observer(
-    config: EventObserverConfig,
+    config: BitcoindConfig,
     observer_commands_tx: Sender<ObserverCommand>,
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
     observer_sidecar: Option<ObserverSidecar>,
     ctx: Context,
 ) -> Result<(), Box<dyn Error>> {
-    match config.bitcoin_block_signaling {
-        BitcoinBlockSignaling::ZeroMQ(ref url) => {
-            ctx.try_log(|logger| {
-                slog::info!(logger, "Observing Bitcoin chain events via ZeroMQ: {}", url)
-            });
-            let context_cloned = ctx.clone();
-            let event_observer_config_moved = config.clone();
-            let observer_commands_tx_moved = observer_commands_tx.clone();
-            let _ = hiro_system_kit::thread_named("Chainhook event observer")
-                .spawn(move || {
-                    let future = start_bitcoin_event_observer(
-                        event_observer_config_moved,
-                        observer_commands_tx_moved,
-                        observer_commands_rx,
-                        observer_events_tx.clone(),
-                        observer_sidecar,
-                        context_cloned.clone(),
-                    );
-                    match hiro_system_kit::nestable_block_on(future) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            if let Some(tx) = observer_events_tx {
-                                context_cloned.try_log(|logger| {
-                                    slog::crit!(
-                                        logger,
-                                        "Chainhook event observer thread failed with error: {e}",
-                                    )
-                                });
-                                let _ = tx.send(ObserverEvent::Terminate);
-                            }
-                        }
+    ctx.try_log(|logger| {
+        slog::info!(
+            logger,
+            "Observing Bitcoin chain events via ZeroMQ: {}",
+            config.zmq_url
+        )
+    });
+    let context_cloned = ctx.clone();
+    let event_observer_config_moved = config.clone();
+    let observer_commands_tx_moved = observer_commands_tx.clone();
+    let _ = hiro_system_kit::thread_named("Chainhook event observer")
+        .spawn(move || {
+            let future = start_bitcoin_event_observer(
+                event_observer_config_moved,
+                observer_commands_tx_moved,
+                observer_commands_rx,
+                observer_events_tx.clone(),
+                observer_sidecar,
+                context_cloned.clone(),
+            );
+            match hiro_system_kit::nestable_block_on(future) {
+                Ok(_) => {}
+                Err(e) => {
+                    if let Some(tx) = observer_events_tx {
+                        context_cloned.try_log(|logger| {
+                            slog::crit!(
+                                logger,
+                                "Chainhook event observer thread failed with error: {e}",
+                            )
+                        });
+                        let _ = tx.send(ObserverEvent::Terminate);
                     }
-                })
-                .expect("unable to spawn thread");
-        }
-    }
+                }
+            }
+        })
+        .expect("unable to spawn thread");
     Ok(())
 }
 
 pub async fn start_bitcoin_event_observer(
-    config: EventObserverConfig,
+    config: BitcoindConfig,
     _observer_commands_tx: Sender<ObserverCommand>,
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
@@ -461,7 +306,7 @@ pub enum HandleBlock {
 }
 
 pub async fn start_observer_commands_handler(
-    config: EventObserverConfig,
+    config: BitcoindConfig,
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
     ingestion_shutdown: Option<Shutdown>,
@@ -496,7 +341,7 @@ pub async fn start_observer_commands_handler(
                 let block = loop {
                     match standardize_bitcoin_block(
                         block_data.clone(),
-                        &config.bitcoin_network,
+                        &BitcoinNetwork::from_network(config.network),
                         &ctx,
                     ) {
                         Ok(block) => break Some(block),
@@ -512,7 +357,7 @@ pub async fn start_observer_commands_handler(
                                 block_data = match download_and_parse_block_with_retry(
                                     &http_client,
                                     &block_hash,
-                                    &config.get_bitcoin_config(),
+                                    &config,
                                     &ctx,
                                 )
                                 .await

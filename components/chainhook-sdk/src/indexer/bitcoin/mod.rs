@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use crate::observer::BitcoinConfig;
 use crate::try_debug;
 use crate::utils::Context;
 use bitcoincore_rpc::bitcoin::hashes::Hash;
@@ -13,6 +12,7 @@ use chainhook_types::{
     BitcoinTransactionData,BitcoinTransactionMetadata, BlockHeader, BlockIdentifier, 
     TransactionIdentifier,
 };
+use config::BitcoindConfig;
 use hiro_system_kit::slog;
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
@@ -142,7 +142,7 @@ pub fn build_http_client() -> HttpClient {
 pub async fn download_and_parse_block_with_retry(
     http_client: &HttpClient,
     block_hash: &str,
-    bitcoin_config: &BitcoinConfig,
+    bitcoin_config: &BitcoindConfig,
     ctx: &Context,
 ) -> Result<BitcoinBlockFullBreakdown, String> {
     let mut errors_count = 0;
@@ -172,7 +172,7 @@ pub async fn download_and_parse_block_with_retry(
 pub async fn retrieve_block_hash_with_retry(
     http_client: &HttpClient,
     block_height: &u64,
-    bitcoin_config: &BitcoinConfig,
+    bitcoin_config: &BitcoindConfig,
     ctx: &Context,
 ) -> Result<String, String> {
     let mut errors_count = 0;
@@ -202,7 +202,7 @@ pub async fn retrieve_block_hash_with_retry(
 pub async fn retrieve_block_hash(
     http_client: &HttpClient,
     block_height: &u64,
-    bitcoin_config: &BitcoinConfig,
+    bitcoin_config: &BitcoindConfig,
     _ctx: &Context,
 ) -> Result<String, String> {
     let body = json!({
@@ -213,7 +213,7 @@ pub async fn retrieve_block_hash(
     });
     let block_hash = http_client
         .post(&bitcoin_config.rpc_url)
-        .basic_auth(&bitcoin_config.username, Some(&bitcoin_config.password))
+        .basic_auth(&bitcoin_config.rpc_username, Some(&bitcoin_config.rpc_password))
         .header("Content-Type", "application/json")
         .header("Host", &bitcoin_config.rpc_url[7..])
         .json(&body)
@@ -233,7 +233,7 @@ pub async fn retrieve_block_hash(
 pub async fn try_download_block_bytes_with_retry(
     http_client: HttpClient,
     block_height: u64,
-    bitcoin_config: BitcoinConfig,
+    bitcoin_config: BitcoindConfig,
     ctx: Context,
 ) -> Result<Vec<u8>, String> {
     let block_hash =
@@ -272,7 +272,7 @@ pub struct RpcErrorResponse {
 pub async fn download_block(
     http_client: &HttpClient,
     block_hash: &str,
-    bitcoin_config: &BitcoinConfig,
+    bitcoin_config: &BitcoindConfig,
     _ctx: &Context,
 ) -> Result<Vec<u8>, String> {
     let body = json!({
@@ -283,7 +283,7 @@ pub async fn download_block(
     });
     let res = http_client
         .post(&bitcoin_config.rpc_url)
-        .basic_auth(&bitcoin_config.username, Some(&bitcoin_config.password))
+        .basic_auth(&bitcoin_config.rpc_username, Some(&bitcoin_config.rpc_password))
         .header("Content-Type", "application/json")
         .header("Host", &bitcoin_config.rpc_url[7..])
         .json(&body)
@@ -329,7 +329,7 @@ pub fn parse_downloaded_block(
 pub async fn download_and_parse_block(
     http_client: &HttpClient,
     block_hash: &str,
-    bitcoin_config: &BitcoinConfig,
+    bitcoin_config: &BitcoindConfig,
     _ctx: &Context,
 ) -> Result<BitcoinBlockFullBreakdown, String> {
     let response = download_block(http_client, block_hash, bitcoin_config, _ctx).await?;

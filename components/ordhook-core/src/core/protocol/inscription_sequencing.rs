@@ -11,6 +11,7 @@ use chainhook_types::{
     OrdinalInscriptionCurseType, OrdinalInscriptionTransferDestination, OrdinalOperation,
     TransactionIdentifier,
 };
+use config::Config;
 use crossbeam_channel::unbounded;
 use dashmap::DashMap;
 use deadpool_postgres::Transaction;
@@ -18,7 +19,6 @@ use fxhash::FxHasher;
 
 use crate::core::protocol::satoshi_tracking::UNBOUND_INSCRIPTION_SATPOINT;
 use crate::{
-    config::Config,
     core::resolve_absolute_pointer,
     db::{self, cursor::TransactionBytesCursor, ordinals_pg},
     try_debug, try_error, try_info,
@@ -65,11 +65,7 @@ pub fn parallelize_inscription_data_computations(
     config: &Config,
     ctx: &Context,
 ) -> Result<bool, String> {
-    let inner_ctx = if config.logs.ordinals_internals {
-        ctx.clone()
-    } else {
-        Context::empty()
-    };
+    let inner_ctx = ctx.clone();
 
     try_debug!(
         inner_ctx,

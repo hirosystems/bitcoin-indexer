@@ -1,6 +1,7 @@
 use crate::bitcoin::{TxIn, TxOut};
 use crate::ordinals::OrdinalOperation;
 use crate::Brc20Operation;
+use bitcoin::Network;
 use schemars::JsonSchema;
 use std::cmp::Ordering;
 use std::fmt::Display;
@@ -446,17 +447,15 @@ impl BitcoinNetwork {
             BitcoinNetwork::Signet => "signet",
         }
     }
-}
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-pub enum BitcoinBlockSignaling {
-    ZeroMQ(String),
-}
-
-impl BitcoinBlockSignaling {
-    pub fn is_bitcoind_zmq_block_signaling_expected(&self) -> bool {
-        match &self {
-            _ => false,
+    pub fn from_network(network: Network) -> BitcoinNetwork {
+        match network {
+            Network::Bitcoin => BitcoinNetwork::Mainnet,
+            Network::Testnet => BitcoinNetwork::Testnet,
+            Network::Testnet4 => BitcoinNetwork::Testnet,
+            Network::Signet => BitcoinNetwork::Signet,
+            Network::Regtest => BitcoinNetwork::Regtest,
+            _ => unreachable!(),
         }
     }
 }
