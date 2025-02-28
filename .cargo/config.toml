@@ -2,6 +2,7 @@
 bitcoin-indexer-install = "install --path components/ordhook-cli --locked --force"
 bitcoin-indexer-fmt = "fmt .---config group imports=StdExternalCrate, imports_granularity=Module"
 bitcoin-indexer-clippy = "clippy --tests --all-features --all-targets -- -D warnings"
+bitcoin-indexer-clippy-cli = "clippy --tests --all-features --all-targets --message-format=short -- -D warnings"
 
 [env]
 RUST_TEST_THREADS = "1"

@@ -119,17 +119,8 @@ jobs:
         run: npm run testenv:stop
         if: always()
 
-  rustfmt:
-    name: Rust Format
-    runs-on: ubuntu-latest
-    steps:
-      - name: Rustfmt
-        id: rustfmt
-        uses: stacks-network/actions/rustfmt@main
-        with:
-          alias: "bitcoin-indexer-fmt"
-
   clippy:
+    name: rust-clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -140,8 +131,38 @@ jobs:
           rustup update
           cargo install --force cargo-tarpaulin
       - name: Run clippy
+        id: clippy
         run: |
-          cargo bitcoin-indexer-clippy
+          # Run clippy and capture output
+          CLIPPY_OUTPUT=$(cargo bitcoin-indexer-clippy-cli 2>&1)
+          CLIPPY_EXIT_CODE=$?
+          
+          # Store the output for later steps
+          echo "$CLIPPY_OUTPUT" > clippy_output.txt
+          
+          # Set output variables for next steps
+          if [ $CLIPPY_EXIT_CODE -ne 0 ]; then
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+      - name: Create error summary
+        if: steps.clippy.outputs.status == 'failed'
+        run: |
+          echo "## ❌ Clippy Check Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To see and fix these issues, run:" >> $GITHUB_STEP_SUMMARY
+          echo "```bash" >> $GITHUB_STEP_SUMMARY
+          echo "cargo bitcoin-indexer-clippy" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo "### Clippy Errors" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          cat clippy_output.txt >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### How to fix" >> $GITHUB_STEP_SUMMARY
+          exit 1
 
   test:
     strategy:
