@@ -122,6 +122,18 @@ jobs:
   rustfmt:
     name: rust-fmt
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - cli
+          - chainhook-sdk
+          - chainhook-postgres
+          - ordhook-core
+          - runes
+    defaults:
+      run:
+        working-directory: ./components/${{ matrix.suite }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -203,43 +215,6 @@ jobs:
           set -e
           exit $CLIPPY_EXIT_CODE
 
-  doc-test:
-    name: rust-doc-test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Run doctests
-        id: doctest
-        run: |
-          # Disable immediate exit on error
-          set +e
-
-          # Run doctests and capture output
-          cargo test --doc --workspace 2>&1 | tee /tmp/doctest_output.log
-          DOCTEST_EXIT_CODE=${PIPESTATUS[0]}
-
-          # Print output if doctest failed
-          if [ $DOCTEST_EXIT_CODE -ne 0 ]; then
-            echo "## ❌ Doc Tests Failed
-
-          To see and fix these issues, run:
-          \`\`\`bash
-          cargo test --doc --workspace
-          \`\`\`
-
-          ### Doctest Errors
-          \`\`\`
-          $(cat /tmp/doctest_output.log | grep -E '(error\:)|(warning\:)')
-          \`\`\`" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Enable immediate exit on error again
-          set -e
-          exit $DOCTEST_EXIT_CODE
-
   test:
     strategy:
       fail-fast: false
@@ -279,6 +254,10 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
+      - name: Run doc tests
+        run: |
+          cargo test --doc
+
       - name: Run tests
         run: |
           cargo install --force cargo-tarpaulin
@@ -299,7 +278,7 @@ jobs:
 
   semantic-release:
     runs-on: ubuntu-latest
-    needs: [api-lint, api-test, test]
+    needs: [api-lint, api-test, test, rustfmt]
     outputs:
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
       new_release_published: ${{ steps.semantic.outputs.new_release_published }}
