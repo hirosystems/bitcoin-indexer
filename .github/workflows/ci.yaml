@@ -120,7 +120,7 @@ jobs:
         if: always()
 
   rustfmt:
-    name: rustfmt
+    name: rust-fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -146,7 +146,7 @@ jobs:
           \`cargo fmt\` reported formatting errors in the following locations.
           You can fix them by executing the following command and committing the changes.
           \`\`\`bash
-          cargo fmt --all
+          cargo bitcoin-indexer-fmt
           \`\`\`
           MARKDOWN_INTRO
 
@@ -204,7 +204,7 @@ jobs:
           exit $CLIPPY_EXIT_CODE
 
   doc-test:
-    name: doc-test
+    name: rust-doc-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
