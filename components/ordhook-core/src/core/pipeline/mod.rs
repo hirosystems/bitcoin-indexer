@@ -1,21 +1,24 @@
 pub mod processors;
 
-use chainhook_sdk::utils::Context;
+use std::{
+    collections::{HashMap, VecDeque},
+    thread::{sleep, JoinHandle},
+    time::Duration,
+};
+
+use chainhook_sdk::{
+    indexer::bitcoin::{
+        build_http_client, parse_downloaded_block, standardize_bitcoin_block,
+        try_download_block_bytes_with_retry,
+    },
+    utils::Context,
+};
 use chainhook_types::{BitcoinBlockData, BitcoinNetwork};
 use config::Config;
 use crossbeam_channel::bounded;
-use std::collections::{HashMap, VecDeque};
-use std::thread::{sleep, JoinHandle};
-use std::time::Duration;
 use tokio::task::JoinSet;
 
-use crate::db::cursor::BlockBytesCursor;
-use crate::{try_debug, try_info};
-
-use chainhook_sdk::indexer::bitcoin::{
-    build_http_client, parse_downloaded_block, standardize_bitcoin_block,
-    try_download_block_bytes_with_retry,
-};
+use crate::{db::cursor::BlockBytesCursor, try_debug, try_info};
 
 pub enum PostProcessorCommand {
     ProcessBlocks(Vec<(u64, Vec<u8>)>, Vec<BitcoinBlockData>),

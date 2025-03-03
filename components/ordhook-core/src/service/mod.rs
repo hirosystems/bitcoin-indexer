@@ -1,25 +1,14 @@
-use crate::core::meta_protocols::brc20::cache::{brc20_new_cache, Brc20MemoryCache};
-use crate::core::pipeline::bitcoind_download_blocks;
-use crate::core::pipeline::processors::block_archiving::start_block_archiving_processor;
-use crate::core::pipeline::processors::inscription_indexing::{
-    index_block, rollback_block, start_inscription_indexing_processor,
+use std::{
+    collections::BTreeMap,
+    hash::BuildHasherDefault,
+    sync::{mpsc::channel, Arc},
 };
-use crate::core::protocol::sequence_cursor::SequenceCursor;
-use crate::core::{
-    first_inscription_height, new_traversals_lazy_cache, should_sync_ordinals_db,
-    should_sync_rocks_db,
-};
-use crate::db::blocks::{self, find_missing_blocks, open_blocks_db_with_retry, run_compaction};
-use crate::db::cursor::{BlockBytesCursor, TransactionBytesCursor};
-use crate::db::ordinals_pg;
-use crate::utils::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring};
-use crate::{try_crit, try_error, try_info};
+
 use chainhook_postgres::{pg_begin, pg_pool, pg_pool_client};
-use chainhook_sdk::observer::{
-    start_event_observer, BitcoinBlockDataCached, ObserverEvent, ObserverSidecar,
+use chainhook_sdk::{
+    observer::{start_event_observer, BitcoinBlockDataCached, ObserverEvent, ObserverSidecar},
+    utils::{bitcoind::bitcoind_wait_for_chain_tip, BlockHeights, Context},
 };
-use chainhook_sdk::utils::bitcoind::bitcoind_wait_for_chain_tip;
-use chainhook_sdk::utils::{BlockHeights, Context};
 use chainhook_types::BlockIdentifier;
 use config::{Config, OrdinalsMetaProtocolsConfig};
 use crossbeam_channel::select;
@@ -27,10 +16,31 @@ use dashmap::DashMap;
 use deadpool_postgres::Pool;
 use fxhash::FxHasher;
 
-use std::collections::BTreeMap;
-use std::hash::BuildHasherDefault;
-use std::sync::mpsc::channel;
-use std::sync::Arc;
+use crate::{
+    core::{
+        first_inscription_height,
+        meta_protocols::brc20::cache::{brc20_new_cache, Brc20MemoryCache},
+        new_traversals_lazy_cache,
+        pipeline::{
+            bitcoind_download_blocks,
+            processors::{
+                block_archiving::start_block_archiving_processor,
+                inscription_indexing::{
+                    index_block, rollback_block, start_inscription_indexing_processor,
+                },
+            },
+        },
+        protocol::sequence_cursor::SequenceCursor,
+        should_sync_ordinals_db, should_sync_rocks_db,
+    },
+    db::{
+        blocks::{self, find_missing_blocks, open_blocks_db_with_retry, run_compaction},
+        cursor::{BlockBytesCursor, TransactionBytesCursor},
+        ordinals_pg,
+    },
+    try_crit, try_error, try_info,
+    utils::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring},
+};
 
 #[derive(Debug, Clone)]
 pub struct PgConnectionPools {
@@ -96,13 +106,12 @@ impl Service {
                 let registry_moved = self.prometheus.registry.clone();
                 let ctx_cloned = self.ctx.clone();
                 let port = metrics.prometheus_port;
-                let _ = std::thread::spawn(move || {
-                    let _ = hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
-                        port,
-                        registry_moved,
-                        ctx_cloned,
-                    ));
-                });
+                let _ =
+                    std::thread::spawn(move || {
+                        let _ = hiro_system_kit::nestable_block_on(
+                            start_serving_prometheus_metrics(port, registry_moved, ctx_cloned),
+                        );
+                    });
             }
         }
         let (max_inscription_number, chain_tip) = {

@@ -1,5 +1,7 @@
-use std::fs::File;
-use std::io::{BufReader, Read};
+use std::{
+    fs::File,
+    io::{BufReader, Read},
+};
 
 use bitcoin::Network;
 

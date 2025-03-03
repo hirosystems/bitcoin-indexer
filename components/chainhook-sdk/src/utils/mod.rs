@@ -294,8 +294,7 @@ fn test_block_heights_blocks_limits_entries() {
 }
 
 pub fn read_file_content_at_path(file_path: &PathBuf) -> Result<Vec<u8>, String> {
-    use std::fs::File;
-    use std::io::BufReader;
+    use std::{fs::File, io::BufReader};
 
     let file = File::open(file_path.clone())
         .map_err(|e| format!("unable to read file {}\n{:?}", file_path.display(), e))?;

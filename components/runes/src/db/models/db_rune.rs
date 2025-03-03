@@ -206,9 +206,8 @@ mod test {
 
     use ordinals::{Etching, SpacedRune, Terms};
 
-    use crate::db::cache::transaction_location::TransactionLocation;
-
     use super::DbRune;
+    use crate::db::cache::transaction_location::TransactionLocation;
 
     #[test]
     fn test_from_etching() {

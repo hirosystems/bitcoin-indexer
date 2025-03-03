@@ -1,24 +1,27 @@
 mod zmq;
 
-use crate::indexer::bitcoin::{
-    build_http_client, download_and_parse_block_with_retry, standardize_bitcoin_block,
-    BitcoinBlockFullBreakdown,
+use std::{
+    collections::HashMap,
+    error::Error,
+    str,
+    sync::mpsc::{Receiver, Sender},
 };
-use crate::utils::Context;
 
 use chainhook_types::{
     BitcoinBlockData, BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData,
     BitcoinChainUpdatedWithReorgData, BitcoinNetwork, BlockIdentifier, BlockchainEvent,
 };
 use config::BitcoindConfig;
-use hiro_system_kit;
-use hiro_system_kit::slog;
-use rocket::serde::Deserialize;
-use rocket::Shutdown;
-use std::collections::HashMap;
-use std::error::Error;
-use std::str;
-use std::sync::mpsc::{Receiver, Sender};
+use hiro_system_kit::{self, slog};
+use rocket::{serde::Deserialize, Shutdown};
+
+use crate::{
+    indexer::bitcoin::{
+        build_http_client, download_and_parse_block_with_retry, standardize_bitcoin_block,
+        BitcoinBlockFullBreakdown,
+    },
+    utils::Context,
+};
 
 #[derive(Deserialize)]
 pub struct NewTransaction {

@@ -7,14 +7,13 @@ use chainhook_types::{
 };
 use deadpool_postgres::Transaction;
 
-use crate::{core::meta_protocols::brc20::u128_amount_to_decimals_str, try_info};
-
 use super::{
     brc20_activation_height,
     cache::Brc20MemoryCache,
     parser::ParsedBrc20Operation,
     verifier::{verify_brc20_operation, verify_brc20_transfers, VerifiedBrc20Operation},
 };
+use crate::{core::meta_protocols::brc20::u128_amount_to_decimals_str, try_info};
 
 /// Index ordinal transfers in a single Bitcoin block looking for BRC-20 transfers.
 async fn index_unverified_brc20_transfers(

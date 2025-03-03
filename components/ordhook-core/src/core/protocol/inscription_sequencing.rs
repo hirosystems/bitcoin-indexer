@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     hash::BuildHasherDefault,
-    sync::Arc,
+    sync::{mpsc::channel, Arc},
 };
 
 use bitcoin::Network;
@@ -16,22 +16,18 @@ use crossbeam_channel::unbounded;
 use dashmap::DashMap;
 use deadpool_postgres::Transaction;
 use fxhash::FxHasher;
-
-use crate::core::protocol::satoshi_tracking::UNBOUND_INSCRIPTION_SATPOINT;
-use crate::{
-    core::resolve_absolute_pointer,
-    db::{self, cursor::TransactionBytesCursor, ordinals_pg},
-    try_debug, try_error, try_info,
-    utils::format_inscription_id,
-};
 use ord::{charm::Charm, sat::Sat};
-
-use std::sync::mpsc::channel;
 
 use super::{
     satoshi_numbering::{compute_satoshi_number, TraversalResult},
     satoshi_tracking::compute_satpoint_post_transfer,
     sequence_cursor::SequenceCursor,
+};
+use crate::{
+    core::{protocol::satoshi_tracking::UNBOUND_INSCRIPTION_SATPOINT, resolve_absolute_pointer},
+    db::{self, cursor::TransactionBytesCursor, ordinals_pg},
+    try_debug, try_error, try_info,
+    utils::format_inscription_id,
 };
 
 /// Parallelize the computation of ordinals numbers for inscriptions present in a block.
@@ -610,8 +606,6 @@ async fn update_tx_inscriptions_with_consensus_sequence_data(
 mod test {
     use std::collections::BTreeMap;
 
-    use test_case::test_case;
-
     use chainhook_postgres::{pg_begin, pg_pool_client};
     use chainhook_sdk::utils::Context;
     use chainhook_types::{
@@ -620,7 +614,9 @@ mod test {
         OrdinalOperation, TransactionIdentifier,
     };
     use ord::charm::Charm;
+    use test_case::test_case;
 
+    use super::update_block_inscriptions_with_consensus_sequence_data;
     use crate::{
         core::{
             protocol::{satoshi_numbering::TraversalResult, sequence_cursor::SequenceCursor},
@@ -631,8 +627,6 @@ mod test {
             pg_reset_db, pg_test_connection, pg_test_connection_pool,
         },
     };
-
-    use super::update_block_inscriptions_with_consensus_sequence_data;
 
     #[test_case(None => Ok(("0000000000000000000000000000000000000000000000000000000000000000:0:0".into(), Some(0))); "first unbound sequence")]
     #[test_case(Some(230) => Ok(("0000000000000000000000000000000000000000000000000000000000000000:0:231".into(), Some(231))); "next unbound sequence")]

@@ -1,15 +1,14 @@
 pub mod bitcoin;
 pub mod fork_scratch_pad;
 
-use crate::utils::{AbstractBlock, Context};
+use std::collections::VecDeque;
 
 use chainhook_types::{BlockHeader, BlockIdentifier, BlockchainEvent};
 use config::BitcoindConfig;
 use hiro_system_kit::slog;
 
-use std::collections::VecDeque;
-
 use self::fork_scratch_pad::ForkScratchPad;
+use crate::utils::{AbstractBlock, Context};
 
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct AssetClassCache {

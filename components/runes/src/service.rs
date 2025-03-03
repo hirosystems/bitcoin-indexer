@@ -1,19 +1,22 @@
 use std::sync::mpsc::channel;
 
-use crate::db::cache::index_cache::IndexCache;
-use crate::db::index::{get_rune_genesis_block_height, index_block, roll_back_block};
-use crate::db::{pg_connect, pg_get_block_height};
-use crate::scan::bitcoin::scan_blocks;
-use crate::{try_error, try_info};
-use chainhook_sdk::observer::BitcoinBlockDataCached;
-use chainhook_sdk::utils::bitcoind::bitcoind_get_block_height;
 use chainhook_sdk::{
-    observer::{start_event_observer, ObserverEvent, ObserverSidecar},
-    utils::Context,
+    observer::{start_event_observer, BitcoinBlockDataCached, ObserverEvent, ObserverSidecar},
+    utils::{bitcoind::bitcoind_get_block_height, Context},
 };
 use chainhook_types::BlockIdentifier;
 use config::Config;
 use crossbeam_channel::select;
+
+use crate::{
+    db::{
+        cache::index_cache::IndexCache,
+        index::{get_rune_genesis_block_height, index_block, roll_back_block},
+        pg_connect, pg_get_block_height,
+    },
+    scan::bitcoin::scan_blocks,
+    try_error, try_info,
+};
 
 pub async fn get_index_chain_tip(config: &Config, ctx: &Context) -> u64 {
     let mut pg_client = pg_connect(&config, true, ctx).await;

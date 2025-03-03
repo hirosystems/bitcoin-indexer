@@ -1,11 +1,10 @@
 use std::{thread::sleep, time::Duration};
 
-use crate::utils::Context;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use config::BitcoindConfig;
 use hiro_system_kit::slog;
 
-use crate::{try_error, try_info};
+use crate::{try_error, try_info, utils::Context};
 
 fn bitcoind_get_client(config: &BitcoindConfig, ctx: &Context) -> Client {
     loop {

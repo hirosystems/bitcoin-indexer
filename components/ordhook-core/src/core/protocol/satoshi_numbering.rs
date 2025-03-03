@@ -1,17 +1,19 @@
+use std::{hash::BuildHasherDefault, sync::Arc};
+
 use chainhook_sdk::utils::Context;
 use chainhook_types::{BlockIdentifier, OrdinalInscriptionNumber, TransactionIdentifier};
+use config::Config;
 use dashmap::DashMap;
 use fxhash::FxHasher;
-use std::hash::BuildHasherDefault;
-use std::sync::Arc;
+use ord::{height::Height, sat::Sat};
 
-use crate::db::blocks::find_pinned_block_bytes_at_block_height;
-use config::Config;
-
-use crate::db::cursor::{BlockBytesCursor, TransactionBytesCursor};
-use crate::try_error;
-use ord::height::Height;
-use ord::sat::Sat;
+use crate::{
+    db::{
+        blocks::find_pinned_block_bytes_at_block_height,
+        cursor::{BlockBytesCursor, TransactionBytesCursor},
+    },
+    try_error,
+};
 
 #[derive(Clone, Debug)]
 pub struct TraversalResult {
@@ -315,9 +317,11 @@ mod test {
 
     use chainhook_sdk::utils::Context;
     use chainhook_types::{bitcoin::TxOut, BlockIdentifier, TransactionIdentifier};
+    use config::Config;
     use dashmap::DashMap;
     use fxhash::FxHasher;
 
+    use super::compute_satoshi_number;
     use crate::{
         core::{
             new_traversals_lazy_cache,
@@ -329,9 +333,6 @@ mod test {
             drop_all_dbs,
         },
     };
-    use config::Config;
-
-    use super::compute_satoshi_number;
 
     fn store_tx_in_traversals_cache(
         cache: &DashMap<(u32, [u8; 8]), TransactionBytesCursor, BuildHasherDefault<FxHasher>>,

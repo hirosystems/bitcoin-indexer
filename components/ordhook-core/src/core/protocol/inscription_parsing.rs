@@ -1,5 +1,6 @@
-use bitcoin::hash_types::Txid;
-use bitcoin::Witness;
+use std::{collections::HashMap, str, str::FromStr};
+
+use bitcoin::{hash_types::Txid, Witness};
 use chainhook_sdk::utils::Context;
 use chainhook_types::{
     BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
@@ -7,17 +8,20 @@ use chainhook_types::{
     OrdinalOperation,
 };
 use config::Config;
+use ord::{
+    envelope::{Envelope, ParsedEnvelope},
+    inscription::Inscription,
+    inscription_id::InscriptionId,
+};
 use serde_json::json;
-use std::collections::HashMap;
-use std::str::FromStr;
 
-use crate::core::meta_protocols::brc20::brc20_activation_height;
-use crate::core::meta_protocols::brc20::parser::{parse_brc20_operation, ParsedBrc20Operation};
-use crate::try_warn;
-use ord::envelope::{Envelope, ParsedEnvelope};
-use ord::inscription::Inscription;
-use ord::inscription_id::InscriptionId;
-use std::str;
+use crate::{
+    core::meta_protocols::brc20::{
+        brc20_activation_height,
+        parser::{parse_brc20_operation, ParsedBrc20Operation},
+    },
+    try_warn,
+};
 
 pub fn parse_inscriptions_from_witness(
     input_index: usize,
@@ -179,9 +183,8 @@ mod test {
     use chainhook_types::OrdinalOperation;
     use config::Config;
 
-    use crate::core::test_builders::{TestBlockBuilder, TestTransactionBuilder, TestTxInBuilder};
-
     use super::parse_inscriptions_in_standardized_block;
+    use crate::core::test_builders::{TestBlockBuilder, TestTransactionBuilder, TestTxInBuilder};
 
     #[test]
     fn parses_inscriptions_in_block() {

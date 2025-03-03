@@ -13,13 +13,12 @@ use deadpool_postgres::GenericClient;
 use lru::LruCache;
 use maplit::hashmap;
 
-use crate::core::protocol::satoshi_tracking::parse_output_and_offset_from_satpoint;
-
 use super::{
     brc20_pg,
     models::{DbOperation, DbToken},
     verifier::{VerifiedBrc20BalanceData, VerifiedBrc20TokenDeployData, VerifiedBrc20TransferData},
 };
+use crate::core::protocol::satoshi_tracking::parse_output_and_offset_from_satpoint;
 
 /// If the given `config` has BRC-20 enabled, returns a BRC-20 memory cache.
 pub fn brc20_new_cache(config: &Config) -> Option<Brc20MemoryCache> {
@@ -493,6 +492,7 @@ mod test {
     use chainhook_types::{BitcoinNetwork, BlockIdentifier, TransactionIdentifier};
     use test_case::test_case;
 
+    use super::Brc20MemoryCache;
     use crate::{
         core::meta_protocols::brc20::{
             brc20_pg,
@@ -505,8 +505,6 @@ mod test {
         },
         db::{pg_reset_db, pg_test_connection, pg_test_connection_pool},
     };
-
-    use super::Brc20MemoryCache;
 
     #[tokio::test]
     async fn test_brc20_memory_cache_transfer_miss() -> Result<(), String> {

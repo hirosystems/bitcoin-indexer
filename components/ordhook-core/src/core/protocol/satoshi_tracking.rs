@@ -8,14 +8,13 @@ use chainhook_types::{
 };
 use deadpool_postgres::Transaction;
 
+use super::inscription_sequencing::get_bitcoin_network;
 use crate::{
     core::{compute_next_satpoint_data, SatPosition},
     db::ordinals_pg,
     try_info,
     utils::format_outpoint_to_watch,
 };
-
-use super::inscription_sequencing::get_bitcoin_network;
 
 pub const UNBOUND_INSCRIPTION_SATPOINT: &str =
     "0000000000000000000000000000000000000000000000000000000000000000:0";
@@ -224,9 +223,8 @@ mod test {
     use chainhook_sdk::utils::Context;
     use chainhook_types::OrdinalInscriptionTransferDestination;
 
-    use crate::core::test_builders::{TestTransactionBuilder, TestTxInBuilder, TestTxOutBuilder};
-
     use super::compute_satpoint_post_transfer;
+    use crate::core::test_builders::{TestTransactionBuilder, TestTxInBuilder, TestTxOutBuilder};
 
     #[test]
     fn computes_satpoint_spent_as_fee() {

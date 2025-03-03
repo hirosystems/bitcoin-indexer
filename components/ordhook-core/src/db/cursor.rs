@@ -1,5 +1,4 @@
-use std::io::Cursor;
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 
 use chainhook_sdk::indexer::bitcoin::BitcoinBlockFullBreakdown;
 use chainhook_types::BitcoinBlockData;
@@ -366,12 +365,13 @@ impl<'a> Iterator for TransactionBytesCursorIterator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chainhook_sdk::{
         indexer::bitcoin::{parse_downloaded_block, standardize_bitcoin_block},
         utils::Context,
     };
     use chainhook_types::BitcoinNetwork;
+
+    use super::*;
 
     #[test]
     fn test_block_cursor_roundtrip() {

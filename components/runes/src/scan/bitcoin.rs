@@ -1,15 +1,21 @@
-use crate::db::cache::index_cache::IndexCache;
-use crate::db::index::{index_block, roll_back_block};
-use crate::try_info;
-use chainhook_sdk::indexer::bitcoin::{
-    build_http_client, download_and_parse_block_with_retry, retrieve_block_hash_with_retry,
-    standardize_bitcoin_block,
+use chainhook_sdk::{
+    indexer::bitcoin::{
+        build_http_client, download_and_parse_block_with_retry, retrieve_block_hash_with_retry,
+        standardize_bitcoin_block,
+    },
+    utils::{bitcoind::bitcoind_get_block_height, BlockHeights, Context},
 };
-use chainhook_sdk::utils::bitcoind::bitcoind_get_block_height;
-use chainhook_sdk::utils::{BlockHeights, Context};
 use chainhook_types::BitcoinNetwork;
 use config::Config;
 use tokio_postgres::Client;
+
+use crate::{
+    db::{
+        cache::index_cache::IndexCache,
+        index::{index_block, roll_back_block},
+    },
+    try_info,
+};
 
 pub async fn drop_blocks(start_block: u64, end_block: u64, pg_client: &mut Client, ctx: &Context) {
     for block in start_block..=end_block {

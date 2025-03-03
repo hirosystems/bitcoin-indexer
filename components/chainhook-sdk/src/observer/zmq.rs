@@ -1,8 +1,10 @@
+use std::{collections::VecDeque, sync::mpsc::Sender};
+
 use config::BitcoindConfig;
 use hiro_system_kit::slog;
-use std::sync::mpsc::Sender;
 use zmq::Socket;
 
+use super::ObserverCommand;
 use crate::{
     indexer::{
         bitcoin::{build_http_client, download_and_parse_block_with_retry},
@@ -11,9 +13,6 @@ use crate::{
     try_info, try_warn,
     utils::Context,
 };
-use std::collections::VecDeque;
-
-use super::ObserverCommand;
 
 fn new_zmq_socket() -> Socket {
     let context = zmq::Context::new();
@@ -82,20 +81,16 @@ pub async fn start_zeromq_runloop(
         block_hashes.push_front(block_hash);
 
         while let Some(block_hash) = block_hashes.pop_front() {
-            let block = match download_and_parse_block_with_retry(
-                &http_client,
-                &block_hash,
-                &config,
-                ctx,
-            )
-            .await
-            {
-                Ok(block) => block,
-                Err(e) => {
-                    try_warn!(ctx, "zmq: Unable to download block: {e}");
-                    continue;
-                }
-            };
+            let block =
+                match download_and_parse_block_with_retry(&http_client, &block_hash, &config, ctx)
+                    .await
+                {
+                    Ok(block) => block,
+                    Err(e) => {
+                        try_warn!(ctx, "zmq: Unable to download block: {e}");
+                        continue;
+                    }
+                };
 
             let header = block.get_block_header();
             try_info!(ctx, "zmq: Standardizing bitcoin block #{}", block.height);

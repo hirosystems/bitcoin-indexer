@@ -8,6 +8,10 @@ use lru::LruCache;
 use ordinals::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
 use tokio_postgres::{Client, Transaction};
 
+use super::{
+    db_cache::DbCache, input_rune_balance::InputRuneBalance, transaction_cache::TransactionCache,
+    transaction_location::TransactionLocation, utils::move_block_output_cache_to_output_cache,
+};
 use crate::{
     db::{
         cache::utils::input_rune_balances_from_tx_inputs,
@@ -19,11 +23,6 @@ use crate::{
         pg_get_max_rune_number, pg_get_rune_by_id, pg_get_rune_total_mints,
     },
     try_debug, try_info, try_warn,
-};
-
-use super::{
-    db_cache::DbCache, input_rune_balance::InputRuneBalance, transaction_cache::TransactionCache,
-    transaction_location::TransactionLocation, utils::move_block_output_cache_to_output_cache,
 };
 
 /// Holds rune data across multiple blocks for faster computations. Processes rune events as they happen during transactions and

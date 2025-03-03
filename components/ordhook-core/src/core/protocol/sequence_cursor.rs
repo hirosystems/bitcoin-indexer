@@ -2,9 +2,8 @@ use bitcoin::Network;
 use chainhook_types::OrdinalInscriptionNumber;
 use deadpool_postgres::GenericClient;
 
-use crate::db::ordinals_pg;
-
 use super::inscription_sequencing;
+use crate::db::ordinals_pg;
 
 /// Helper caching inscription sequence cursor
 ///
@@ -167,10 +166,10 @@ impl SequenceCursor {
 mod test {
     use bitcoin::Network;
     use chainhook_postgres::{pg_begin, pg_pool_client};
-
     use chainhook_types::OrdinalOperation;
     use test_case::test_case;
 
+    use super::SequenceCursor;
     use crate::{
         core::test_builders::{TestBlockBuilder, TestTransactionBuilder},
         db::{
@@ -178,8 +177,6 @@ mod test {
             pg_reset_db, pg_test_connection, pg_test_connection_pool,
         },
     };
-
-    use super::SequenceCursor;
 
     #[test_case((780000, false) => Ok((2, 2)); "with blessed pre jubilee")]
     #[test_case((780000, true) => Ok((-2, -2)); "with cursed pre jubilee")]

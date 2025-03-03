@@ -4,15 +4,14 @@ pub mod protocol;
 #[cfg(test)]
 pub mod test_builders;
 
+use std::{hash::BuildHasherDefault, ops::Div};
+
 use bitcoin::Network;
 use chainhook_postgres::pg_pool_client;
+use chainhook_sdk::utils::{bitcoind::bitcoind_get_block_height, Context};
 use config::Config;
 use dashmap::DashMap;
 use fxhash::{FxBuildHasher, FxHasher};
-use std::hash::BuildHasherDefault;
-use std::ops::Div;
-
-use chainhook_sdk::utils::Context;
 
 use crate::{
     db::{
@@ -25,7 +24,6 @@ use crate::{
     },
     service::PgConnectionPools,
 };
-use chainhook_sdk::utils::bitcoind::bitcoind_get_block_height;
 
 pub fn first_inscription_height(config: &Config) -> u64 {
     match config.bitcoind.network {

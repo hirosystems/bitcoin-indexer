@@ -1,24 +1,20 @@
 use std::collections::HashMap;
 
-use bitcoin::absolute::LockTime;
-use bitcoin::transaction::TxOut;
-use bitcoin::transaction::Version;
-use bitcoin::Amount;
-use bitcoin::Network;
-use bitcoin::ScriptBuf;
-use bitcoin::Transaction;
+use bitcoin::{
+    absolute::LockTime,
+    transaction::{TxOut, Version},
+    Amount, Network, ScriptBuf, Transaction,
+};
 use chainhook_sdk::utils::Context;
-use chainhook_types::BitcoinBlockData;
-use chainhook_types::BitcoinTransactionData;
-use ordinals::Artifact;
-use ordinals::Runestone;
+use chainhook_types::{BitcoinBlockData, BitcoinTransactionData};
+use ordinals::{Artifact, Runestone};
 use tokio_postgres::Client;
 
-use crate::db::cache::transaction_location::TransactionLocation;
-use crate::db::pg_roll_back_block;
-use crate::try_info;
-
 use super::cache::index_cache::IndexCache;
+use crate::{
+    db::{cache::transaction_location::TransactionLocation, pg_roll_back_block},
+    try_info,
+};
 
 pub fn get_rune_genesis_block_height(network: Network) -> u64 {
     match network {

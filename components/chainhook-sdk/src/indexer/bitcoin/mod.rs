@@ -1,21 +1,21 @@
 use std::time::Duration;
 
-use crate::try_debug;
-use crate::utils::Context;
-use bitcoincore_rpc::bitcoin::hashes::Hash;
-use bitcoincore_rpc::bitcoin::{self, Amount, BlockHash};
-use bitcoincore_rpc::jsonrpc::error::RpcError;
+use bitcoincore_rpc::{
+    bitcoin::{self, hashes::Hash, Amount, BlockHash},
+    jsonrpc::error::RpcError,
+};
 use bitcoincore_rpc_json::GetRawTransactionResultVoutScriptPubKey;
-use chainhook_types::bitcoin::{OutPoint, TxIn, TxOut};
 use chainhook_types::{
-    BitcoinBlockData, BitcoinBlockMetadata, BitcoinNetwork, 
-    BitcoinTransactionData,BitcoinTransactionMetadata, BlockHeader, BlockIdentifier, 
-    TransactionIdentifier,
+    bitcoin::{OutPoint, TxIn, TxOut},
+    BitcoinBlockData, BitcoinBlockMetadata, BitcoinNetwork, BitcoinTransactionData,
+    BitcoinTransactionMetadata, BlockHeader, BlockIdentifier, TransactionIdentifier,
 };
 use config::BitcoindConfig;
 use hiro_system_kit::slog;
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
+
+use crate::{try_debug, utils::Context};
 
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -213,7 +213,10 @@ pub async fn retrieve_block_hash(
     });
     let block_hash = http_client
         .post(&bitcoin_config.rpc_url)
-        .basic_auth(&bitcoin_config.rpc_username, Some(&bitcoin_config.rpc_password))
+        .basic_auth(
+            &bitcoin_config.rpc_username,
+            Some(&bitcoin_config.rpc_password),
+        )
         .header("Content-Type", "application/json")
         .header("Host", &bitcoin_config.rpc_url[7..])
         .json(&body)
@@ -283,7 +286,10 @@ pub async fn download_block(
     });
     let res = http_client
         .post(&bitcoin_config.rpc_url)
-        .basic_auth(&bitcoin_config.rpc_username, Some(&bitcoin_config.rpc_password))
+        .basic_auth(
+            &bitcoin_config.rpc_username,
+            Some(&bitcoin_config.rpc_password),
+        )
         .header("Content-Type", "application/json")
         .header("Host", &bitcoin_config.rpc_url[7..])
         .json(&body)
@@ -344,7 +350,12 @@ pub fn standardize_bitcoin_block(
     let mut transactions = vec![];
     let block_height = block.height as u64;
 
-    try_debug!(ctx, "Standardizing Bitcoin block #{} {}", block.height, block.hash);
+    try_debug!(
+        ctx,
+        "Standardizing Bitcoin block #{} {}",
+        block.height,
+        block.hash
+    );
 
     for (tx_index, mut tx) in block.tx.into_iter().enumerate() {
         let txid = tx.txid.to_string();

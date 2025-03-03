@@ -1,11 +1,17 @@
-use crate::bitcoin::{TxIn, TxOut};
-use crate::ordinals::OrdinalOperation;
-use crate::Brc20Operation;
+use std::{
+    cmp::Ordering,
+    fmt::Display,
+    hash::{Hash, Hasher},
+};
+
 use bitcoin::Network;
 use schemars::JsonSchema;
-use std::cmp::Ordering;
-use std::fmt::Display;
-use std::hash::{Hash, Hasher};
+
+use crate::{
+    bitcoin::{TxIn, TxOut},
+    ordinals::OrdinalOperation,
+    Brc20Operation,
+};
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]

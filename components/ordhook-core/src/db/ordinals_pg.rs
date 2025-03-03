@@ -12,14 +12,13 @@ use deadpool_postgres::GenericClient;
 use refinery::embed_migrations;
 use tokio_postgres::{types::ToSql, Client};
 
-use crate::{
-    core::protocol::{satoshi_numbering::TraversalResult, satoshi_tracking::WatchedSatpoint},
-    utils::format_outpoint_to_watch,
-};
-
 use super::models::{
     DbCurrentLocation, DbInscription, DbInscriptionParent, DbInscriptionRecursion, DbLocation,
     DbSatoshi,
+};
+use crate::{
+    core::protocol::{satoshi_numbering::TraversalResult, satoshi_tracking::WatchedSatpoint},
+    utils::format_outpoint_to_watch,
 };
 
 embed_migrations!("../../migrations/ordinals");

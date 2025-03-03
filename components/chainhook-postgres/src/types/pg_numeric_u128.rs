@@ -136,9 +136,8 @@ impl Ord for PgNumericU128 {
 mod test {
     use test_case::test_case;
 
-    use crate::pg_test_client;
-
     use super::PgNumericU128;
+    use crate::pg_test_client;
 
     #[test_case(340282366920938463463374607431768211455; "u128 max")]
     #[test_case(80000000000000000; "with trailing zeros")]

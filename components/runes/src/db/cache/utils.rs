@@ -7,6 +7,7 @@ use lru::LruCache;
 use ordinals::RuneId;
 use tokio_postgres::Transaction;
 
+use super::{input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation};
 use crate::{
     db::{
         models::{
@@ -16,8 +17,6 @@ use crate::{
     },
     try_info, try_warn,
 };
-
-use super::{input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation};
 
 /// Takes all transaction inputs and transforms them into rune balances to be allocated for operations. Looks inside an output LRU
 /// cache and the DB when there are cache misses.
@@ -688,7 +687,10 @@ mod test {
         use std::num::NonZeroUsize;
 
         use chainhook_sdk::utils::Context;
-        use chainhook_types::{bitcoin::{OutPoint, TxIn}, TransactionIdentifier};
+        use chainhook_types::{
+            bitcoin::{OutPoint, TxIn},
+            TransactionIdentifier,
+        };
         use lru::LruCache;
         use maplit::hashmap;
         use ordinals::RuneId;

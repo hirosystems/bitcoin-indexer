@@ -1,16 +1,11 @@
+use std::{path::PathBuf, process, thread::sleep, time::Duration, u64};
+
 use chainhook_sdk::utils::Context;
 use clap::Parser;
 use commands::{Command, ConfigCommand, DatabaseCommand, IndexCommand, Protocol, ServiceCommand};
-use config::generator::generate_toml_config;
-use config::Config;
+use config::{generator::generate_toml_config, Config};
 use hiro_system_kit;
-use ordhook::db::migrate_dbs;
-use ordhook::service::Service;
-use ordhook::try_info;
-use std::path::PathBuf;
-use std::thread::sleep;
-use std::time::Duration;
-use std::{process, u64};
+use ordhook::{db::migrate_dbs, service::Service, try_info};
 
 mod commands;
 
@@ -154,8 +149,7 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
         },
         Protocol::Config(subcmd) => match subcmd {
             ConfigCommand::New(cmd) => {
-                use std::fs::File;
-                use std::io::Write;
+                use std::{fs::File, io::Write};
                 let network = match (cmd.mainnet, cmd.testnet, cmd.regtest) {
                     (true, false, false) => "mainnet",
                     (false, true, false) => "testnet",
