@@ -4,29 +4,16 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'chainhook-postgres'",
+      "name": "run: ordinals service",
       "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=chainhook-postgres"],
+        "args": ["build", "--bin=bitcoin-indexer", "--package=cli"],
         "filter": {
-          "name": "chainhook-postgres",
-          "kind": "lib"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "run: ordhook service",
-      "cargo": {
-        "args": ["build", "--bin=ordhook", "--package=cli"],
-        "filter": {
-          "name": "ordhook",
+          "name": "bitcoin-indexer",
           "kind": "bin"
         }
       },
       "args": [
+        "ordinals",
         "service",
         "start",
         "--config-path=${workspaceFolder}/.vscode/Indexer.toml",
@@ -36,29 +23,20 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in executable 'ordhook'",
+      "name": "run: runes service",
       "cargo": {
-        "args": ["test", "--no-run", "--bin=ordhook", "--package=cli"],
+        "args": ["build", "--bin=bitcoin-indexer", "--package=cli"],
         "filter": {
-          "name": "ordhook",
+          "name": "bitcoin-indexer",
           "kind": "bin"
         }
       },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in library 'ordhook'",
-      "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=ordhook"],
-        "filter": {
-          "name": "ordhook",
-          "kind": "lib"
-        }
-      },
-      "args": [],
+      "args": [
+        "runes",
+        "service",
+        "start",
+        "--config-path=${workspaceFolder}/.vscode/Indexer.toml",
+      ],
       "cwd": "${workspaceFolder}"
     },
     {
