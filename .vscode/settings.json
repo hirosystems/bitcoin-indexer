@@ -1,0 +1,9 @@
+{
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file",
+    "rust-analyzer.rustfmt.extraArgs": [
+        "--config",
+        "group_imports=StdExternalCrate,imports_granularity=Module"
+    ]
+}
