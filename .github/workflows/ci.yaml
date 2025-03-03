@@ -156,7 +156,7 @@ jobs:
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml logs -t -f --no-color &> docker-compose-logs.txt &
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Run tests
         run: |
