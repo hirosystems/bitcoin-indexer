@@ -157,7 +157,7 @@ jobs:
 
       - name: Update Rust
         run: |
-          rustup self update
+          rustup toolchain list
           rustup update
           cargo install --force cargo-tarpaulin
 
