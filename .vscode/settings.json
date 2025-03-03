@@ -4,6 +4,6 @@
     "editor.formatOnSaveMode": "file",
     "rust-analyzer.rustfmt.extraArgs": [
         "--config",
-        "group_imports=StdExternalCrate,imports_granularity=Module"
+        "group_imports=StdExternalCrate,imports_granularity=Crate"
     ]
 }

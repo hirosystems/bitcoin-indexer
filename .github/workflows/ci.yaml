@@ -143,7 +143,7 @@ jobs:
         run: |
           # Run cargo and store the original output
           CARGO_STATUS=0
-          CARGO_OUTPUT=$(cargo fmt --all --manifest-path=Cargo.toml -- --config group_imports=StdExternalCrate,imports_granularity=Module --color=always --check 2>/dev/null) || CARGO_STATUS=$?
+          CARGO_OUTPUT=$(cargo fmt --all --manifest-path=Cargo.toml -- --config group_imports=StdExternalCrate,imports_granularity=Crate --color=always --check 2>/dev/null) || CARGO_STATUS=$?
 
           if [ ${CARGO_STATUS} -eq 0 ]; then
               cat <<MARKDOWN_INTRO >> $GITHUB_STEP_SUMMARY
