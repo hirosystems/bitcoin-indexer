@@ -11,7 +11,7 @@ use tokio_postgres::types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
 
 /// Transforms a u128 value into postgres' `numeric` wire format.
 pub fn u128_into_pg_numeric_bytes(number: u128, out: &mut BytesMut) {
-    let mut num = number.clone();
+    let mut num = number;
     let mut digits = vec![];
     while !num.is_zero() {
         let remainder = (num % 10000).to_i16().unwrap();

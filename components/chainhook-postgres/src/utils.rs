@@ -4,7 +4,7 @@ pub fn multi_row_query_param_str(rows: usize, columns: usize) -> String {
     let mut arg_num = 1;
     let mut arg_str = String::new();
     for _ in 0..rows {
-        arg_str.push_str("(");
+        arg_str.push('(');
         for i in 0..columns {
             arg_str.push_str(format!("${},", arg_num + i).as_str());
         }

@@ -54,14 +54,18 @@ pub fn format_inscription_id(
 pub fn parse_satpoint_to_watch(outpoint_to_watch: &str) -> (TransactionIdentifier, usize, u64) {
     let comps: Vec<&str> = outpoint_to_watch.split(":").collect();
     let tx = TransactionIdentifier::new(comps[0]);
-    let output_index = comps[1].to_string().parse::<usize>().expect(&format!(
-        "fatal: unable to extract output_index from outpoint {}",
-        outpoint_to_watch
-    ));
-    let offset = comps[2].to_string().parse::<u64>().expect(&format!(
-        "fatal: unable to extract offset from outpoint {}",
-        outpoint_to_watch
-    ));
+    let output_index = comps[1].to_string().parse::<usize>().unwrap_or_else(|_| {
+        panic!(
+            "fatal: unable to extract output_index from outpoint {}",
+            outpoint_to_watch
+        )
+    });
+    let offset = comps[2].to_string().parse::<u64>().unwrap_or_else(|_| {
+        panic!(
+            "fatal: unable to extract offset from outpoint {}",
+            outpoint_to_watch
+        )
+    });
     (tx, output_index, offset)
 }
 
@@ -78,20 +82,24 @@ pub fn format_outpoint_to_watch(
 
 pub fn parse_inscription_id(inscription_id: &str) -> (TransactionIdentifier, usize) {
     let comps: Vec<&str> = inscription_id.split("i").collect();
-    let tx = TransactionIdentifier::new(&comps[0]);
-    let output_index = comps[1].to_string().parse::<usize>().expect(&format!(
-        "fatal: unable to extract output_index from inscription_id {}",
-        inscription_id
-    ));
+    let tx = TransactionIdentifier::new(comps[0]);
+    let output_index = comps[1].to_string().parse::<usize>().unwrap_or_else(|_| {
+        panic!(
+            "fatal: unable to extract output_index from inscription_id {}",
+            inscription_id
+        )
+    });
     (tx, output_index)
 }
 
 pub fn parse_outpoint_to_watch(outpoint_to_watch: &str) -> (TransactionIdentifier, usize) {
     let comps: Vec<&str> = outpoint_to_watch.split(":").collect();
-    let tx = TransactionIdentifier::new(&comps[0]);
-    let output_index = comps[1].to_string().parse::<usize>().expect(&format!(
-        "fatal: unable to extract output_index from outpoint {}",
-        outpoint_to_watch
-    ));
+    let tx = TransactionIdentifier::new(comps[0]);
+    let output_index = comps[1].to_string().parse::<usize>().unwrap_or_else(|_| {
+        panic!(
+            "fatal: unable to extract output_index from outpoint {}",
+            outpoint_to_watch
+        )
+    });
     (tx, output_index)
 }

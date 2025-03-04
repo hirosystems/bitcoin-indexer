@@ -20,6 +20,11 @@ pub struct PrometheusMonitoring {
     pub registered_predicates: UInt64Gauge,
     pub registry: Registry,
 }
+impl Default for PrometheusMonitoring {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl PrometheusMonitoring {
     pub fn new() -> PrometheusMonitoring {

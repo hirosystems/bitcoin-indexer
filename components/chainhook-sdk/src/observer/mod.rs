@@ -83,12 +83,14 @@ pub struct BitcoinBlockDataCached {
     pub processed_by_sidecar: bool,
 }
 
+type BlockMutationSender =
+    crossbeam_channel::Sender<(Vec<BitcoinBlockDataCached>, Vec<BlockIdentifier>)>;
+type BlockMutationReceiver = crossbeam_channel::Receiver<Vec<BitcoinBlockDataCached>>;
+type BlockEventHandlerSender = crossbeam_channel::Sender<HandleBlock>;
+
 pub struct ObserverSidecar {
-    pub bitcoin_blocks_mutator: Option<(
-        crossbeam_channel::Sender<(Vec<BitcoinBlockDataCached>, Vec<BlockIdentifier>)>,
-        crossbeam_channel::Receiver<Vec<BitcoinBlockDataCached>>,
-    )>,
-    pub bitcoin_chain_event_notifier: Option<crossbeam_channel::Sender<HandleBlock>>,
+    pub bitcoin_blocks_mutator: Option<(BlockMutationSender, BlockMutationReceiver)>,
+    pub bitcoin_chain_event_notifier: Option<BlockEventHandlerSender>,
 }
 
 impl ObserverSidecar {

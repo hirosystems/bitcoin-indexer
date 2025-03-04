@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process, thread::sleep, time::Duration, u64};
+use std::{path::PathBuf, process, thread::sleep, time::Duration};
 
 use chainhook_sdk::utils::Context;
 use clap::Parser;
@@ -129,12 +129,12 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                     let chain_tip = runes::service::get_index_chain_tip(&config, ctx).await;
                     confirm_rollback(chain_tip, cmd.blocks)?;
 
-                    let mut pg_client = runes::db::pg_connect(&config, false, &ctx).await;
+                    let mut pg_client = runes::db::pg_connect(&config, false, ctx).await;
                     runes::scan::bitcoin::drop_blocks(
                         chain_tip - cmd.blocks as u64,
                         chain_tip,
                         &mut pg_client,
-                        &ctx,
+                        ctx,
                     )
                     .await;
                 }

@@ -192,7 +192,7 @@ impl<'a> BlockBytesCursor<'a> {
         let mut buffer = vec![];
         // Number of transactions in the block (not including coinbase)
         let tx_len = block.tx.len() as u16;
-        buffer.write(&tx_len.to_be_bytes())?;
+        buffer.write_all(&tx_len.to_be_bytes())?;
         // For each transaction:
         let u16_max = u16::MAX as usize;
         for (i, tx) in block.tx.iter().enumerate() {
@@ -210,9 +210,9 @@ impl<'a> BlockBytesCursor<'a> {
                 inputs_len = 0;
             }
             // Number of inputs
-            buffer.write(&inputs_len.to_be_bytes())?;
+            buffer.write_all(&inputs_len.to_be_bytes())?;
             // Number of outputs
-            buffer.write(&outputs_len.to_be_bytes())?;
+            buffer.write_all(&outputs_len.to_be_bytes())?;
         }
         // For each transaction:
         for tx in block.tx.iter() {
@@ -252,19 +252,19 @@ impl<'a> BlockBytesCursor<'a> {
                 buffer.write_all(&txin)?;
                 // txin's block height
                 let block_height = input.prevout.as_ref().unwrap().height as u32;
-                buffer.write(&block_height.to_be_bytes())?;
+                buffer.write_all(&block_height.to_be_bytes())?;
                 // txin's vout index
                 let vout = input.vout.unwrap() as u16;
-                buffer.write(&vout.to_be_bytes())?;
+                buffer.write_all(&vout.to_be_bytes())?;
                 // txin's sats value
                 let sats = input.prevout.as_ref().unwrap().value.to_sat();
-                buffer.write(&sats.to_be_bytes())?;
+                buffer.write_all(&sats.to_be_bytes())?;
             }
             // For each transaction output:
             for i in 0..outputs_len {
                 let output = &tx.vout[i];
                 let sats = output.value.to_sat();
-                buffer.write(&sats.to_be_bytes())?;
+                buffer.write_all(&sats.to_be_bytes())?;
             }
         }
         Ok(buffer)
@@ -274,7 +274,7 @@ impl<'a> BlockBytesCursor<'a> {
         let mut buffer = vec![];
         // Number of transactions in the block (not including coinbase)
         let tx_len = block.transactions.len() as u16;
-        buffer.write(&tx_len.to_be_bytes())?;
+        buffer.write_all(&tx_len.to_be_bytes())?;
         // For each transaction:
         for (i, tx) in block.transactions.iter().enumerate() {
             let inputs_len = if i > 0 {
@@ -284,9 +284,9 @@ impl<'a> BlockBytesCursor<'a> {
             };
             let outputs_len = tx.metadata.outputs.len() as u16;
             // Number of inputs
-            buffer.write(&inputs_len.to_be_bytes())?;
+            buffer.write_all(&inputs_len.to_be_bytes())?;
             // Number of outputs
-            buffer.write(&outputs_len.to_be_bytes())?;
+            buffer.write_all(&outputs_len.to_be_bytes())?;
         }
         // For each transaction:
         for (i, tx) in block.transactions.iter().enumerate() {
@@ -301,19 +301,19 @@ impl<'a> BlockBytesCursor<'a> {
                     buffer.write_all(&txin)?;
                     // txin's block height
                     let block_height = input.previous_output.block_height as u32;
-                    buffer.write(&block_height.to_be_bytes())?;
+                    buffer.write_all(&block_height.to_be_bytes())?;
                     // txin's vout index
                     let vout = input.previous_output.vout as u16;
-                    buffer.write(&vout.to_be_bytes())?;
+                    buffer.write_all(&vout.to_be_bytes())?;
                     // txin's sats value
                     let sats = input.previous_output.value;
-                    buffer.write(&sats.to_be_bytes())?;
+                    buffer.write_all(&sats.to_be_bytes())?;
                 }
             }
             // For each transaction output:
             for output in tx.metadata.outputs.iter() {
                 let sats = output.value;
-                buffer.write(&sats.to_be_bytes())?;
+                buffer.write_all(&sats.to_be_bytes())?;
             }
         }
         Ok(buffer)

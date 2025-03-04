@@ -48,7 +48,7 @@ pub fn bitcoind_wait_for_chain_tip(config: &BitcoindConfig, ctx: &Context) {
     loop {
         match bitcoin_rpc.get_blockchain_info() {
             Ok(result) => {
-                if result.initial_block_download == false && result.blocks == result.headers {
+                if !result.initial_block_download && result.blocks == result.headers {
                     confirmations += 1;
                     // Wait for 10 confirmations before declaring node is at chain tip, just in case it's still connecting to
                     // peers.

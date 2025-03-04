@@ -82,7 +82,7 @@ pub async fn start_zeromq_runloop(
 
         while let Some(block_hash) = block_hashes.pop_front() {
             let block =
-                match download_and_parse_block_with_retry(&http_client, &block_hash, &config, ctx)
+                match download_and_parse_block_with_retry(&http_client, &block_hash, config, ctx)
                     .await
                 {
                     Ok(block) => block,

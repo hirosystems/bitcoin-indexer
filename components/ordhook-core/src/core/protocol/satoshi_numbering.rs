@@ -74,6 +74,8 @@ pub fn compute_satoshi_number(
                 tx.inputs[inscription_input_index].block_height,
             )
         }
+        // TODO: check if to remove this loop
+        #[allow(clippy::never_loop)]
         None => loop {
             match find_pinned_block_bytes_at_block_height(ordinal_block_number, 3, &blocks_db, &ctx)
             {
@@ -161,6 +163,8 @@ pub fn compute_satoshi_number(
         }
 
         let pinned_block_bytes = {
+            // TODO: check if to remove this loop
+            #[allow(clippy::never_loop)]
             loop {
                 match find_pinned_block_bytes_at_block_height(
                     ordinal_block_number,
