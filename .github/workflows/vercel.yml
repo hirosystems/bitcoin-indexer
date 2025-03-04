@@ -9,6 +9,7 @@ on:
     branches:
       - beta
       - develop
+      - vercel
   pull_request:
   release:
     types:
