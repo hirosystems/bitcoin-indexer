@@ -16,7 +16,7 @@
     "lint:prettier": "prettier --check src/**/*.ts tests/**/*.ts",
     "lint:unused-exports": "ts-unused-exports tsconfig.json --showLineNumber --excludePathsFromReport=util/*",
     "generate:openapi": "rimraf ./tmp && node -r ts-node/register ./util/openapi-generator.ts",
-    "generate:docs": "redoc-cli build --output ./tmp/index.html ./tmp/openapi.yaml",
+    "generate:docs": "redoc-cli build --output ./tmp/index.html ./tmp/openapi.yaml &&  mv ./tmp ../../tmp && mv ../../tmp/tmp ../../tmp/ordinals",
     "generate:git-info": "rimraf .git-info && node_modules/.bin/api-toolkit-git-info",
     "generate:vercel": "npm run generate:git-info && npm run generate:openapi && npm run generate:docs",
     "testenv:run": "docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml up",

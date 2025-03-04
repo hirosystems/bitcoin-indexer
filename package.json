@@ -1,0 +1,13 @@
+{
+  "name": "bitcoin-indexer",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Hiro Systems PBC <engineering@hiro.so> (https://hiro.so)",
+  "license": "Apache 2.0",
+  "scripts": {
+    "generate:vercel": "rimraf ./tmp && mkdir ./tmp && npm run generate:vercel --prefix api/ordinals && npm run generate:vercel --prefix api/runes"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1"
+  }
+}
