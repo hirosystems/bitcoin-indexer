@@ -9,7 +9,7 @@
     "start-ts": "ts-node ./src/index.ts",
     "test": "jest --runInBand",
     "generate:openapi": "rimraf ./tmp && node -r ts-node/register ./util/openapi-generator.ts",
-    "generate:docs": "redoc-cli build --output ./tmp/index.html ./tmp/openapi.yaml && mv ./tmp ../../tmp && mv ../../tmp/tmp ../../tmp/runes",
+    "generate:docs": "redoc-cli build --output ./tmp/index.html ./tmp/openapi.yaml",
     "generate:git-info": "rimraf .git-info && node_modules/.bin/api-toolkit-git-info",
     "generate:vercel": "npm run generate:git-info && npm run generate:openapi && npm run generate:docs",
     "lint:eslint": "eslint . --ext .ts,.tsx -f unix",
