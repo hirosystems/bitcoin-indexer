@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use bitcoin::{Address, Network, ScriptBuf};
 use chainhook_sdk::utils::Context;
@@ -52,10 +52,12 @@ pub async fn augment_block_with_transfers(
     ctx: &Context,
 ) -> Result<(), String> {
     let network = get_bitcoin_network(&block.metadata.network);
+    let mut block_transferred_satpoints = HashMap::new();
     for (tx_index, tx) in block.transactions.iter_mut().enumerate() {
-        let _ = augment_transaction_with_ordinal_transfers(
+        augment_transaction_with_ordinal_transfers(
             tx,
             tx_index,
+            &mut block_transferred_satpoints,
             &block.block_identifier,
             &network,
             db_tx,
@@ -146,13 +148,12 @@ pub fn compute_satpoint_post_transfer(
 pub async fn augment_transaction_with_ordinal_transfers(
     tx: &mut BitcoinTransactionData,
     tx_index: usize,
+    block_transferred_satpoints: &mut HashMap<String, Vec<WatchedSatpoint>>,
     block_identifier: &BlockIdentifier,
     network: &Network,
     db_tx: &Transaction<'_>,
     ctx: &Context,
-) -> Result<Vec<OrdinalInscriptionTransferData>, String> {
-    let mut transfers = vec![];
-
+) -> Result<(), String> {
     // The transfers are inserted in storage after the inscriptions.
     // We have a unicity constraing, and can only have 1 ordinals per satpoint.
     let mut updated_sats = HashSet::new();
@@ -162,11 +163,33 @@ pub async fn augment_transaction_with_ordinal_transfers(
         }
     }
 
-    // For each satpoint inscribed retrieved, we need to compute the next outpoint to watch
-    let input_entries =
-        ordinals_pg::get_inscribed_satpoints_at_tx_inputs(&tx.metadata.inputs, db_tx).await?;
+    // Load all sats that will be transferred with this transaction i.e. loop through all tx inputs and look for previous
+    // satpoints we need to move.
+    //
+    // Since the DB state is currently at the end of the previous block, and there may be multiple transfers for the same sat in
+    // this new block, we'll use a memory cache to keep all sats that have been transferred but have not yet been written into the
+    // DB.
+    let mut cached_satpoints = HashMap::new();
+    let mut inputs_for_db_lookup = vec![];
+    for (vin, input) in tx.metadata.inputs.iter().enumerate() {
+        let output_key = format_outpoint_to_watch(
+            &input.previous_output.txid,
+            input.previous_output.vout as usize,
+        );
+        // Look in memory cache, or save for a batched DB lookup later.
+        if let Some(watched_satpoints) = block_transferred_satpoints.remove(&output_key) {
+            cached_satpoints.insert(vin, watched_satpoints);
+        } else {
+            inputs_for_db_lookup.push((vin, output_key));
+        }
+    }
+    let mut input_satpoints =
+        ordinals_pg::get_inscribed_satpoints_at_tx_inputs(&inputs_for_db_lookup, db_tx).await?;
+    input_satpoints.extend(cached_satpoints);
+
+    // Process all transfers across all inputs.
     for (input_index, input) in tx.metadata.inputs.iter().enumerate() {
-        let Some(entries) = input_entries.get(&input_index) else {
+        let Some(entries) = input_satpoints.get(&input_index) else {
             continue;
         };
         for watched_satpoint in entries.into_iter() {
@@ -199,6 +222,12 @@ pub async fn augment_transaction_with_ordinal_transfers(
                 satpoint_post_transfer: satpoint_post_transfer.clone(),
                 post_transfer_output_value,
             };
+            // Keep an in-memory copy of this watchpoint at its new tx output for later retrieval.
+            let (output, _) = parse_output_and_offset_from_satpoint(&satpoint_post_transfer)?;
+            let entry = block_transferred_satpoints
+                .entry(output)
+                .or_insert(vec![]);
+            entry.push(watched_satpoint.clone());
 
             try_info!(
                 ctx,
@@ -208,14 +237,13 @@ pub async fn augment_transaction_with_ordinal_transfers(
                 satpoint_post_transfer,
                 block_identifier.index
             );
-            transfers.push(transfer_data.clone());
             tx.metadata
                 .ordinal_operations
                 .push(OrdinalOperation::InscriptionTransferred(transfer_data));
         }
     }
 
-    Ok(transfers)
+    Ok(())
 }
 
 #[cfg(test)]
