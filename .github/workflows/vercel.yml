@@ -19,10 +19,6 @@ jobs:
   vercel:
     runs-on: ubuntu-latest
 
-    environment:
-      name: ${{ github.ref_name == 'main' && 'Production' || 'Preview' }}
-      url: 'https://bitcoin-indexer.vercel.app/'
-
     steps:
       - uses: actions/checkout@v2
         with:
