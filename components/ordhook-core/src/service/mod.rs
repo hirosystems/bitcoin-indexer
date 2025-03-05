@@ -96,13 +96,12 @@ impl Service {
                 let registry_moved = self.prometheus.registry.clone();
                 let ctx_cloned = self.ctx.clone();
                 let port = metrics.prometheus_port;
-                let _ = std::thread::spawn(move || {
-                    let _ = hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
-                        port,
-                        registry_moved,
-                        ctx_cloned,
-                    ));
-                });
+                let _ =
+                    std::thread::spawn(move || {
+                        let _ = hiro_system_kit::nestable_block_on(
+                            start_serving_prometheus_metrics(port, registry_moved, ctx_cloned),
+                        );
+                    });
             }
         }
         let (max_inscription_number, chain_tip) = {
@@ -265,9 +264,9 @@ impl Service {
     }
 
     /// Synchronizes and indexes all databases until their block height matches bitcoind's block height.
-    pub async fn catch_up_to_bitcoin_chain_tip(&self) -> Result<(), String> {
+    pub async fn catch_up_to_bitcoin_chain_tip(&self) -> Result<BlockIdentifier, String> {
         // 0: Make sure bitcoind is synchronized.
-        bitcoind_wait_for_chain_tip(&self.config.bitcoind, &self.ctx);
+        let mut chain_tip = bitcoind_wait_for_chain_tip(&self.config.bitcoind, &self.ctx);
 
         // 1: Catch up blocks DB so it is at least at the same height as the ordinals DB.
         if let Some((start_block, end_block)) =
@@ -328,7 +327,7 @@ impl Service {
         }
 
         try_info!(self.ctx, "Index has reached bitcoin chain tip");
-        Ok(())
+        Ok(chain_tip)
     }
 }
 

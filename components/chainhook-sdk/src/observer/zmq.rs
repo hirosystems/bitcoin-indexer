@@ -1,3 +1,4 @@
+use chainhook_types::BlockIdentifier;
 use config::BitcoindConfig;
 use hiro_system_kit::slog;
 use std::sync::mpsc::Sender;
@@ -8,7 +9,7 @@ use crate::{
         bitcoin::{build_http_client, download_and_parse_block_with_retry},
         fork_scratch_pad::ForkScratchPad,
     },
-    try_info, try_warn,
+    try_debug, try_info, try_warn,
     utils::Context,
 };
 use std::collections::VecDeque;
@@ -33,12 +34,29 @@ fn new_zmq_socket() -> Socket {
 
 pub async fn start_zeromq_runloop(
     config: &BitcoindConfig,
+    index_chain_tip: &BlockIdentifier,
     observer_commands_tx: Sender<ObserverCommand>,
     ctx: &Context,
-) {
-    let bitcoind_zmq_url = config.zmq_url.clone();
+) -> Result<(), String> {
     let http_client = build_http_client();
+    let mut bitcoin_blocks_pool = ForkScratchPad::new();
 
+    // Initialize the `ForkScratchPad` with the current index's last seen block, so we can detect any re-orgs or gaps that may
+    // come our way with the next ZMQ messages.
+    let last_block =
+        download_and_parse_block_with_retry(&http_client, index_chain_tip.get_hash_bytes_str(), config, ctx)
+            .await?;
+    match bitcoin_blocks_pool.process_header(last_block.get_block_header(), ctx) {
+        Ok(_) => {
+            try_debug!(
+                ctx,
+                "zmq: Primed fork processor with last seen block hash {index_chain_tip}"
+            );
+        }
+        Err(e) => return Err(format!("zmq: Unable to load last seen block: {e}")),
+    }
+
+    let bitcoind_zmq_url = config.zmq_url.clone();
     try_info!(
         ctx,
         "zmq: Waiting for ZMQ connection acknowledgment from bitcoind"
@@ -50,8 +68,6 @@ pub async fn start_zeromq_runloop(
         ctx,
         "zmq: Connected, waiting for ZMQ messages from bitcoind"
     );
-
-    let mut bitcoin_blocks_pool = ForkScratchPad::new();
 
     loop {
         let msg = match socket.recv_multipart(0) {
@@ -82,20 +98,16 @@ pub async fn start_zeromq_runloop(
         block_hashes.push_front(block_hash);
 
         while let Some(block_hash) = block_hashes.pop_front() {
-            let block = match download_and_parse_block_with_retry(
-                &http_client,
-                &block_hash,
-                &config,
-                ctx,
-            )
-            .await
-            {
-                Ok(block) => block,
-                Err(e) => {
-                    try_warn!(ctx, "zmq: Unable to download block: {e}");
-                    continue;
-                }
-            };
+            let block =
+                match download_and_parse_block_with_retry(&http_client, &block_hash, &config, ctx)
+                    .await
+                {
+                    Ok(block) => block,
+                    Err(e) => {
+                        try_warn!(ctx, "zmq: Unable to download block: {e}");
+                        continue;
+                    }
+                };
 
             let header = block.get_block_header();
             try_info!(ctx, "zmq: Standardizing bitcoin block #{}", block.height);

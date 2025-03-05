@@ -143,91 +143,10 @@ impl ObserverSidecar {
     }
 }
 
-/// A helper struct used to configure and call [start_event_observer], which spawns a thread to observer chain events.
-///
-/// ### Examples
-/// ```
-/// use chainhook_sdk::observer::EventObserverBuilder;
-/// use chainhook_sdk::observer::ObserverCommand;
-/// use chainhook_sdk::utils::Context;
-/// use config::BitcoindConfig;
-/// use std::error::Error;
-/// use std::sync::mpsc::{Receiver, Sender};
-///
-/// fn start_event_observer(
-///     config: BitcoindConfig,
-///     observer_commands_tx: &Sender<ObserverCommand>,
-///     observer_commands_rx: Receiver<ObserverCommand>,
-///     ctx: &Context,
-/// )-> Result<(), Box<dyn Error>> {
-///     EventObserverBuilder::new(
-///         config,
-///         &observer_commands_tx,
-///         observer_commands_rx,
-///         &ctx
-///     )
-///     .start()
-/// }
-/// ```
-pub struct EventObserverBuilder {
-    config: BitcoindConfig,
-    observer_commands_tx: Sender<ObserverCommand>,
-    observer_commands_rx: Receiver<ObserverCommand>,
-    ctx: Context,
-    observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
-    observer_sidecar: Option<ObserverSidecar>,
-}
-
-impl EventObserverBuilder {
-    pub fn new(
-        config: BitcoindConfig,
-        observer_commands_tx: &Sender<ObserverCommand>,
-        observer_commands_rx: Receiver<ObserverCommand>,
-        ctx: &Context,
-    ) -> Self {
-        EventObserverBuilder {
-            config,
-            observer_commands_tx: observer_commands_tx.clone(),
-            observer_commands_rx,
-            ctx: ctx.clone(),
-            observer_events_tx: None,
-            observer_sidecar: None,
-        }
-    }
-
-    /// Sets the `observer_events_tx` Sender. Set this and listen on the corresponding
-    /// Receiver to be notified of every [ObserverEvent].
-    pub fn events_tx(
-        &mut self,
-        observer_events_tx: crossbeam_channel::Sender<ObserverEvent>,
-    ) -> &mut Self {
-        self.observer_events_tx = Some(observer_events_tx);
-        self
-    }
-
-    /// Sets a sidecar for the observer. See [ObserverSidecar].
-    pub fn sidecar(&mut self, sidecar: ObserverSidecar) -> &mut Self {
-        self.observer_sidecar = Some(sidecar);
-        self
-    }
-
-    /// Starts the event observer, calling [start_event_observer]. This function consumes the
-    /// [EventObserverBuilder] and spawns a new thread to run the observer.
-    pub fn start(self) -> Result<(), Box<dyn Error>> {
-        start_event_observer(
-            self.config,
-            self.observer_commands_tx,
-            self.observer_commands_rx,
-            self.observer_events_tx,
-            self.observer_sidecar,
-            self.ctx,
-        )
-    }
-}
-
-/// Spawns a thread to observe blockchain events. Use [EventObserverBuilder] to configure easily.
+/// Spawns a thread to observe blockchain events.
 pub fn start_event_observer(
     config: BitcoindConfig,
+    index_chain_tip: &BlockIdentifier,
     observer_commands_tx: Sender<ObserverCommand>,
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
@@ -244,10 +163,12 @@ pub fn start_event_observer(
     let context_cloned = ctx.clone();
     let event_observer_config_moved = config.clone();
     let observer_commands_tx_moved = observer_commands_tx.clone();
+    let chain_tip_moved = index_chain_tip.clone();
     let _ = hiro_system_kit::thread_named("Chainhook event observer")
         .spawn(move || {
             let future = start_bitcoin_event_observer(
                 event_observer_config_moved,
+                &chain_tip_moved,
                 observer_commands_tx_moved,
                 observer_commands_rx,
                 observer_events_tx.clone(),
@@ -275,6 +196,7 @@ pub fn start_event_observer(
 
 pub async fn start_bitcoin_event_observer(
     config: BitcoindConfig,
+    index_chain_tip: &BlockIdentifier,
     _observer_commands_tx: Sender<ObserverCommand>,
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
@@ -283,9 +205,15 @@ pub async fn start_bitcoin_event_observer(
 ) -> Result<(), Box<dyn Error>> {
     let ctx_moved = ctx.clone();
     let config_moved = config.clone();
+    let chain_tip_moved = index_chain_tip.clone();
     let _ = hiro_system_kit::thread_named("ZMQ handler").spawn(move || {
-        let future = zmq::start_zeromq_runloop(&config_moved, _observer_commands_tx, &ctx_moved);
-        hiro_system_kit::nestable_block_on(future);
+        let future = zmq::start_zeromq_runloop(
+            &config_moved,
+            &chain_tip_moved,
+            _observer_commands_tx,
+            &ctx_moved,
+        );
+        hiro_system_kit::nestable_block_on(future)
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.

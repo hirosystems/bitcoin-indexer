@@ -2,6 +2,7 @@ use std::{thread::sleep, time::Duration};
 
 use crate::utils::Context;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
+use chainhook_types::BlockIdentifier;
 use config::BitcoindConfig;
 use hiro_system_kit::slog;
 
@@ -43,7 +44,7 @@ pub fn bitcoind_get_block_height(config: &BitcoindConfig, ctx: &Context) -> u64 
 }
 
 /// Checks if bitcoind is still synchronizing blocks and waits until it's finished if that is the case.
-pub fn bitcoind_wait_for_chain_tip(config: &BitcoindConfig, ctx: &Context) {
+pub fn bitcoind_wait_for_chain_tip(config: &BitcoindConfig, ctx: &Context) -> BlockIdentifier {
     let bitcoin_rpc = bitcoind_get_client(config, ctx);
     let mut confirmations = 0;
     loop {
@@ -55,7 +56,10 @@ pub fn bitcoind_wait_for_chain_tip(config: &BitcoindConfig, ctx: &Context) {
                     // peers.
                     if confirmations == 10 {
                         try_info!(ctx, "bitcoind: Chain tip reached");
-                        return;
+                        return BlockIdentifier {
+                            index: result.blocks,
+                            hash: format!("0x{}", result.best_block_hash.to_string()),
+                        };
                     }
                     try_info!(ctx, "bitcoind: Verifying chain tip");
                 } else {
