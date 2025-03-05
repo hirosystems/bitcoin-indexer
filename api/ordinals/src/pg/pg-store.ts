@@ -172,7 +172,7 @@ export class PgStore extends BasePgStore {
             i.curse_type,
             i.ordinal_number AS sat_ordinal,
             (
-              SELECT ip.parent_inscription_id
+              SELECT STRING_AGG(ip.parent_inscription_id, ',')
               FROM inscription_parents AS ip
               WHERE ip.inscription_id = i.inscription_id
             ) AS parent_refs,
