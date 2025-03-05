@@ -29,7 +29,7 @@ async fn index_unverified_brc20_transfers(
     }
     let mut results = vec![];
     let mut verified_brc20_transfers =
-        verify_brc20_transfers(transfers, brc20_cache, &brc20_db_tx, &ctx).await?;
+        verify_brc20_transfers(transfers, brc20_cache, brc20_db_tx, ctx).await?;
     // Sort verified transfers by tx_index to make sure they are applied in the order they came through.
     verified_brc20_transfers.sort_by(|a, b| a.2.tx_index.cmp(&b.2.tx_index));
 
@@ -118,8 +118,8 @@ pub async fn index_block_and_insert_brc20_operations(
                         &block.block_identifier,
                         &block.metadata.network,
                         brc20_cache,
-                        &brc20_db_tx,
-                        &ctx,
+                        brc20_db_tx,
+                        ctx,
                     )
                     .await?
                     else {

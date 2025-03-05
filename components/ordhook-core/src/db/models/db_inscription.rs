@@ -79,7 +79,7 @@ impl DbInscription {
             }),
             recursive: false, // This will be determined later
             input_index: PgBigIntU32(reveal.inscription_input_index as u32),
-            pointer: reveal.inscription_pointer.map(|p| PgNumericU64(p)),
+            pointer: reveal.inscription_pointer.map(PgNumericU64),
             metadata: reveal.metadata.as_ref().map(|m| m.to_string()),
             metaprotocol: reveal.metaprotocol.clone(),
             delegate: reveal.delegate.clone(),

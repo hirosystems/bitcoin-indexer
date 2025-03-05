@@ -164,7 +164,7 @@ async fn process_blocks(
 
         index_block(
             &mut block,
-            &next_blocks,
+            next_blocks,
             sequence_cursor,
             &mut cache_l1,
             cache_l2,
@@ -210,11 +210,11 @@ pub async fn index_block(
 
         // Parsed BRC20 ops will be deposited here for this block.
         let mut brc20_operation_map = HashMap::new();
-        parse_inscriptions_in_standardized_block(block, &mut brc20_operation_map, config, &ctx);
+        parse_inscriptions_in_standardized_block(block, &mut brc20_operation_map, config, ctx);
 
         let has_inscription_reveals = parallelize_inscription_data_computations(
-            &block,
-            &next_blocks,
+            block,
+            next_blocks,
             cache_l1,
             cache_l2,
             config,
@@ -245,7 +245,7 @@ pub async fn index_block(
                 &mut brc20_operation_map,
                 brc20_cache,
                 &brc20_tx,
-                &ctx,
+                ctx,
             )
             .await?;
 

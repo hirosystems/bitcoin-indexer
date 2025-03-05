@@ -62,43 +62,38 @@ pub fn compute_satoshi_number(
     let mut back_track = vec![];
 
     let (mut tx_cursor, mut ordinal_block_number) = match traversals_cache
-        .get(&(block_identifier.index as u32, txid.clone()))
+        .get(&(block_identifier.index as u32, txid))
     {
         Some(entry) => {
             let tx = entry.value();
             (
                 (
-                    tx.inputs[inscription_input_index].txin.clone(),
+                    tx.inputs[inscription_input_index].txin,
                     tx.inputs[inscription_input_index].vout.into(),
                 ),
                 tx.inputs[inscription_input_index].block_height,
             )
         }
-        // TODO: check if to remove this loop
-        #[allow(clippy::never_loop)]
-        None => loop {
-            match find_pinned_block_bytes_at_block_height(ordinal_block_number, 3, &blocks_db, &ctx)
-            {
+        None => {
+            match find_pinned_block_bytes_at_block_height(ordinal_block_number, 3, blocks_db, ctx) {
                 None => {
                     return Err(format!("block #{ordinal_block_number} not in database"));
                 }
                 Some(block_bytes) => {
-                    let cursor = BlockBytesCursor::new(&block_bytes.as_ref());
+                    let cursor = BlockBytesCursor::new(block_bytes.as_ref());
                     match cursor.find_and_serialize_transaction_with_txid(&txid) {
-                        Some(tx) => {
-                            break (
-                                (
-                                    tx.inputs[inscription_input_index].txin.clone(),
-                                    tx.inputs[inscription_input_index].vout.into(),
-                                ),
-                                tx.inputs[inscription_input_index].block_height,
-                            );
-                        }
+                        Some(tx) => (
+                            (
+                                tx.inputs[inscription_input_index].txin,
+                                tx.inputs[inscription_input_index].vout.into(),
+                            ),
+                            tx.inputs[inscription_input_index].block_height,
+                        ),
                         None => return Err(format!("txid not in block #{ordinal_block_number}")),
                     }
                 }
             }
-        },
+        }
     };
 
     let mut hops: u32 = 0;
@@ -132,7 +127,7 @@ pub fn compute_satoshi_number(
                 if sats_out < sats_in {
                     ordinal_offset = sats_out - (sats_in - input.txin_value);
                     ordinal_block_number = input.block_height;
-                    tx_cursor = (input.txin.clone(), input.vout as usize);
+                    tx_cursor = (input.txin, input.vout as usize);
                     next_found_in_cache = true;
                     break;
                 }
@@ -163,19 +158,10 @@ pub fn compute_satoshi_number(
         }
 
         let pinned_block_bytes = {
-            // TODO: check if to remove this loop
-            #[allow(clippy::never_loop)]
-            loop {
-                match find_pinned_block_bytes_at_block_height(
-                    ordinal_block_number,
-                    3,
-                    &blocks_db,
-                    &ctx,
-                ) {
-                    Some(block) => break block,
-                    None => {
-                        return Err(format!("block #{ordinal_block_number} not in database (traversing {} / {} in progress)", transaction_identifier.hash, block_identifier.index));
-                    }
+            match find_pinned_block_bytes_at_block_height(ordinal_block_number, 3, blocks_db, ctx) {
+                Some(block) => block,
+                None => {
+                    return Err(format!("block #{ordinal_block_number} not in database (traversing {} / {} in progress)", transaction_identifier.hash, block_identifier.index));
                 }
             }
         };
@@ -195,7 +181,7 @@ pub fn compute_satoshi_number(
             }
             ordinal_offset += intra_coinbase_output_offset;
 
-            let subsidy = Height(ordinal_block_number.into()).subsidy();
+            let subsidy = Height(ordinal_block_number).subsidy();
             if ordinal_offset < subsidy {
                 // Great!
                 break;
@@ -229,7 +215,7 @@ pub fn compute_satoshi_number(
                         if sats_in > total_out {
                             ordinal_offset = total_out - (sats_in - input.txin_value);
                             ordinal_block_number = input.block_height;
-                            tx_cursor = (input.txin.clone(), input.vout as usize);
+                            tx_cursor = (input.txin, input.vout as usize);
                             break;
                         }
                     }
@@ -268,12 +254,12 @@ pub fn compute_satoshi_number(
                 sats_in += input.txin_value;
 
                 if sats_out < sats_in {
-                    back_track.push((ordinal_block_number, tx_cursor.0.clone(), tx_cursor.1));
+                    back_track.push((ordinal_block_number, tx_cursor.0, tx_cursor.1));
                     traversals_cache
                         .insert((ordinal_block_number, tx_cursor.0), tx_bytes_cursor.clone());
                     ordinal_offset = sats_out - (sats_in - input.txin_value);
                     ordinal_block_number = input.block_height;
-                    tx_cursor = (input.txin.clone(), input.vout as usize);
+                    tx_cursor = (input.txin, input.vout as usize);
                     break;
                 }
             }
@@ -299,7 +285,7 @@ pub fn compute_satoshi_number(
         }
     }
 
-    let height = Height(ordinal_block_number.into());
+    let height = Height(ordinal_block_number);
     let ordinal_number = height.starting_sat().0 + ordinal_offset;
 
     Ok((

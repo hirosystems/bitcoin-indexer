@@ -108,7 +108,7 @@ pub async fn verify_brc20_operation(
                 return Ok(None);
             };
             if data.tick.len() == 5 {
-                if reveal.parents.len() == 0 {
+                if reveal.parents.is_empty() {
                     try_debug!(
                         ctx,
                         "BRC-20: Attempting to mint self-minted token {} without a parent ref",
@@ -187,7 +187,7 @@ pub async fn verify_brc20_operation(
                 return Ok(None);
             }
             let Some(avail_balance) = cache
-                .get_token_address_avail_balance(&token.ticker, &inscriber_address, db_tx)
+                .get_token_address_avail_balance(&token.ticker, inscriber_address, db_tx)
                 .await?
             else {
                 try_debug!(
@@ -293,7 +293,7 @@ pub async fn verify_brc20_transfers(
             (*tx_identifier).clone(),
         ));
     }
-    return Ok(results);
+    Ok(results)
 }
 
 #[cfg(test)]

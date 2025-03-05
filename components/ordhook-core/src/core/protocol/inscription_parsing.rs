@@ -33,7 +33,7 @@ pub fn parse_inscriptions_from_witness(
     let envelopes: Vec<Envelope<Inscription>> = Envelope::from_tapscript(tapscript, input_index)
         .ok()?
         .into_iter()
-        .map(|e| ParsedEnvelope::from(e))
+        .map(ParsedEnvelope::from)
         .collect();
     let mut inscriptions = vec![];
     for envelope in envelopes.into_iter() {
@@ -63,9 +63,9 @@ pub fn parse_inscriptions_from_witness(
         };
 
         let no_content_bytes = vec![];
-        let inscription_content_bytes = envelope.payload.body().take().unwrap_or(&no_content_bytes);
+        let inscription_content_bytes = envelope.payload.body().unwrap_or(&no_content_bytes);
         let mut content_bytes = "0x".to_string();
-        content_bytes.push_str(&hex::encode(&inscription_content_bytes));
+        content_bytes.push_str(&hex::encode(inscription_content_bytes));
 
         let parents = envelope
             .payload
@@ -73,15 +73,9 @@ pub fn parse_inscriptions_from_witness(
             .iter()
             .map(|i| i.to_string())
             .collect();
-        let delegate = envelope
-            .payload
-            .delegate()
-            .and_then(|i| Some(i.to_string()));
-        let metaprotocol = envelope
-            .payload
-            .metaprotocol()
-            .and_then(|p| Some(p.to_string()));
-        let metadata = envelope.payload.metadata().and_then(|m| Some(json!(m)));
+        let delegate = envelope.payload.delegate().map(|i| i.to_string());
+        let metaprotocol = envelope.payload.metaprotocol().map(|p| p.to_string());
+        let metadata = envelope.payload.metadata().map(|m| json!(m));
 
         // Most of these fields will be calculated later when we know for certain which satoshi contains this inscription.
         let reveal_data = OrdinalInscriptionRevealData {
@@ -104,7 +98,7 @@ pub fn parse_inscriptions_from_witness(
             ordinal_block_height: 0,
             ordinal_offset: 0,
             transfers_pre_inscription: 0,
-            satpoint_post_inscription: format!(""),
+            satpoint_post_inscription: String::new(),
             curse_type,
             charms: 0,
             unbound_sequence: None,
@@ -137,8 +131,7 @@ pub fn parse_inscriptions_from_standardized_tx(
         ) {
             for (reveal, inscription) in inscriptions.into_iter() {
                 if let Some(brc20) = config.ordinals_brc20_config() {
-                    if brc20.enabled && block_identifier.index >= brc20_activation_height(&network)
-                    {
+                    if brc20.enabled && block_identifier.index >= brc20_activation_height(network) {
                         match parse_brc20_operation(&inscription) {
                             Ok(Some(op)) => {
                                 brc20_operation_map.insert(reveal.inscription_id.clone(), op);

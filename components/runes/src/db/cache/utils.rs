@@ -54,7 +54,7 @@ pub async fn input_rune_balances_from_tx_inputs(
     }
     // Look for cache misses in database. We don't need to `flush` the DB cache here because we've already looked in the current
     // block's output cache.
-    if cache_misses.len() > 0 {
+    if !cache_misses.is_empty() {
         let output_balances = pg_get_input_rune_balances(cache_misses, db_tx, ctx).await;
         indexed_input_runes.extend(output_balances);
     }
@@ -86,9 +86,9 @@ pub fn move_block_output_cache_to_output_cache(
     output_cache: &mut LruCache<(String, u32), HashMap<RuneId, Vec<InputRuneBalance>>>,
 ) {
     for (k, block_output_map) in block_output_cache.iter() {
-        if let Some(v) = output_cache.get_mut(&k) {
+        if let Some(v) = output_cache.get_mut(k) {
             for (rune_id, balances) in block_output_map.iter() {
-                if let Some(rune_balance) = v.get_mut(&rune_id) {
+                if let Some(rune_balance) = v.get_mut(rune_id) {
                     rune_balance.extend(balances.clone());
                 } else {
                     v.insert(*rune_id, balances.clone());

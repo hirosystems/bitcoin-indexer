@@ -30,7 +30,7 @@ pub fn parse_output_and_offset_from_satpoint(
 ) -> Result<(String, Option<u64>), String> {
     let parts: Vec<&str> = satpoint.split(':').collect();
     let tx_id = parts
-        .get(0)
+        .first()
         .ok_or("get_output_and_offset_from_satpoint: tx_id not found")?;
     let output = parts
         .get(1)
@@ -77,8 +77,13 @@ pub fn compute_satpoint_post_transfer(
         .inputs
         .iter()
         .map(|o| o.previous_output.value)
-        .collect::<_>();
-    let outputs = tx.metadata.outputs.iter().map(|o| o.value).collect::<_>();
+        .collect::<Vec<_>>();
+    let outputs = tx
+        .metadata
+        .outputs
+        .iter()
+        .map(|o| o.value)
+        .collect::<Vec<_>>();
     let post_transfer_data = compute_next_satpoint_data(
         input_index,
         &inputs,
@@ -92,8 +97,8 @@ pub fn compute_satpoint_post_transfer(
             SatPosition::Output((output_index, offset)) => {
                 let outpoint = format_outpoint_to_watch(&tx.transaction_identifier, output_index);
                 let script_pub_key_hex = tx.metadata.outputs[output_index].get_script_pubkey_hex();
-                let updated_address = match ScriptBuf::from_hex(&script_pub_key_hex) {
-                    Ok(script) => match Address::from_script(&script, network.clone()) {
+                let updated_address = match ScriptBuf::from_hex(script_pub_key_hex) {
+                    Ok(script) => match Address::from_script(&script, network) {
                         Ok(address) => {
                             OrdinalInscriptionTransferDestination::Transferred(address.to_string())
                         }
@@ -168,7 +173,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
         let Some(entries) = input_entries.get(&input_index) else {
             continue;
         };
-        for watched_satpoint in entries.into_iter() {
+        for watched_satpoint in entries.iter() {
             if updated_sats.contains(&watched_satpoint.ordinal_number) {
                 continue;
             }
@@ -183,7 +188,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
 
             let (destination, satpoint_post_transfer, post_transfer_output_value) =
                 compute_satpoint_post_transfer(
-                    &&*tx,
+                    &*tx,
                     input_index,
                     watched_satpoint.offset,
                     network,

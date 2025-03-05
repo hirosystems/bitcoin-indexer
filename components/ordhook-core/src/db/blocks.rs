@@ -48,11 +48,11 @@ fn rocks_db_default_options(ulimit: usize, _memory_available: usize) -> Options 
 
 pub fn open_blocks_db_with_retry(readwrite: bool, config: &Config, ctx: &Context) -> DB {
     let mut retries = 0;
-    let blocks_db = loop {
+    loop {
         let res = if readwrite {
-            open_readwrite_blocks_db(config, &ctx)
+            open_readwrite_blocks_db(config, ctx)
         } else {
-            open_readonly_blocks_db(config, &ctx)
+            open_readonly_blocks_db(config, ctx)
         };
         match res {
             Ok(db) => break db,
@@ -67,8 +67,7 @@ pub fn open_blocks_db_with_retry(readwrite: bool, config: &Config, ctx: &Context
                 continue;
             }
         }
-    };
-    blocks_db
+    }
 }
 
 pub fn open_readonly_blocks_db(config: &Config, _ctx: &Context) -> Result<DB, String> {
@@ -78,15 +77,15 @@ pub fn open_readonly_blocks_db(config: &Config, _ctx: &Context) -> Result<DB, St
     opts.set_disable_auto_compactions(true);
     opts.set_max_background_jobs(0);
     let db = DB::open_for_read_only(&opts, path, false)
-        .map_err(|e| format!("unable to read hord.rocksdb: {}", e.to_string()))?;
+        .map_err(|e| format!("unable to read hord.rocksdb: {}", e))?;
     Ok(db)
 }
 
 fn open_readwrite_blocks_db(config: &Config, _ctx: &Context) -> Result<DB, String> {
     let path = get_default_blocks_db_path(&config.expected_cache_path());
     let opts = rocks_db_default_options(config.resources.ulimit, config.resources.memory_available);
-    let db = DB::open(&opts, path)
-        .map_err(|e| format!("unable to read-write hord.rocksdb: {}", e.to_string()))?;
+    let db =
+        DB::open(&opts, path).map_err(|e| format!("unable to read-write hord.rocksdb: {}", e))?;
     Ok(db)
 }
 
@@ -100,7 +99,7 @@ pub fn insert_entry_in_blocks(
     let block_height_bytes = block_height.to_be_bytes();
     let mut retries = 0;
     loop {
-        let res = blocks_db_rw.put(&block_height_bytes, block_bytes);
+        let res = blocks_db_rw.put(block_height_bytes, block_bytes);
         match res {
             Ok(_) => break,
             Err(e) => {
@@ -165,7 +164,7 @@ pub fn find_pinned_block_bytes_at_block_height<'a>(
     }
 }
 
-pub fn find_block_bytes_at_block_height<'a>(
+pub fn find_block_bytes_at_block_height(
     block_height: u32,
     retry: u8,
     blocks_db: &DB,
@@ -202,13 +201,13 @@ pub fn find_block_bytes_at_block_height<'a>(
 
 pub fn run_compaction(blocks_db_rw: &DB, lim: u32) {
     let gen = 0u32.to_be_bytes();
-    let _ = blocks_db_rw.compact_range(Some(&gen), Some(&lim.to_be_bytes()));
+    blocks_db_rw.compact_range(Some(&gen), Some(&lim.to_be_bytes()));
 }
 
 pub fn find_missing_blocks(blocks_db: &DB, start: u32, end: u32, ctx: &Context) -> Vec<u32> {
     let mut missing_blocks = vec![];
     for i in start..=end {
-        if find_pinned_block_bytes_at_block_height(i as u32, 0, &blocks_db, ctx).is_none() {
+        if find_pinned_block_bytes_at_block_height(i, 0, blocks_db, ctx).is_none() {
             missing_blocks.push(i);
         }
     }

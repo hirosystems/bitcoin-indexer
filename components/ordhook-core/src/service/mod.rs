@@ -106,12 +106,13 @@ impl Service {
                 let registry_moved = self.prometheus.registry.clone();
                 let ctx_cloned = self.ctx.clone();
                 let port = metrics.prometheus_port;
-                let _ =
-                    std::thread::spawn(move || {
-                        let _ = hiro_system_kit::nestable_block_on(
-                            start_serving_prometheus_metrics(port, registry_moved, ctx_cloned),
-                        );
-                    });
+                let _ = std::thread::spawn(move || {
+                    hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
+                        port,
+                        registry_moved,
+                        ctx_cloned,
+                    ));
+                });
             }
         }
         let (max_inscription_number, chain_tip) = {
@@ -160,19 +161,16 @@ impl Service {
                     break;
                 }
             };
-            match event {
-                ObserverEvent::Terminate => {
-                    try_info!(&self.ctx, "Terminating runloop");
-                    break;
-                }
-                _ => {}
+            if let ObserverEvent::Terminate = event {
+                try_info!(&self.ctx, "Terminating runloop");
+                break;
             }
         }
         Ok(())
     }
 
     /// Rolls back index data for the specified block heights.
-    pub async fn rollback(&self, block_heights: &Vec<u64>) -> Result<(), String> {
+    pub async fn rollback(&self, block_heights: &[u64]) -> Result<(), String> {
         for block_height in block_heights.iter() {
             rollback_block(*block_height, &self.config, &self.pg_pools, &self.ctx).await?;
         }
@@ -260,7 +258,7 @@ impl Service {
             bitcoind_download_blocks(
                 &self.config,
                 missing_blocks.into_iter().map(|x| x as u64).collect(),
-                tip.into(),
+                tip,
                 &block_ingestion_processor,
                 10_000,
                 &self.ctx,
@@ -290,7 +288,7 @@ impl Service {
                 start_block_archiving_processor(&self.config, &self.ctx, true, None);
             let blocks = BlockHeights::BlockRange(start_block, end_block)
                 .get_sorted_entries()
-                .map_err(|_e| format!("Block start / end block spec invalid"))?;
+                .map_err(|_e| "Block start / end block spec invalid".to_string())?;
             bitcoind_download_blocks(
                 &self.config,
                 blocks.into(),
@@ -323,7 +321,7 @@ impl Service {
             );
             let blocks = BlockHeights::BlockRange(start_block, end_block)
                 .get_sorted_entries()
-                .map_err(|_e| format!("Block start / end block spec invalid"))?;
+                .map_err(|_e| "Block start / end block spec invalid".to_string())?;
             bitcoind_download_blocks(
                 &self.config,
                 blocks.into(),
@@ -342,8 +340,8 @@ impl Service {
 }
 
 pub async fn chainhook_sidecar_mutate_blocks(
-    blocks_to_mutate: &mut Vec<BitcoinBlockDataCached>,
-    block_ids_to_rollback: &Vec<BlockIdentifier>,
+    blocks_to_mutate: &mut [BitcoinBlockDataCached],
+    block_ids_to_rollback: &[BlockIdentifier],
     cache_l2: &Arc<DashMap<(u32, [u8; 8]), TransactionBytesCursor, BuildHasherDefault<FxHasher>>>,
     brc20_cache: &mut Option<Brc20MemoryCache>,
     prometheus: &PrometheusMonitoring,
@@ -351,14 +349,14 @@ pub async fn chainhook_sidecar_mutate_blocks(
     pg_pools: &PgConnectionPools,
     ctx: &Context,
 ) -> Result<(), String> {
-    if block_ids_to_rollback.len() > 0 {
+    if !block_ids_to_rollback.is_empty() {
         let blocks_db_rw = open_blocks_db_with_retry(true, config, ctx);
         for block_id in block_ids_to_rollback.iter() {
             blocks::delete_blocks_in_block_range(
                 block_id.index as u32,
                 block_id.index as u32,
                 &blocks_db_rw,
-                &ctx,
+                ctx,
             );
             rollback_block(block_id.index, config, pg_pools, ctx).await?;
         }
@@ -387,7 +385,7 @@ pub async fn chainhook_sidecar_mutate_blocks(
                 &block_bytes,
                 true,
                 &blocks_db_rw,
-                &ctx,
+                ctx,
             );
             blocks_db_rw
                 .flush()
@@ -400,7 +398,7 @@ pub async fn chainhook_sidecar_mutate_blocks(
             &vec![],
             &mut sequence_cursor,
             &mut cache_l1,
-            &cache_l2,
+            cache_l2,
             brc20_cache.as_mut(),
             prometheus,
             config,

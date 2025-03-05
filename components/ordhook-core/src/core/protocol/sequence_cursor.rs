@@ -19,6 +19,12 @@ pub struct SequenceCursor {
     current_block_height: u64,
 }
 
+impl Default for SequenceCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SequenceCursor {
     pub fn new() -> Self {
         SequenceCursor {
@@ -55,8 +61,7 @@ impl SequenceCursor {
             false => self.pick_next_pos_classic(client).await?,
         };
 
-        let jubilee = if block_height >= inscription_sequencing::get_jubilee_block_height(&network)
-        {
+        let jubilee = if block_height >= inscription_sequencing::get_jubilee_block_height(network) {
             self.pick_next_jubilee_number(client).await?
         } else {
             classic
@@ -106,8 +111,8 @@ impl SequenceCursor {
         match self.jubilee_cursor {
             None => match ordinals_pg::get_highest_inscription_number(client).await? {
                 Some(inscription_number) => {
-                    self.jubilee_cursor = Some(inscription_number as i64);
-                    Ok(inscription_number as i64 + 1)
+                    self.jubilee_cursor = Some(inscription_number);
+                    Ok(inscription_number + 1)
                 }
                 _ => Ok(0),
             },

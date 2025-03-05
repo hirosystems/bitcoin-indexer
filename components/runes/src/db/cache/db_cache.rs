@@ -24,6 +24,12 @@ pub struct DbCache {
     pub balance_deductions: HashMap<(String, String), DbBalanceChange>,
 }
 
+impl Default for DbCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DbCache {
     pub fn new() -> Self {
         DbCache {
@@ -38,34 +44,34 @@ impl DbCache {
     /// Insert all data into the DB and clear cache.
     pub async fn flush(&mut self, db_tx: &mut Transaction<'_>, ctx: &Context) {
         try_info!(ctx, "Flushing DB cache...");
-        if self.runes.len() > 0 {
+        if !self.runes.is_empty() {
             try_debug!(ctx, "Flushing {} runes", self.runes.len());
             let _ = pg_insert_runes(&self.runes, db_tx, ctx).await;
             self.runes.clear();
         }
-        if self.supply_changes.len() > 0 {
+        if !self.supply_changes.is_empty() {
             try_debug!(ctx, "Flushing {} supply changes", self.supply_changes.len());
             let _ = pg_insert_supply_changes(
-                &self.supply_changes.values().cloned().collect(),
+                &self.supply_changes.values().cloned().collect::<Vec<_>>(),
                 db_tx,
                 ctx,
             )
             .await;
             self.supply_changes.clear();
         }
-        if self.ledger_entries.len() > 0 {
+        if !self.ledger_entries.is_empty() {
             try_debug!(ctx, "Flushing {} ledger entries", self.ledger_entries.len());
             let _ = pg_insert_ledger_entries(&self.ledger_entries, db_tx, ctx).await;
             self.ledger_entries.clear();
         }
-        if self.balance_increases.len() > 0 {
+        if !self.balance_increases.is_empty() {
             try_debug!(
                 ctx,
                 "Flushing {} balance increases",
                 self.balance_increases.len()
             );
             let _ = pg_insert_balance_changes(
-                &self.balance_increases.values().cloned().collect(),
+                &self.balance_increases.values().cloned().collect::<Vec<_>>(),
                 true,
                 db_tx,
                 ctx,
@@ -73,14 +79,18 @@ impl DbCache {
             .await;
             self.balance_increases.clear();
         }
-        if self.balance_deductions.len() > 0 {
+        if !self.balance_deductions.is_empty() {
             try_debug!(
                 ctx,
                 "Flushing {} balance deductions",
                 self.balance_deductions.len()
             );
             let _ = pg_insert_balance_changes(
-                &self.balance_deductions.values().cloned().collect(),
+                &self
+                    .balance_deductions
+                    .values()
+                    .cloned()
+                    .collect::<Vec<_>>(),
                 false,
                 db_tx,
                 ctx,

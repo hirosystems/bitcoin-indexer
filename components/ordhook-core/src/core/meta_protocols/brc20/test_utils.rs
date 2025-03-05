@@ -21,6 +21,12 @@ pub struct Brc20RevealBuilder {
     pub parents: Vec<String>,
 }
 
+impl Default for Brc20RevealBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Brc20RevealBuilder {
     pub fn new() -> Self {
         Brc20RevealBuilder {
@@ -99,6 +105,12 @@ pub struct Brc20TransferBuilder {
     pub destination: OrdinalInscriptionTransferDestination,
     pub satpoint_post_transfer: String,
     pub tx_index: usize,
+}
+
+impl Default for Brc20TransferBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Brc20TransferBuilder {

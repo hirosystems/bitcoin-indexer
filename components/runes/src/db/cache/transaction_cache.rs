@@ -209,7 +209,7 @@ impl TransactionCache {
         Some(new_sequential_ledger_entry(
             &self.location,
             Some(terms_amount.0),
-            rune_id.clone(),
+            *rune_id,
             None,
             None,
             None,
@@ -241,7 +241,7 @@ impl TransactionCache {
         Some(new_sequential_ledger_entry(
             &self.location,
             Some(terms_amount.0),
-            rune_id.clone(),
+            *rune_id,
             None,
             None,
             None,
@@ -283,7 +283,7 @@ impl TransactionCache {
             .unwrap_or(0);
         // Perform movements.
         let mut results = vec![];
-        if self.eligible_outputs.len() == 0 {
+        if self.eligible_outputs.is_empty() {
             // No eligible outputs means burn.
             try_info!(
                 ctx,
@@ -391,12 +391,12 @@ impl TransactionCache {
     }
 
     fn add_input_runes(&mut self, rune_id: &RuneId, entry: InputRuneBalance) {
-        if let Some(balance) = self.input_runes.get_mut(&rune_id) {
+        if let Some(balance) = self.input_runes.get_mut(rune_id) {
             balance.push_back(entry);
         } else {
             let mut vec = VecDeque::new();
             vec.push_back(entry);
-            self.input_runes.insert(rune_id.clone(), vec);
+            self.input_runes.insert(*rune_id, vec);
         }
     }
 }

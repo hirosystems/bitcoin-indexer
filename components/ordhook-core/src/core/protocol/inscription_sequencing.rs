@@ -34,14 +34,14 @@ use crate::{
 ///
 /// This function will:
 /// 1) Limit the number of ordinals numbers to compute by filtering out all the ordinals numbers  pre-computed
-/// and present in the L1 cache.
+///     and present in the L1 cache.
 /// 2) Create a threadpool, by spawning as many threads as specified by the config to process the batch ordinals to
-/// retrieve
+///     retrieve the ordinal number.
 /// 3) Consume eventual entries in cache L1
 /// 4) Inject the ordinals to compute (random order) in a priority queue
-/// via the command line).
+///     via the command line).
 /// 5) Keep injecting ordinals from next blocks (if any) as long as the ordinals from the current block are not all
-/// computed and augment the cache L1 for future blocks.
+///     computed and augment the cache L1 for future blocks.
 ///
 /// If the block has already been computed in the past (so presence of ordinals number present in the `inscriptions` db)
 /// the transaction is removed from the set to compute, and not injected in L1 either.
@@ -55,7 +55,7 @@ use crate::{
 ///
 pub fn parallelize_inscription_data_computations(
     block: &BitcoinBlockData,
-    next_blocks: &Vec<BitcoinBlockData>,
+    next_blocks: &[BitcoinBlockData],
     cache_l1: &mut BTreeMap<(TransactionIdentifier, usize, u64), TraversalResult>,
     cache_l2: &Arc<DashMap<(u32, [u8; 8]), TransactionBytesCursor, BuildHasherDefault<FxHasher>>>,
     config: &Config,
@@ -85,7 +85,7 @@ pub fn parallelize_inscription_data_computations(
 
     let mut tx_thread_pool = vec![];
     let mut thread_pool_handles = vec![];
-    let blocks_db = Arc::new(db::blocks::open_blocks_db_with_retry(false, &config, &ctx));
+    let blocks_db = Arc::new(db::blocks::open_blocks_db_with_retry(false, config, ctx));
 
     let thread_pool_capacity = config.resources.get_optimal_thread_pool_capacity();
     for thread_index in 0..thread_pool_capacity {
@@ -171,11 +171,11 @@ pub fn parallelize_inscription_data_computations(
     }
 
     // Feed each worker from the thread pool with 2 workitems each
-    for thread_index in 0..thread_pool_capacity {
-        let _ = tx_thread_pool[thread_index].send(priority_queue.pop_front());
+    for thread in &tx_thread_pool {
+        let _ = thread.send(priority_queue.pop_front());
     }
-    for thread_index in 0..thread_pool_capacity {
-        let _ = tx_thread_pool[thread_index].send(priority_queue.pop_front());
+    for thread in &tx_thread_pool {
+        let _ = thread.send(priority_queue.pop_front());
     }
 
     let mut next_block_iter = next_blocks.iter();
@@ -216,34 +216,28 @@ pub fn parallelize_inscription_data_computations(
 
         if let Some(w) = priority_queue.pop_front() {
             let _ = tx_thread_pool[thread_index].send(Some(w));
-        } else {
-            if let Some(w) = warmup_queue.pop_front() {
-                let _ = tx_thread_pool[thread_index].send(Some(w));
-            } else {
-                if let Some(next_block) = next_block_iter.next() {
-                    let (transactions_ids, _) = get_transactions_to_process(next_block, cache_l1);
+        } else if let Some(w) = warmup_queue.pop_front() {
+            let _ = tx_thread_pool[thread_index].send(Some(w));
+        } else if let Some(next_block) = next_block_iter.next() {
+            let (transactions_ids, _) = get_transactions_to_process(next_block, cache_l1);
 
-                    try_info!(
-                        inner_ctx,
-                        "Number of inscriptions in block #{} to pre-process: {}",
-                        block.block_identifier.index,
-                        transactions_ids.len()
-                    );
+            try_info!(
+                inner_ctx,
+                "Number of inscriptions in block #{} to pre-process: {}",
+                block.block_identifier.index,
+                transactions_ids.len()
+            );
 
-                    for (transaction_id, input_index, inscription_pointer) in
-                        transactions_ids.into_iter()
-                    {
-                        warmup_queue.push_back((
-                            transaction_id,
-                            next_block.block_identifier.clone(),
-                            input_index,
-                            inscription_pointer,
-                            false,
-                        ));
-                    }
-                    let _ = tx_thread_pool[thread_index].send(warmup_queue.pop_front());
-                }
+            for (transaction_id, input_index, inscription_pointer) in transactions_ids.into_iter() {
+                warmup_queue.push_back((
+                    transaction_id,
+                    next_block.block_identifier.clone(),
+                    input_index,
+                    inscription_pointer,
+                    false,
+                ));
             }
+            let _ = tx_thread_pool[thread_index].send(warmup_queue.pop_front());
         }
     }
     try_debug!(
@@ -255,9 +249,10 @@ pub fn parallelize_inscription_data_computations(
     // Collect eventual results for incoming blocks
     for tx in tx_thread_pool.iter() {
         // Empty the queue
-        if let Ok((traversal_result, _prioritary, thread_index)) = traversal_rx.try_recv() {
-            if let Ok((traversal, inscription_pointer, _)) = traversal_result {
-                try_debug!(
+        if let Ok((Ok((traversal, inscription_pointer, _)), _prioritary, thread_index)) =
+            traversal_rx.try_recv()
+        {
+            try_debug!(
                     inner_ctx,
                     "Completed ordinal number retrieval for Satpoint {}:{}:{} (block: #{}:{}, transfers: {}, pre-retrieval, thread: {thread_index})",
                     traversal.transaction_identifier_inscription.hash,
@@ -267,15 +262,14 @@ pub fn parallelize_inscription_data_computations(
                     traversal.get_ordinal_coinbase_offset(),
                     traversal.transfers
                 );
-                cache_l1.insert(
-                    (
-                        traversal.transaction_identifier_inscription.clone(),
-                        traversal.inscription_input_index,
-                        inscription_pointer,
-                    ),
-                    traversal,
-                );
-            }
+            cache_l1.insert(
+                (
+                    traversal.transaction_identifier_inscription.clone(),
+                    traversal.inscription_input_index,
+                    inscription_pointer,
+                ),
+                traversal,
+            );
         }
         let _ = tx.send(None);
     }
@@ -302,7 +296,7 @@ pub fn parallelize_inscription_data_computations(
 /// 1) Retrieve all the eventual inscriptions previously stored in DB for the block  
 /// 2) Traverse the list of transaction present in the block (except coinbase).
 /// 3) Check if the transaction is present in the cache L1 and augment the cache hit list accordingly and move on to the
-/// next transaction.
+///     next transaction.
 /// 4) Check if the transaction was processed in the pastand move on to the next transaction.
 /// 5) Augment the list of transaction to process.
 ///
@@ -553,7 +547,7 @@ async fn update_tx_inscriptions_with_consensus_sequence_data(
         }
 
         let (destination, satpoint_post_transfer, output_value) =
-            compute_satpoint_post_transfer(&&*tx, input_index, relative_offset, network, ctx);
+            compute_satpoint_post_transfer(&*tx, input_index, relative_offset, network, ctx);
         inscription.satpoint_post_inscription = satpoint_post_transfer;
         inscription_subindex += 1;
 

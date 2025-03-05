@@ -31,8 +31,8 @@ pub async fn scan_blocks(
     ctx: &Context,
 ) -> Result<(), String> {
     let block_heights_to_scan_res = BlockHeights::Blocks(blocks).get_sorted_entries();
-    let mut block_heights_to_scan =
-        block_heights_to_scan_res.map_err(|_e| format!("Block start / end block spec invalid"))?;
+    let mut block_heights_to_scan = block_heights_to_scan_res
+        .map_err(|_e| "Block start / end block spec invalid".to_string())?;
 
     try_info!(
         ctx,
