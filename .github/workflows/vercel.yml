@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  vercel:
+  openapi-publish:
     runs-on: ubuntu-latest
 
     steps:
