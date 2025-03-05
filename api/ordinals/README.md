@@ -117,11 +117,11 @@ to the community for contributing bugfixes and improvements. Read below to learn
 how you can take part in improving the product.
 
 ## Code of Conduct
-Please read our [Code of conduct](../../../.github/blob/main/CODE_OF_CONDUCT.md)
+Please read our [Code of conduct](https://github.com/hirosystems/.github/blob/main/CODE_OF_CONDUCT.md)
 since we expect project participants to adhere to it. 
 
 ## Contributing Guide
-Read our [contributing guide](.github/CONTRIBUTING.md) to learn about our
+Read our [contributing guide](../../.github/CONTRIBUTING.md) to learn about our
 development process, how to propose bugfixes and improvements, and how to build
 and test your changes.
 
