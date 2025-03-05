@@ -1,0 +1,55 @@
+name: Vercel
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+on:
+  push:
+    branches:
+      - beta
+      - develop
+  pull_request:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+jobs:
+  openapi-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment information
+        run: vercel pull --yes --environment=${{ github.ref_name == 'main' && 'production' || 'preview' }} --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build project artifacts
+        run: vercel build ${{ github.ref_name == 'main' && '--prod' || '' }} --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy project artifacts to Vercel
+        id: deploy
+        run: vercel ${{ github.ref_name == 'main' && '--prod' || 'deploy' }} --prebuilt --token=${{ secrets.VERCEL_TOKEN }} | awk '{print "deployment_url="$1}' >> $GITHUB_OUTPUT
+
+      - name: Trigger docs.hiro.so deployment
+        if: github.ref_name == 'main'
+        run: curl -X POST ${{ secrets.VERCEL_DOCS_DEPLOY_HOOK_URL }}
+
+      - name: Add comment with Vercel deployment URL
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          comment_tag: vercel
+          message: |
+            Vercel deployment URL: ${{ steps.deploy.outputs.deployment_url }} :rocket:
