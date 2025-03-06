@@ -15,9 +15,8 @@ use super::models::{
     DbCurrentLocation, DbInscription, DbInscriptionParent, DbInscriptionRecursion, DbLocation,
     DbSatoshi,
 };
-use crate::{
-    core::protocol::{satoshi_numbering::TraversalResult, satoshi_tracking::WatchedSatpoint},
-    utils::format_outpoint_to_watch,
+use crate::core::protocol::{
+    satoshi_numbering::TraversalResult, satoshi_tracking::WatchedSatpoint,
 };
 
 embed_migrations!("../../migrations/ordinals");
@@ -189,7 +188,7 @@ pub async fn get_inscriptions_at_block<T: GenericClient>(
 }
 
 pub async fn get_inscribed_satpoints_at_tx_inputs<T: GenericClient>(
-    inputs: &[TxIn],
+    inputs: &Vec<(usize, String)>,
     client: &T,
 ) -> Result<HashMap<usize, Vec<WatchedSatpoint>>, String> {
     let mut results = HashMap::new();

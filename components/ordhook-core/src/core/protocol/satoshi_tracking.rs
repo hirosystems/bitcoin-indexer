@@ -228,9 +228,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
             };
             // Keep an in-memory copy of this watchpoint at its new tx output for later retrieval.
             let (output, _) = parse_output_and_offset_from_satpoint(&satpoint_post_transfer)?;
-            let entry = block_transferred_satpoints
-                .entry(output)
-                .or_insert(vec![]);
+            let entry = block_transferred_satpoints.entry(output).or_default();
             entry.push(watched_satpoint.clone());
 
             try_info!(
@@ -260,6 +258,7 @@ mod test {
         OrdinalInscriptionTransferDestination, OrdinalOperation,
     };
 
+    use super::compute_satpoint_post_transfer;
     use crate::{
         core::{
             protocol::satoshi_tracking::augment_block_with_transfers,
@@ -269,8 +268,6 @@ mod test {
         },
         db::{ordinals_pg, pg_reset_db, pg_test_connection, pg_test_connection_pool},
     };
-    use super::compute_satpoint_post_transfer;
-    use crate::core::test_builders::{TestTransactionBuilder, TestTxInBuilder, TestTxOutBuilder};
 
     #[tokio::test]
     async fn tracks_chained_satoshi_transfers_in_block() -> Result<(), String> {
