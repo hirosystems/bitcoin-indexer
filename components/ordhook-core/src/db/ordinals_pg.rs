@@ -5,16 +5,14 @@ use chainhook_postgres::{
     utils,
 };
 use chainhook_types::{
-    bitcoin::TxIn, BitcoinBlockData, OrdinalInscriptionNumber, OrdinalOperation,
-    TransactionIdentifier,
+    BitcoinBlockData, OrdinalInscriptionNumber, OrdinalOperation, TransactionIdentifier,
 };
 use deadpool_postgres::GenericClient;
 use refinery::embed_migrations;
 use tokio_postgres::{types::ToSql, Client};
 
-use crate::{
-    core::protocol::{satoshi_numbering::TraversalResult, satoshi_tracking::WatchedSatpoint},
-    utils::format_outpoint_to_watch,
+use crate::core::protocol::{
+    satoshi_numbering::TraversalResult, satoshi_tracking::WatchedSatpoint,
 };
 
 use super::models::{
@@ -191,23 +189,17 @@ pub async fn get_inscriptions_at_block<T: GenericClient>(
 }
 
 pub async fn get_inscribed_satpoints_at_tx_inputs<T: GenericClient>(
-    inputs: &Vec<TxIn>,
+    inputs: &Vec<(usize, String)>,
     client: &T,
 ) -> Result<HashMap<usize, Vec<WatchedSatpoint>>, String> {
     let mut results = HashMap::new();
+    if inputs.is_empty() {
+        return Ok(results);
+    }
     for chunk in inputs.chunks(500) {
         let outpoints: Vec<(String, String)> = chunk
             .iter()
-            .enumerate()
-            .map(|(vin, input)| {
-                (
-                    vin.to_string(),
-                    format_outpoint_to_watch(
-                        &input.previous_output.txid,
-                        input.previous_output.vout as usize,
-                    ),
-                )
-            })
+            .map(|(vin, satpoint)| (vin.to_string(), satpoint.clone()))
             .collect();
         let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
         for (vin, input) in outpoints.iter() {
