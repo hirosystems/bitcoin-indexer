@@ -4,7 +4,7 @@ use chainhook_sdk::utils::Context;
 use clap::Parser;
 use commands::{Command, ConfigCommand, DatabaseCommand, IndexCommand, Protocol, ServiceCommand};
 use config::{generator::generate_toml_config, Config};
-use hiro_system_kit;
+use hiro_system_kit::{self, error, info};
 use ordhook::{db::migrate_dbs, service::Service, try_info};
 
 mod commands;
