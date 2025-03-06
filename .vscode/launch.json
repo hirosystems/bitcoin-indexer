@@ -16,7 +16,7 @@
         "ordinals",
         "service",
         "start",
-        "--config-path=${workspaceFolder}/.vscode/Indexer.toml",
+        "--config-path=${workspaceFolder}/.vscode/Indexer.toml"
       ],
       "cwd": "${workspaceFolder}"
     },
@@ -35,9 +35,25 @@
         "runes",
         "service",
         "start",
-        "--config-path=${workspaceFolder}/.vscode/Indexer.toml",
+        "--config-path=${workspaceFolder}/.vscode/Indexer.toml"
       ],
       "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "run: ordinals-api",
+      "cwd": "${workspaceFolder}/api/ordinals",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "args": ["${workspaceFolder}/api/ordinals/src/index.ts"],
+      "outputCapture": "std",
+      "internalConsoleOptions": "openOnSessionStart",
+      "envFile": "${workspaceFolder}/api/ordinals/.env",
+      "env": {
+        "NODE_ENV": "development",
+        "TS_NODE_SKIP_IGNORE": "true"
+      },
+      "killBehavior": "polite"
     },
     {
       "type": "node",
@@ -45,11 +61,7 @@
       "name": "test: ordinals-api",
       "program": "${workspaceFolder}/api/ordinals/node_modules/jest/bin/jest",
       "cwd": "${workspaceFolder}/api/ordinals/",
-      "args": [
-        "--testTimeout=3600000",
-        "--runInBand",
-        "--no-cache"
-      ],
+      "args": ["--testTimeout=3600000", "--runInBand", "--no-cache"],
       "outputCapture": "std",
       "console": "integratedTerminal",
       "preLaunchTask": "npm: testenv:run",
@@ -57,8 +69,8 @@
       "env": {
         "PGHOST": "localhost",
         "PGUSER": "postgres",
-        "PGPASSWORD": "postgres",
-      },
+        "PGPASSWORD": "postgres"
+      }
     },
     {
       "type": "node",
@@ -79,8 +91,8 @@
       "env": {
         "PGHOST": "localhost",
         "PGUSER": "postgres",
-        "PGPASSWORD": "postgres",
-      },
+        "PGPASSWORD": "postgres"
+      }
     },
     {
       "type": "node",
@@ -101,8 +113,8 @@
       "env": {
         "PGHOST": "localhost",
         "PGUSER": "postgres",
-        "PGPASSWORD": "postgres",
-      },
+        "PGPASSWORD": "postgres"
+      }
     },
     {
       "type": "node",
@@ -110,11 +122,7 @@
       "name": "test: runes-api",
       "program": "${workspaceFolder}/api/runes/node_modules/jest/bin/jest",
       "cwd": "${workspaceFolder}/api/runes/",
-      "args": [
-        "--testTimeout=3600000",
-        "--runInBand",
-        "--no-cache",
-      ],
+      "args": ["--testTimeout=3600000", "--runInBand", "--no-cache"],
       "outputCapture": "std",
       "console": "integratedTerminal",
       "preLaunchTask": "npm: testenv:run",
@@ -122,8 +130,8 @@
       "env": {
         "PGHOST": "localhost",
         "PGUSER": "postgres",
-        "PGPASSWORD": "postgres",
-      },
-    },
+        "PGPASSWORD": "postgres"
+      }
+    }
   ]
 }

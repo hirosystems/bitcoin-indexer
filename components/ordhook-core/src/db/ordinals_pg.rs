@@ -5,8 +5,7 @@ use chainhook_postgres::{
     utils,
 };
 use chainhook_types::{
-    bitcoin::TxIn, BitcoinBlockData, OrdinalInscriptionNumber, OrdinalOperation,
-    TransactionIdentifier,
+    BitcoinBlockData, OrdinalInscriptionNumber, OrdinalOperation, TransactionIdentifier,
 };
 use deadpool_postgres::GenericClient;
 use refinery::embed_migrations;
@@ -194,19 +193,13 @@ pub async fn get_inscribed_satpoints_at_tx_inputs<T: GenericClient>(
     client: &T,
 ) -> Result<HashMap<usize, Vec<WatchedSatpoint>>, String> {
     let mut results = HashMap::new();
+    if inputs.is_empty() {
+        return Ok(results);
+    }
     for chunk in inputs.chunks(500) {
         let outpoints: Vec<(String, String)> = chunk
             .iter()
-            .enumerate()
-            .map(|(vin, input)| {
-                (
-                    vin.to_string(),
-                    format_outpoint_to_watch(
-                        &input.previous_output.txid,
-                        input.previous_output.vout as usize,
-                    ),
-                )
-            })
+            .map(|(vin, satpoint)| (vin.to_string(), satpoint.clone()))
             .collect();
         let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
         for (vin, input) in outpoints.iter() {
