@@ -1,3 +1,51 @@
+## [3.0.0](https://github.com/hirosystems/bitcoin-indexer/compare/v2.2.5...v3.0.0) (2025-03-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* store inscription data in postgres instead of sqlite (#375)
+* support brc20 activity on scan blocks command (#350)
+* keep original deployed ticker for brc20 tokens (#349)
+
+### Features
+
+* add prometheus monitoring ([#356](https://github.com/hirosystems/bitcoin-indexer/issues/356)) ([f35e1d0](https://github.com/hirosystems/bitcoin-indexer/commit/f35e1d00e7940e31abcb8439b5b12a43be5023ea))
+* **api:** add parent_refs field to inscription responses ([#436](https://github.com/hirosystems/bitcoin-indexer/issues/436)) ([5630644](https://github.com/hirosystems/bitcoin-indexer/commit/563064413bcc2168f96cb87af4fd6ab51ed36e73))
+* **api:** return inscription charms in responses ([#435](https://github.com/hirosystems/bitcoin-indexer/issues/435)) ([a7073da](https://github.com/hirosystems/bitcoin-indexer/commit/a7073da0b4bb0c61d57284c48c65f73b0491a909))
+* index inscription charms ([#433](https://github.com/hirosystems/bitcoin-indexer/issues/433)) ([4291eab](https://github.com/hirosystems/bitcoin-indexer/commit/4291eabba7110ca5d4684f4801e234621e64d96b))
+* keep original deployed ticker for brc20 tokens ([#349](https://github.com/hirosystems/bitcoin-indexer/issues/349)) ([39774a9](https://github.com/hirosystems/bitcoin-indexer/commit/39774a9f867d79932826f9d50d271ee1bf45c13d))
+* migrate ordinals api to ordhook repo ([#389](https://github.com/hirosystems/bitcoin-indexer/issues/389)) ([205b4c8](https://github.com/hirosystems/bitcoin-indexer/commit/205b4c80bdc29fc10447c50546123d75fc829b77))
+* **runes:** add runes api to codebase ([#449](https://github.com/hirosystems/bitcoin-indexer/issues/449)) ([da5596a](https://github.com/hirosystems/bitcoin-indexer/commit/da5596afecded057213dd3626e8df847ba568b5c))
+* **runes:** add runes indexer ([#453](https://github.com/hirosystems/bitcoin-indexer/issues/453)) ([fd2a849](https://github.com/hirosystems/bitcoin-indexer/commit/fd2a8496e3aba767d83c382281eda5204f5aa8d7))
+* support a separate storage directory for observers.sqlite ([#354](https://github.com/hirosystems/bitcoin-indexer/issues/354)) ([7a65fdf](https://github.com/hirosystems/bitcoin-indexer/commit/7a65fdf10728b7701cbcf7b83db92ec74d13535a))
+* support brc20 activity on scan blocks command ([#350](https://github.com/hirosystems/bitcoin-indexer/issues/350)) ([caacff7](https://github.com/hirosystems/bitcoin-indexer/commit/caacff7c4f3d148b37232e04030814fa3ce3b30b))
+* wait for bitcoind to be at chain tip before starting service ([#364](https://github.com/hirosystems/bitcoin-indexer/issues/364)) ([d4b67bb](https://github.com/hirosystems/bitcoin-indexer/commit/d4b67bb6f6ee16bac2add119f477ba42da824a98))
+
+
+### Bug Fixes
+
+* also check config when looking for brc20 db connection ([#347](https://github.com/hirosystems/bitcoin-indexer/issues/347)) ([d80388b](https://github.com/hirosystems/bitcoin-indexer/commit/d80388b505255117963a53206e41987e34551aaf))
+* **api:** multiple parent display ([703f98f](https://github.com/hirosystems/bitcoin-indexer/commit/703f98f77f9797db3e4f4f0e3e14fbdb7c5275f8))
+* **api:** show delegate inscription id correctly ([#439](https://github.com/hirosystems/bitcoin-indexer/issues/439)) ([d4ee264](https://github.com/hirosystems/bitcoin-indexer/commit/d4ee264ad0bec2749299b60e985927ba87d6f40e))
+* **brc20:** add to_address index to operations table ([#390](https://github.com/hirosystems/bitcoin-indexer/issues/390)) ([67c6035](https://github.com/hirosystems/bitcoin-indexer/commit/67c6035828994dd72e7ffa72b4e405c04465acb3))
+* **brc20:** historical token balance ([#444](https://github.com/hirosystems/bitcoin-indexer/issues/444)) ([41438ac](https://github.com/hirosystems/bitcoin-indexer/commit/41438aca962ba7f2c4add4df87740fdb6df6de00))
+* **brc20:** verify ordinal transfers in chunks instead of individually ([#394](https://github.com/hirosystems/bitcoin-indexer/issues/394)) ([fe842e2](https://github.com/hirosystems/bitcoin-indexer/commit/fe842e2e778729b635220719aad26c09684439e2))
+* calculate charms correctly when inscription is unbound ([#440](https://github.com/hirosystems/bitcoin-indexer/issues/440)) ([acfda83](https://github.com/hirosystems/bitcoin-indexer/commit/acfda83757e5c06977ecf43ca396b7fcd780d71b))
+* clean up rocksdb connections during rollbacks ([#420](https://github.com/hirosystems/bitcoin-indexer/issues/420)) ([216cd52](https://github.com/hirosystems/bitcoin-indexer/commit/216cd52c0ea654e14601167a64cd7040903c08a2))
+* display unbound inscription satpoints as all zeros with unbound sequence as offset ([#445](https://github.com/hirosystems/bitcoin-indexer/issues/445)) ([6815878](https://github.com/hirosystems/bitcoin-indexer/commit/68158786f06c0a4ad6f56509eaa96012986f7790))
+* kill process when a streamed block fails to index ([#431](https://github.com/hirosystems/bitcoin-indexer/issues/431)) ([84e189b](https://github.com/hirosystems/bitcoin-indexer/commit/84e189b9b49b710a3b143dab4ff53155951620c0))
+* only create brc-20 db connection and cache if required ([#357](https://github.com/hirosystems/bitcoin-indexer/issues/357)) ([5692426](https://github.com/hirosystems/bitcoin-indexer/commit/5692426e4b85dde1fd7aefd01dd7f25a4f969fad))
+* **ordinals:** track multiple sat transfers in the same block correctly ([#460](https://github.com/hirosystems/bitcoin-indexer/issues/460)) ([b611ff3](https://github.com/hirosystems/bitcoin-indexer/commit/b611ff3423f90163b7879685d7ac004dbe830974))
+* remove double parsing of inscriptions ([#421](https://github.com/hirosystems/bitcoin-indexer/issues/421)) ([19c8a79](https://github.com/hirosystems/bitcoin-indexer/commit/19c8a79cd2da64897c7862bae156bd37ef1f88f2))
+* roll back ordinals db changes when brc20 db commit fails ([#367](https://github.com/hirosystems/bitcoin-indexer/issues/367)) ([f4e0c79](https://github.com/hirosystems/bitcoin-indexer/commit/f4e0c7935b825d2119d20c5acf08d289fe231423))
+* store inscription content as is ([#391](https://github.com/hirosystems/bitcoin-indexer/issues/391)) ([3f10607](https://github.com/hirosystems/bitcoin-indexer/commit/3f10607ba9ef1d6b0d6fd68f9779031e239c0596))
+* upgrade `ord` dependencies and integrate `chainhook-sdk` code ([#397](https://github.com/hirosystems/bitcoin-indexer/issues/397)) ([fcffa7e](https://github.com/hirosystems/bitcoin-indexer/commit/fcffa7e5c1567fe6c8d6e19a5aa18ee67633938c)), closes [#412](https://github.com/hirosystems/bitcoin-indexer/issues/412)
+
+
+### Code Refactoring
+
+* store inscription data in postgres instead of sqlite ([#375](https://github.com/hirosystems/bitcoin-indexer/issues/375)) ([4afb201](https://github.com/hirosystems/bitcoin-indexer/commit/4afb2010068770078c7d9fd2ab37533352379c15))
+
 ## [3.0.0-beta.11](https://github.com/hirosystems/ordhook/compare/v3.0.0-beta.10...v3.0.0-beta.11) (2025-02-25)
 
 
