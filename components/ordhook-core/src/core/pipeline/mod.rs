@@ -1,23 +1,21 @@
 pub mod processors;
 
-use chainhook_sdk::observer::BitcoinConfig;
-use chainhook_sdk::types::BitcoinBlockData;
 use chainhook_sdk::utils::Context;
+use chainhook_types::{BitcoinBlockData, BitcoinNetwork};
+use config::Config;
 use crossbeam_channel::bounded;
 use std::collections::{HashMap, VecDeque};
 use std::thread::{sleep, JoinHandle};
 use std::time::Duration;
 use tokio::task::JoinSet;
 
-use crate::config::Config;
-use crate::db::BlockBytesCursor;
+use crate::db::cursor::BlockBytesCursor;
 use crate::{try_debug, try_info};
 
 use chainhook_sdk::indexer::bitcoin::{
-    build_http_client, parse_downloaded_block, try_download_block_bytes_with_retry,
+    build_http_client, parse_downloaded_block, standardize_bitcoin_block,
+    try_download_block_bytes_with_retry,
 };
-
-use super::protocol::inscription_parsing::parse_inscriptions_and_standardize_block;
 
 pub enum PostProcessorCommand {
     ProcessBlocks(Vec<(u64, Vec<u8>)>, Vec<BitcoinBlockData>),
@@ -35,36 +33,22 @@ pub struct PostProcessorController {
     pub thread_handle: JoinHandle<()>,
 }
 
-pub async fn download_and_pipeline_blocks(
+/// Downloads blocks from bitcoind's RPC interface and pushes them to a `PostProcessorController` so they can be indexed or
+/// ingested as needed.
+pub async fn bitcoind_download_blocks(
     config: &Config,
     blocks: Vec<u64>,
     start_sequencing_blocks_at_height: u64,
-    blocks_post_processor: Option<&PostProcessorController>,
+    blocks_post_processor: &PostProcessorController,
     speed: usize,
     ctx: &Context,
 ) -> Result<(), String> {
-    // let guard = pprof::ProfilerGuardBuilder::default()
-    //     .frequency(20)
-    //     .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-    //     .build()
-    //     .unwrap();
-
-    let bitcoin_config = BitcoinConfig {
-        username: config.network.bitcoind_rpc_username.clone(),
-        password: config.network.bitcoind_rpc_password.clone(),
-        rpc_url: config.network.bitcoind_rpc_url.clone(),
-        network: config.network.bitcoin_network.clone(),
-        bitcoin_block_signaling: config.network.bitcoin_block_signaling.clone(),
-    };
-
-    let ordhook_config = config.get_ordhook_config();
-
     let number_of_blocks_to_process = blocks.len() as u64;
 
     let (block_compressed_tx, block_compressed_rx) = crossbeam_channel::bounded(speed);
     let http_client = build_http_client();
 
-    let moved_config = bitcoin_config.clone();
+    let moved_config = config.bitcoind.clone();
     let moved_ctx = ctx.clone();
     let moved_http_client = http_client.clone();
 
@@ -83,13 +67,13 @@ pub async fn download_and_pipeline_blocks(
     // - 1 thread for the thread handling networking
     // - 1 thread for the thread handling disk serialization
     let thread_pool_network_response_processing_capacity =
-        ordhook_config.resources.get_optimal_thread_pool_capacity();
+        config.resources.get_optimal_thread_pool_capacity();
     // For each worker in that pool, we want to bound the size of the queue to avoid OOM
     // Blocks size can range from 1 to 4Mb (when packed with witness data).
     // Start blocking networking when each worker has a backlog of 8 blocks seems reasonable.
     let worker_queue_size = 2;
 
-    for _ in 0..ordhook_config.resources.bitcoind_rpc_threads {
+    for _ in 0..config.resources.bitcoind_rpc_threads {
         if let Some(block_height) = block_heights.pop_front() {
             let config = moved_config.clone();
             let ctx = moved_ctx.clone();
@@ -106,7 +90,7 @@ pub async fn download_and_pipeline_blocks(
     }
 
     let moved_ctx: Context = ctx.clone();
-    let moved_bitcoin_network = bitcoin_config.network.clone();
+    let moved_bitcoin_network = config.bitcoind.network.clone();
 
     let mut tx_thread_pool = vec![];
     let mut rx_thread_pool = vec![];
@@ -132,13 +116,13 @@ pub async fn download_and_pipeline_blocks(
                         .expect("unable to compress block");
                     let block_height = raw_block_data.height as u64;
                     let block_data = if block_height >= start_sequencing_blocks_at_height {
-                        let block_data = parse_inscriptions_and_standardize_block(
+                        let block = standardize_bitcoin_block(
                             raw_block_data,
-                            &moved_bitcoin_network,
+                            &BitcoinNetwork::from_network(moved_bitcoin_network),
                             &moved_ctx,
                         )
                         .expect("unable to deserialize block");
-                        Some(block_data)
+                        Some(block)
                     } else {
                         None
                     };
@@ -156,10 +140,7 @@ pub async fn download_and_pipeline_blocks(
 
     let cloned_ctx = ctx.clone();
 
-    let blocks_post_processor_commands_tx = blocks_post_processor
-        .as_ref()
-        .and_then(|p| Some(p.commands_tx.clone()));
-
+    let blocks_post_processor_commands_tx = blocks_post_processor.commands_tx.clone();
     let storage_thread = hiro_system_kit::thread_named("Block processor dispatcher")
         .spawn(move || {
             let mut inbox = HashMap::new();
@@ -173,9 +154,7 @@ pub async fn download_and_pipeline_blocks(
                         cloned_ctx,
                         "#{blocks_processed} blocks successfully sent to processor"
                     );
-                    if let Some(ref blocks_tx) = blocks_post_processor_commands_tx {
-                        let _ = blocks_tx.send(PostProcessorCommand::Terminate);
-                    }
+                    let _ = blocks_post_processor_commands_tx.send(PostProcessorCommand::Terminate);
                     break;
                 }
 
@@ -218,12 +197,9 @@ pub async fn download_and_pipeline_blocks(
                 // Early "continue"
                 if !ooo_compacted_blocks.is_empty() {
                     blocks_processed += ooo_compacted_blocks.len() as u64;
-                    if let Some(ref blocks_tx) = blocks_post_processor_commands_tx {
-                        let _ = blocks_tx.send(PostProcessorCommand::ProcessBlocks(
-                            ooo_compacted_blocks,
-                            vec![],
-                        ));
-                    }
+                    let _ = blocks_post_processor_commands_tx.send(
+                        PostProcessorCommand::ProcessBlocks(ooo_compacted_blocks, vec![]),
+                    );
                 }
 
                 if inbox.is_empty() {
@@ -242,12 +218,9 @@ pub async fn download_and_pipeline_blocks(
                 blocks_processed += blocks.len() as u64;
 
                 if !blocks.is_empty() {
-                    if let Some(ref blocks_tx) = blocks_post_processor_commands_tx {
-                        let _ = blocks_tx.send(PostProcessorCommand::ProcessBlocks(
-                            compacted_blocks,
-                            blocks,
-                        ));
-                    }
+                    let _ = blocks_post_processor_commands_tx.send(
+                        PostProcessorCommand::ProcessBlocks(compacted_blocks, blocks),
+                    );
                 }
 
                 if inbox_cursor > end_block {
@@ -306,12 +279,10 @@ pub async fn download_and_pipeline_blocks(
 
     try_debug!(ctx, "Pipeline successfully terminated");
 
-    if let Some(post_processor) = blocks_post_processor {
-        loop {
-            if let Ok(signal) = post_processor.events_rx.recv() {
-                match signal {
-                    PostProcessorEvent::Terminated | PostProcessorEvent::Expired => break,
-                }
+    loop {
+        if let Ok(signal) = blocks_post_processor.events_rx.recv() {
+            match signal {
+                PostProcessorEvent::Terminated | PostProcessorEvent::Expired => break,
             }
         }
     }

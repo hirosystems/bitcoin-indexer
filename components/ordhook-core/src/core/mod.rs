@@ -1,35 +1,41 @@
 pub mod meta_protocols;
 pub mod pipeline;
 pub mod protocol;
+#[cfg(test)]
+pub mod test_builders;
 
+use bitcoin::Network;
+use chainhook_postgres::pg_pool_client;
+use config::Config;
 use dashmap::DashMap;
 use fxhash::{FxBuildHasher, FxHasher};
 use std::hash::BuildHasherDefault;
 use std::ops::Div;
-use std::path::PathBuf;
 
 use chainhook_sdk::utils::Context;
 
 use crate::{
-    config::{Config, LogConfig, MetaProtocolsConfig, ResourcesConfig},
-    db::{find_pinned_block_bytes_at_block_height, open_ordhook_db_conn_rocks_db_loop},
-    utils::bitcoind::bitcoind_get_block_height,
+    db::{
+        blocks::{
+            find_last_block_inserted, find_pinned_block_bytes_at_block_height,
+            open_blocks_db_with_retry,
+        },
+        cursor::TransactionBytesCursor,
+        ordinals_pg,
+    },
+    service::PgConnectionPools,
 };
+use chainhook_sdk::utils::bitcoind::bitcoind_get_block_height;
 
-use crate::db::{
-    find_last_block_inserted, find_latest_inscription_block_height, initialize_ordhook_db,
-    open_readonly_ordhook_db_conn,
-};
-
-use crate::db::TransactionBytesCursor;
-
-#[derive(Clone, Debug)]
-pub struct OrdhookConfig {
-    pub resources: ResourcesConfig,
-    pub db_path: PathBuf,
-    pub first_inscription_height: u64,
-    pub logs: LogConfig,
-    pub meta_protocols: MetaProtocolsConfig,
+pub fn first_inscription_height(config: &Config) -> u64 {
+    match config.bitcoind.network {
+        Network::Bitcoin => 767430,
+        Network::Regtest => 1,
+        Network::Testnet => 2413343,
+        Network::Testnet4 => 0,
+        Network::Signet => 112402,
+        _ => unreachable!(),
+    }
 }
 
 pub fn new_traversals_cache(
@@ -114,18 +120,15 @@ pub fn compute_next_satpoint_data(
     SatPosition::Output((selected_output_index, relative_offset_in_selected_output))
 }
 
-pub fn should_sync_rocks_db(config: &Config, ctx: &Context) -> Result<Option<(u64, u64)>, String> {
-    let blocks_db = open_ordhook_db_conn_rocks_db_loop(
-        true,
-        &config.expected_cache_path(),
-        config.resources.ulimit,
-        config.resources.memory_available,
-        &ctx,
-    );
-    let inscriptions_db_conn = open_readonly_ordhook_db_conn(&config.expected_cache_path(), &ctx)?;
+pub async fn should_sync_rocks_db(
+    config: &Config,
+    pg_pools: &PgConnectionPools,
+    ctx: &Context,
+) -> Result<Option<(u64, u64)>, String> {
+    let blocks_db = open_blocks_db_with_retry(true, &config, &ctx);
     let last_compressed_block = find_last_block_inserted(&blocks_db) as u64;
-    let last_indexed_block = match find_latest_inscription_block_height(&inscriptions_db_conn, ctx)?
-    {
+    let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
+    let last_indexed_block = match ordinals_pg::get_chain_tip_block_height(&ord_client).await? {
         Some(last_indexed_block) => last_indexed_block,
         None => 0,
     };
@@ -138,26 +141,16 @@ pub fn should_sync_rocks_db(config: &Config, ctx: &Context) -> Result<Option<(u6
     Ok(res)
 }
 
-pub fn should_sync_ordhook_db(
+pub async fn should_sync_ordinals_db(
     config: &Config,
+    pg_pools: &PgConnectionPools,
     ctx: &Context,
 ) -> Result<Option<(u64, u64, usize)>, String> {
-    let blocks_db = open_ordhook_db_conn_rocks_db_loop(
-        true,
-        &config.expected_cache_path(),
-        config.resources.ulimit,
-        config.resources.memory_available,
-        &ctx,
-    );
+    let blocks_db = open_blocks_db_with_retry(true, &config, &ctx);
     let mut start_block = find_last_block_inserted(&blocks_db) as u64;
 
-    if start_block == 0 {
-        let _ = initialize_ordhook_db(&config.expected_cache_path(), &ctx);
-    }
-
-    let inscriptions_db_conn = open_readonly_ordhook_db_conn(&config.expected_cache_path(), &ctx)?;
-
-    match find_latest_inscription_block_height(&inscriptions_db_conn, ctx)? {
+    let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
+    match ordinals_pg::get_chain_tip_block_height(&ord_client).await? {
         Some(height) => {
             if find_pinned_block_bytes_at_block_height(height as u32, 3, &blocks_db, &ctx).is_none()
             {
@@ -168,12 +161,12 @@ pub fn should_sync_ordhook_db(
             start_block += 1;
         }
         None => {
-            start_block = start_block.min(config.get_ordhook_config().first_inscription_height);
+            start_block = start_block.min(first_inscription_height(config));
         }
     };
 
     // TODO: Gracefully handle Regtest, Testnet and Signet
-    let end_block = bitcoind_get_block_height(config, ctx);
+    let end_block = bitcoind_get_block_height(&config.bitcoind, ctx);
     let (mut end_block, speed) = if start_block < 200_000 {
         (end_block.min(200_000), 10_000)
     } else if start_block < 550_000 {

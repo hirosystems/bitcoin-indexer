@@ -1,0 +1,39 @@
+[package]
+name = "chainhook-sdk"
+version.workspace = true
+description = "Stateless Transaction Indexing Engine for Stacks and Bitcoin"
+license = "GPL-3.0"
+edition = "2021"
+
+[dependencies]
+config = { path = "../config" }
+serde = { version = "1", features = ["rc"] }
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+serde-hex = "0.1.0"
+serde_derive = "1"
+hiro-system-kit = { workspace = true }
+rocket = { version = "=0.5.0", features = ["json"] }
+bitcoin = { workspace = true }
+bitcoincore-rpc = "0.18.0"
+bitcoincore-rpc-json = "0.18.0"
+reqwest = { version = "0.12", default-features = false, features = [
+    "blocking",
+    "json",
+    "rustls-tls",
+] }
+tokio = { workspace = true }
+base58 = "0.2.0"
+crossbeam-channel = "0.5.6"
+hex = "0.4.3"
+zmq = "0.10.0"
+lazy_static = "1.4.0"
+chainhook-types = { path = "../chainhook-types-rs" }
+
+[dev-dependencies]
+assert-json-diff = "2.0.2"
+test-case = "3.1.0"
+
+[features]
+default = ["hiro-system-kit/log"]
+debug = ["hiro-system-kit/debug"]
+release = ["hiro-system-kit/release_debug", "hiro-system-kit/full_log_level_prefix"]

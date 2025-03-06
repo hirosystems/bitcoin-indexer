@@ -1,0 +1,5 @@
+[alias]
+bitcoin-indexer-install = "install --path components/cli --locked --force"
+
+[env]
+RUST_TEST_THREADS = "1"

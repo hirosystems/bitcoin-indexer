@@ -1,0 +1,137 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "run: ordinals service",
+      "cargo": {
+        "args": ["build", "--bin=bitcoin-indexer", "--package=cli"],
+        "filter": {
+          "name": "bitcoin-indexer",
+          "kind": "bin"
+        }
+      },
+      "args": [
+        "ordinals",
+        "service",
+        "start",
+        "--config-path=${workspaceFolder}/.vscode/Indexer.toml"
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "run: runes service",
+      "cargo": {
+        "args": ["build", "--bin=bitcoin-indexer", "--package=cli"],
+        "filter": {
+          "name": "bitcoin-indexer",
+          "kind": "bin"
+        }
+      },
+      "args": [
+        "runes",
+        "service",
+        "start",
+        "--config-path=${workspaceFolder}/.vscode/Indexer.toml"
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "run: ordinals-api",
+      "cwd": "${workspaceFolder}/api/ordinals",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "args": ["${workspaceFolder}/api/ordinals/src/index.ts"],
+      "outputCapture": "std",
+      "internalConsoleOptions": "openOnSessionStart",
+      "envFile": "${workspaceFolder}/api/ordinals/.env",
+      "env": {
+        "NODE_ENV": "development",
+        "TS_NODE_SKIP_IGNORE": "true"
+      },
+      "killBehavior": "polite"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "test: ordinals-api",
+      "program": "${workspaceFolder}/api/ordinals/node_modules/jest/bin/jest",
+      "cwd": "${workspaceFolder}/api/ordinals/",
+      "args": ["--testTimeout=3600000", "--runInBand", "--no-cache"],
+      "outputCapture": "std",
+      "console": "integratedTerminal",
+      "preLaunchTask": "npm: testenv:run",
+      "postDebugTask": "npm: testenv:stop",
+      "env": {
+        "PGHOST": "localhost",
+        "PGUSER": "postgres",
+        "PGPASSWORD": "postgres"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "test: ordinals-api (api)",
+      "program": "${workspaceFolder}/api/ordinals/node_modules/jest/bin/jest",
+      "cwd": "${workspaceFolder}/api/ordinals/",
+      "args": [
+        "--testTimeout=3600000",
+        "--runInBand",
+        "--no-cache",
+        "${workspaceFolder}/api/ordinals/tests/api/"
+      ],
+      "outputCapture": "std",
+      "console": "integratedTerminal",
+      "preLaunchTask": "npm: testenv:run",
+      "postDebugTask": "npm: testenv:stop",
+      "env": {
+        "PGHOST": "localhost",
+        "PGUSER": "postgres",
+        "PGPASSWORD": "postgres"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "test: ordinals-api (brc-20)",
+      "program": "${workspaceFolder}/api/ordinals/node_modules/jest/bin/jest",
+      "cwd": "${workspaceFolder}/api/ordinals/",
+      "args": [
+        "--testTimeout=3600000",
+        "--runInBand",
+        "--no-cache",
+        "${workspaceFolder}/api/ordinals/tests/brc-20/"
+      ],
+      "outputCapture": "std",
+      "console": "integratedTerminal",
+      "preLaunchTask": "npm: testenv:run",
+      "postDebugTask": "npm: testenv:stop",
+      "env": {
+        "PGHOST": "localhost",
+        "PGUSER": "postgres",
+        "PGPASSWORD": "postgres"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "test: runes-api",
+      "program": "${workspaceFolder}/api/runes/node_modules/jest/bin/jest",
+      "cwd": "${workspaceFolder}/api/runes/",
+      "args": ["--testTimeout=3600000", "--runInBand", "--no-cache"],
+      "outputCapture": "std",
+      "console": "integratedTerminal",
+      "preLaunchTask": "npm: testenv:run",
+      "postDebugTask": "npm: testenv:stop",
+      "env": {
+        "PGHOST": "localhost",
+        "PGUSER": "postgres",
+        "PGPASSWORD": "postgres"
+      }
+    }
+  ]
+}

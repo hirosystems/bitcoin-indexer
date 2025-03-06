@@ -1,6 +1,6 @@
 [package]
 name = "ordhook"
-version = "1.0.0"
+version.workspace = true
 edition = "2021"
 
 [dependencies]
@@ -9,17 +9,19 @@ serde = "1"
 serde_json = "1"
 serde_derive = "1"
 hex = "0.4.3"
-rand = "0.8.5"
-lru = "0.12.3"
-chainhook-sdk = { version = "=0.12.10", features = ["zeromq"] }
-# chainhook-sdk = { version = "=0.12.10", path = "../../../chainhook/components/chainhook-sdk", features = ["zeromq"] }
-hiro-system-kit = "0.3.1"
+rand = "0.9.0"
+lru = "0.13.0"
+config = { path = "../config" }
+bitcoin = { workspace = true }
+chainhook-sdk = { path = "../chainhook-sdk" }
+chainhook-types = { path = "../chainhook-types-rs" }
+hiro-system-kit = { workspace = true }
 reqwest = { version = "0.11", default-features = false, features = [
     "stream",
     "json",
     "rustls-tls",
 ] }
-tokio = { version = "1.35.1", features = ["full"] }
+tokio = { workspace = true }
 futures-util = "0.3.24"
 flate2 = "1.0.24"
 tar = "0.4.38"
@@ -27,25 +29,26 @@ flume = "0.11.0"
 ansi_term = "0.12.1"
 atty = "0.2.14"
 crossbeam-channel = "0.5.8"
-uuid = { version = "1.3.0", features = ["v4", "fast-rng"] }
 threadpool = "1.8.1"
-rocket_okapi = "0.8.0-rc.3"
-rocket = { version = "0.5.0", features = ["json"] }
 dashmap = "5.4.0"
 fxhash = "0.2.1"
-rusqlite = { version = "0.28.0", features = ["bundled"] }
 anyhow = { version = "1.0.56", features = ["backtrace"] }
-schemars = { version = "0.8.16", git = "https://github.com/hirosystems/schemars.git", branch = "feat-chainhook-fixes" }
 progressing = '3'
 futures = "0.3.28"
 rocksdb = { version = "0.21.0", default-features = false, features = [
     "snappy",
 ] }
-pprof = { version = "0.13.0", features = ["flamegraph"], optional = true }
+pprof = { version = "0.14.0", features = ["flamegraph"], optional = true }
 hyper = { version = "=0.14.27" }
 lazy_static = { version = "1.4.0" }
-ciborium = "0.2.1"
 regex = "1.10.3"
+prometheus = "0.13.3"
+chainhook-postgres = { path = "../chainhook-postgres" }
+tokio-postgres = { workspace = true }
+deadpool-postgres = { workspace = true }
+refinery = { workspace = true }
+maplit = "1.0.2"
+ord = { path = "../ord" }
 
 [dev-dependencies]
 test-case = "3.1.0"

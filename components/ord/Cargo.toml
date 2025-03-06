@@ -1,0 +1,13 @@
+[package]
+name = "ord"
+version = "0.22.2"
+edition = "2021"
+
+[dependencies]
+anyhow = { version = "1.0.56", features = ["backtrace"] }
+bitcoin = { workspace = true }
+chainhook-sdk = { path = "../chainhook-sdk" }
+ciborium = "0.2.1"
+serde = "1"
+serde_derive = "1"
+serde_json = "1"

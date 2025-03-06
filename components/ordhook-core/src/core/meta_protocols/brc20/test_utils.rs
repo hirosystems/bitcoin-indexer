@@ -1,9 +1,7 @@
-use chainhook_sdk::{
-    types::{
-        OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
-        OrdinalInscriptionTransferDestination,
-    },
-    utils::Context,
+use chainhook_sdk::utils::Context;
+use chainhook_types::{
+    OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
+    OrdinalInscriptionTransferDestination,
 };
 
 pub fn get_test_ctx() -> Context {
@@ -20,7 +18,7 @@ pub struct Brc20RevealBuilder {
     pub inscriber_address: Option<String>,
     pub inscription_id: String,
     pub ordinal_number: u64,
-    pub parent: Option<String>,
+    pub parents: Vec<String>,
 }
 
 impl Brc20RevealBuilder {
@@ -34,7 +32,7 @@ impl Brc20RevealBuilder {
             inscription_id: "9bb2314d666ae0b1db8161cb373fcc1381681f71445c4e0335aa80ea9c37fcddi0"
                 .to_string(),
             ordinal_number: 0,
-            parent: None,
+            parents: vec![],
         }
     }
 
@@ -61,8 +59,8 @@ impl Brc20RevealBuilder {
         self
     }
 
-    pub fn parent(mut self, val: Option<String>) -> Self {
-        self.parent = val;
+    pub fn parents(mut self, val: Vec<String>) -> Self {
+        self.parents = val;
         self
     }
 
@@ -81,7 +79,7 @@ impl Brc20RevealBuilder {
             delegate: None,
             metaprotocol: None,
             metadata: None,
-            parent: self.parent,
+            parents: self.parents,
             ordinal_number: self.ordinal_number,
             ordinal_block_height: 767430,
             ordinal_offset: 0,
@@ -90,6 +88,8 @@ impl Brc20RevealBuilder {
             satpoint_post_inscription:
                 "9bb2314d666ae0b1db8161cb373fcc1381681f71445c4e0335aa80ea9c37fcdd:0:0".to_string(),
             curse_type: None,
+            charms: 0,
+            unbound_sequence: None,
         }
     }
 }
@@ -97,6 +97,8 @@ impl Brc20RevealBuilder {
 pub struct Brc20TransferBuilder {
     pub ordinal_number: u64,
     pub destination: OrdinalInscriptionTransferDestination,
+    pub satpoint_post_transfer: String,
+    pub tx_index: usize,
 }
 
 impl Brc20TransferBuilder {
@@ -106,6 +108,9 @@ impl Brc20TransferBuilder {
             destination: OrdinalInscriptionTransferDestination::Transferred(
                 "bc1pls75sfwullhygkmqap344f5cqf97qz95lvle6fvddm0tpz2l5ffslgq3m0".to_string(),
             ),
+            satpoint_post_transfer:
+                "e45957c419f130cd5c88cdac3eb1caf2d118aee20c17b15b74a611be395a065d:0:0".to_string(),
+            tx_index: 0,
         }
     }
 
@@ -119,14 +124,19 @@ impl Brc20TransferBuilder {
         self
     }
 
+    pub fn tx_index(mut self, val: usize) -> Self {
+        self.tx_index = val;
+        self
+    }
+
     pub fn build(self) -> OrdinalInscriptionTransferData {
         OrdinalInscriptionTransferData {
             ordinal_number: self.ordinal_number,
             destination: self.destination,
             satpoint_pre_transfer: "".to_string(),
-            satpoint_post_transfer: "".to_string(),
+            satpoint_post_transfer: self.satpoint_post_transfer,
             post_transfer_output_value: Some(500),
-            tx_index: 0,
+            tx_index: self.tx_index,
         }
     }
 }

@@ -1,37 +1,32 @@
-use chainhook_sdk::bitcoincore_rpc_json::bitcoin::Txid;
-use chainhook_sdk::indexer::bitcoin::BitcoinTransactionFullBreakdown;
-use chainhook_sdk::indexer::bitcoin::{standardize_bitcoin_block, BitcoinBlockFullBreakdown};
-use chainhook_sdk::types::{
+use bitcoin::hash_types::Txid;
+use bitcoin::Witness;
+use chainhook_sdk::utils::Context;
+use chainhook_types::{
     BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
     OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,
-    OrdinalInscriptionTransferData, OrdinalOperation,
+    OrdinalOperation,
 };
-use chainhook_sdk::utils::Context;
+use config::Config;
 use serde_json::json;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::core::meta_protocols::brc20::brc20_activation_height;
 use crate::core::meta_protocols::brc20::parser::{parse_brc20_operation, ParsedBrc20Operation};
-use crate::ord::envelope::{Envelope, ParsedEnvelope, RawEnvelope};
-use crate::ord::inscription::Inscription;
-use crate::ord::inscription_id::InscriptionId;
 use crate::try_warn;
-use {chainhook_sdk::bitcoincore_rpc::bitcoin::Witness, std::str};
+use ord::envelope::{Envelope, ParsedEnvelope};
+use ord::inscription::Inscription;
+use ord::inscription_id::InscriptionId;
+use std::str;
 
 pub fn parse_inscriptions_from_witness(
     input_index: usize,
     witness_bytes: Vec<Vec<u8>>,
     txid: &str,
 ) -> Option<Vec<(OrdinalInscriptionRevealData, Inscription)>> {
-    // Efficient debugging: Isolate one specific transaction
-    // if !txid.eq("aa2ab56587c7d6609c95157e6dff37c5c3fa6531702f41229a289a5613887077") {
-    //     return None
-    // }
-
     let witness = Witness::from_slice(&witness_bytes);
     let tapscript = witness.tapscript()?;
-    let envelopes: Vec<Envelope<Inscription>> = RawEnvelope::from_tapscript(tapscript, input_index)
+    let envelopes: Vec<Envelope<Inscription>> = Envelope::from_tapscript(tapscript, input_index)
         .ok()?
         .into_iter()
         .map(|e| ParsedEnvelope::from(e))
@@ -68,7 +63,12 @@ pub fn parse_inscriptions_from_witness(
         let mut content_bytes = "0x".to_string();
         content_bytes.push_str(&hex::encode(&inscription_content_bytes));
 
-        let parent = envelope.payload.parent().and_then(|i| Some(i.to_string()));
+        let parents = envelope
+            .payload
+            .parents()
+            .iter()
+            .map(|i| i.to_string())
+            .collect();
         let delegate = envelope
             .payload
             .delegate()
@@ -79,12 +79,9 @@ pub fn parse_inscriptions_from_witness(
             .and_then(|p| Some(p.to_string()));
         let metadata = envelope.payload.metadata().and_then(|m| Some(json!(m)));
 
+        // Most of these fields will be calculated later when we know for certain which satoshi contains this inscription.
         let reveal_data = OrdinalInscriptionRevealData {
-            content_type: envelope
-                .payload
-                .content_type()
-                .unwrap_or("unknown")
-                .to_string(),
+            content_type: envelope.payload.content_type().unwrap_or("").to_string(),
             content_bytes,
             content_length: inscription_content_bytes.len(),
             inscription_id: inscription_id.to_string(),
@@ -95,7 +92,7 @@ pub fn parse_inscriptions_from_witness(
             inscription_fee: 0,
             inscription_number: OrdinalInscriptionNumber::zero(),
             inscriber_address: None,
-            parent,
+            parents,
             delegate,
             metaprotocol,
             metadata,
@@ -105,6 +102,8 @@ pub fn parse_inscriptions_from_witness(
             transfers_pre_inscription: 0,
             satpoint_post_inscription: format!(""),
             curse_type,
+            charms: 0,
+            unbound_sequence: None,
         };
         inscriptions.push((reveal_data, envelope.payload));
     }
@@ -116,6 +115,7 @@ pub fn parse_inscriptions_from_standardized_tx(
     block_identifier: &BlockIdentifier,
     network: &BitcoinNetwork,
     brc20_operation_map: &mut HashMap<String, ParsedBrc20Operation>,
+    config: &Config,
     ctx: &Context,
 ) -> Vec<OrdinalOperation> {
     let mut operations = vec![];
@@ -132,16 +132,19 @@ pub fn parse_inscriptions_from_standardized_tx(
             tx.transaction_identifier.get_hash_bytes_str(),
         ) {
             for (reveal, inscription) in inscriptions.into_iter() {
-                if block_identifier.index >= brc20_activation_height(&network) {
-                    match parse_brc20_operation(&inscription) {
-                        Ok(Some(op)) => {
-                            brc20_operation_map.insert(reveal.inscription_id.clone(), op);
-                        }
-                        Ok(None) => {}
-                        Err(e) => {
-                            try_warn!(ctx, "Error parsing BRC-20 operation: {}", e);
-                        }
-                    };
+                if let Some(brc20) = config.ordinals_brc20_config() {
+                    if brc20.enabled && block_identifier.index >= brc20_activation_height(&network)
+                    {
+                        match parse_brc20_operation(&inscription) {
+                            Ok(Some(op)) => {
+                                brc20_operation_map.insert(reveal.inscription_id.clone(), op);
+                            }
+                            Ok(None) => {}
+                            Err(e) => {
+                                try_warn!(ctx, "Error parsing BRC-20 operation: {}", e);
+                            }
+                        };
+                    }
                 }
                 operations.push(OrdinalOperation::InscriptionRevealed(reveal));
             }
@@ -150,73 +153,10 @@ pub fn parse_inscriptions_from_standardized_tx(
     operations
 }
 
-pub fn parse_inscriptions_in_raw_tx(
-    tx: &BitcoinTransactionFullBreakdown,
-    _ctx: &Context,
-) -> Vec<OrdinalOperation> {
-    let mut operations = vec![];
-    for (input_index, input) in tx.vin.iter().enumerate() {
-        if let Some(ref witness_data) = input.txinwitness {
-            let witness_bytes: Vec<Vec<u8>> = witness_data
-                .iter()
-                .map(|w| hex::decode(w).unwrap())
-                .collect();
-
-            if let Some(inscriptions) =
-                parse_inscriptions_from_witness(input_index, witness_bytes, &tx.txid)
-            {
-                for (reveal, _inscription) in inscriptions.into_iter() {
-                    operations.push(OrdinalOperation::InscriptionRevealed(reveal));
-                }
-            }
-        }
-    }
-    operations
-}
-
-// #[test]
-// fn test_ordinal_inscription_parsing() {
-//     let bytes = hex::decode("208737bc46923c3e64c7e6768c0346879468bf3aba795a5f5f56efca288f50ed2aac0063036f7264010118746578742f706c61696e3b636861727365743d7574662d38004c9948656c6c6f2030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030300a68").unwrap();
-
-//     let script = Script::from(bytes);
-//     let parser = InscriptionParser {
-//         instructions: script.instructions().peekable(),
-//     };
-
-//     let inscription = match parser.parse_script() {
-//         Ok(inscription) => inscription,
-//         Err(_) => panic!(),
-//     };
-
-//     println!("{:?}", inscription);
-// }
-
-pub fn parse_inscriptions_and_standardize_block(
-    raw_block: BitcoinBlockFullBreakdown,
-    network: &BitcoinNetwork,
-    ctx: &Context,
-) -> Result<BitcoinBlockData, (String, bool)> {
-    let mut ordinal_operations = BTreeMap::new();
-
-    for tx in raw_block.tx.iter() {
-        ordinal_operations.insert(tx.txid.to_string(), parse_inscriptions_in_raw_tx(&tx, ctx));
-    }
-
-    let mut block = standardize_bitcoin_block(raw_block, network, ctx)?;
-
-    for tx in block.transactions.iter_mut() {
-        if let Some(ordinal_operations) =
-            ordinal_operations.remove(tx.transaction_identifier.get_hash_bytes_str())
-        {
-            tx.metadata.ordinal_operations = ordinal_operations;
-        }
-    }
-    Ok(block)
-}
-
 pub fn parse_inscriptions_in_standardized_block(
     block: &mut BitcoinBlockData,
     brc20_operation_map: &mut HashMap<String, ParsedBrc20Operation>,
+    config: &Config,
     ctx: &Context,
 ) {
     for tx in block.transactions.iter_mut() {
@@ -225,35 +165,54 @@ pub fn parse_inscriptions_in_standardized_block(
             &block.block_identifier,
             &block.metadata.network,
             brc20_operation_map,
+            config,
             ctx,
         );
     }
 }
 
-pub fn get_inscriptions_revealed_in_block(
-    block: &BitcoinBlockData,
-) -> Vec<&OrdinalInscriptionRevealData> {
-    let mut ops = vec![];
-    for tx in block.transactions.iter() {
-        for op in tx.metadata.ordinal_operations.iter() {
-            if let OrdinalOperation::InscriptionRevealed(op) = op {
-                ops.push(op);
-            }
-        }
-    }
-    ops
-}
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
 
-pub fn get_inscriptions_transferred_in_block(
-    block: &BitcoinBlockData,
-) -> Vec<&OrdinalInscriptionTransferData> {
-    let mut ops = vec![];
-    for tx in block.transactions.iter() {
-        for op in tx.metadata.ordinal_operations.iter() {
-            if let OrdinalOperation::InscriptionTransferred(op) = op {
-                ops.push(op);
-            }
-        }
+    use chainhook_sdk::utils::Context;
+    use chainhook_types::OrdinalOperation;
+    use config::Config;
+
+    use crate::core::test_builders::{TestBlockBuilder, TestTransactionBuilder, TestTxInBuilder};
+
+    use super::parse_inscriptions_in_standardized_block;
+
+    #[test]
+    fn parses_inscriptions_in_block() {
+        let ctx = Context::empty();
+        let config = Config::test_default();
+        let mut block = TestBlockBuilder::new()
+            .add_transaction(
+                TestTransactionBuilder::new()
+                    .add_input(
+                        TestTxInBuilder::new()
+                            .witness(vec![
+                                "0x6c00eb3c4d35fedd257051333b4ca81d1a25a37a9af4891f1fec2869edd56b14180eafbda8851d63138a724c9b15384bc5f0536de658bd294d426a36212e6f08".to_string(),
+                                "0x209e2849b90a2353691fccedd467215c88eec89a5d0dcf468e6cf37abed344d746ac0063036f7264010118746578742f706c61696e3b636861727365743d7574662d38004c5e7b200a20202270223a20226272632d3230222c0a2020226f70223a20226465706c6f79222c0a2020227469636b223a20226f726469222c0a2020226d6178223a20223231303030303030222c0a2020226c696d223a202231303030220a7d68".to_string(),
+                                "0xc19e2849b90a2353691fccedd467215c88eec89a5d0dcf468e6cf37abed344d746".to_string(),
+                            ])
+                            .build()
+                    )
+                    .build(),
+            )
+            .build();
+        parse_inscriptions_in_standardized_block(&mut block, &mut HashMap::new(), &config, &ctx);
+        let OrdinalOperation::InscriptionRevealed(reveal) =
+            &block.transactions[0].metadata.ordinal_operations[0]
+        else {
+            panic!();
+        };
+        assert_eq!(
+            reveal.inscription_id,
+            "b61b0172d95e266c18aea0c624db987e971a5d6d4ebc2aaed85da4642d635735i0".to_string()
+        );
+        assert_eq!(reveal.content_bytes, "0x7b200a20202270223a20226272632d3230222c0a2020226f70223a20226465706c6f79222c0a2020227469636b223a20226f726469222c0a2020226d6178223a20223231303030303030222c0a2020226c696d223a202231303030220a7d".to_string());
+        assert_eq!(reveal.content_length, 94);
     }
-    ops
 }

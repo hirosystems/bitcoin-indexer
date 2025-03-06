@@ -18,9 +18,9 @@ components/chainhook-types-js/dist
 *.tar.gz
 *.zip
 *.rdb
-Ordhook.toml
+/Ordhook.toml
 
-cache/
+/cache/
 ./tests
 tmp/
 data
@@ -222,3 +222,7 @@ Cargo.lock
 !.yarn/versions
 
 *.node
+
+# Mutation Testing
+mutants.out/
+mutants.out.old/

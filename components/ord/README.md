@@ -1,0 +1,1 @@
+This code is manually imported from [ordinals/ord](https://github.com/ordinals/ord) and it is used for all ordinal inscription parsing.

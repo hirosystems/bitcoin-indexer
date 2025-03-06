@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "npm: testenv:run",
+      "type": "shell",
+      "command": "npm run testenv:run -- -d",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/api/ordinals/",
+      },
+      "problemMatcher": {
+        "pattern": {
+          "regexp": ".",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "."
+        }
+      }
+    },
+    {
+      "label": "npm: testenv:stop",
+      "type": "shell",
+      "command": "npm run testenv:stop",
+      "options": {
+        "cwd": "${workspaceFolder}/api/ordinals/",
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      }
+    }
+  ]
+}

@@ -1,9 +1,4 @@
-target/
-examples/
-dockerfiles/
-Dockerfile
-.dockerignore
-.git*
-node_modules
-package-lock.json
-*.tar.gz
+/target/
+/dockerfiles/
+node_modules/
+tmp/
