@@ -60,7 +60,7 @@ pub async fn pg_connect(config: &Config, run_migrations: bool, ctx: &Context) ->
             Ok((client, connection)) => {
                 tokio::spawn(async move {
                     if let Err(e) = connection.await {
-                        eprintln!("Postgres connection error: {}", e.to_string());
+                        eprintln!("Postgres connection error: {}", e);
                         process::exit(1);
                     }
                 });
@@ -68,7 +68,7 @@ pub async fn pg_connect(config: &Config, run_migrations: bool, ctx: &Context) ->
                 break;
             }
             Err(e) => {
-                try_error!(ctx, "Error connecting to postgres: {}", e.to_string());
+                try_error!(ctx, "Error connecting to postgres: {}", e);
                 std::thread::sleep(std::time::Duration::from_secs(1));
             }
         }
@@ -80,7 +80,7 @@ pub async fn pg_connect(config: &Config, run_migrations: bool, ctx: &Context) ->
 }
 
 pub async fn pg_insert_runes(
-    rows: &Vec<DbRune>,
+    rows: &[DbRune],
     db_tx: &mut Transaction<'_>,
     ctx: &Context,
 ) -> Result<bool, Error> {
@@ -89,7 +89,7 @@ pub async fn pg_insert_runes(
         let mut arg_str = String::new();
         let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
         for row in chunk.iter() {
-            arg_str.push_str("(");
+            arg_str.push('(');
             for i in 0..19 {
                 arg_str.push_str(format!("${},", arg_num + i).as_str());
             }
@@ -139,7 +139,7 @@ pub async fn pg_insert_runes(
 }
 
 pub async fn pg_insert_supply_changes(
-    rows: &Vec<DbSupplyChange>,
+    rows: &[DbSupplyChange],
     db_tx: &mut Transaction<'_>,
     ctx: &Context,
 ) -> Result<bool, Error> {
@@ -216,7 +216,7 @@ pub async fn pg_insert_supply_changes(
 }
 
 pub async fn pg_insert_balance_changes(
-    rows: &Vec<DbBalanceChange>,
+    rows: &[DbBalanceChange],
     increase: bool,
     db_tx: &mut Transaction<'_>,
     ctx: &Context,
@@ -281,7 +281,7 @@ pub async fn pg_insert_balance_changes(
 }
 
 pub async fn pg_insert_ledger_entries(
-    rows: &Vec<DbLedgerEntry>,
+    rows: &[DbLedgerEntry],
     db_tx: &mut Transaction<'_>,
     ctx: &Context,
 ) -> Result<bool, Error> {
@@ -290,7 +290,7 @@ pub async fn pg_insert_ledger_entries(
         let mut arg_str = String::new();
         let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
         for row in chunk.iter() {
-            arg_str.push_str("(");
+            arg_str.push('(');
             for i in 0..12 {
                 arg_str.push_str(format!("${},", arg_num + i).as_str());
             }
@@ -380,11 +380,7 @@ pub async fn pg_get_block_height(client: &mut Client, _ctx: &Context) -> Option<
         .await
         .expect("error getting max block height")?;
     let max: Option<PgNumericU64> = row.get("max");
-    if let Some(max) = max {
-        Some(max.0)
-    } else {
-        None
-    }
+    max.map(|max| max.0)
 }
 
 pub async fn pg_get_rune_by_id(
@@ -402,9 +398,7 @@ pub async fn pg_get_rune_by_id(
             process::exit(1);
         }
     };
-    let Some(row) = row else {
-        return None;
-    };
+    let row = row?;
     Some(DbRune::from_pg_row(&row))
 }
 
@@ -430,9 +424,7 @@ pub async fn pg_get_rune_total_mints(
             process::exit(1);
         }
     };
-    let Some(row) = row else {
-        return None;
-    };
+    let row = row?;
     let minted: PgNumericU128 = row.get("total_mints");
     Some(minted.0)
 }

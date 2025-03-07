@@ -31,7 +31,7 @@ pub fn brc20_self_mint_activation_height(network: &BitcoinNetwork) -> u64 {
 pub fn decimals_str_amount_to_u128(amt: &String, decimals: u8) -> Result<u128, String> {
     let parts: Vec<&str> = amt.split('.').collect();
     let first = parts
-        .get(0)
+        .first()
         .ok_or("decimals_str_amount_to_u128: first part not found")?;
     let integer = (*first)
         .parse::<u128>()
@@ -40,7 +40,7 @@ pub fn decimals_str_amount_to_u128(amt: &String, decimals: u8) -> Result<u128, S
     let mut fractional = 0u128;
     if let Some(second) = parts.get(1) {
         let mut padded = String::with_capacity(decimals as usize);
-        padded.push_str(*second);
+        padded.push_str(second);
         padded.push_str(&"0".repeat(decimals as usize - (*second).len()));
         fractional = padded
             .parse::<u128>()
@@ -58,7 +58,7 @@ pub fn u128_amount_to_decimals_str(amount: u128, decimals: u8) -> String {
     }
     let decimal_point = num_str.len() as i32 - decimals as i32;
     if decimal_point < 0 {
-        let padding = "0".repeat(decimal_point.abs() as usize);
+        let padding = "0".repeat(decimal_point.unsigned_abs() as usize);
         format!("0.{padding}{num_str}")
     } else {
         let (integer, fractional) = num_str.split_at(decimal_point as usize);

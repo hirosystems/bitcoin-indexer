@@ -1,21 +1,24 @@
 pub mod processors;
 
-use chainhook_sdk::utils::Context;
+use std::{
+    collections::{HashMap, VecDeque},
+    thread::{sleep, JoinHandle},
+    time::Duration,
+};
+
+use chainhook_sdk::{
+    indexer::bitcoin::{
+        build_http_client, parse_downloaded_block, standardize_bitcoin_block,
+        try_download_block_bytes_with_retry,
+    },
+    utils::Context,
+};
 use chainhook_types::{BitcoinBlockData, BitcoinNetwork};
 use config::Config;
 use crossbeam_channel::bounded;
-use std::collections::{HashMap, VecDeque};
-use std::thread::{sleep, JoinHandle};
-use std::time::Duration;
 use tokio::task::JoinSet;
 
-use crate::db::cursor::BlockBytesCursor;
-use crate::{try_debug, try_info};
-
-use chainhook_sdk::indexer::bitcoin::{
-    build_http_client, parse_downloaded_block, standardize_bitcoin_block,
-    try_download_block_bytes_with_retry,
-};
+use crate::{db::cursor::BlockBytesCursor, try_debug, try_info};
 
 pub enum PostProcessorCommand {
     ProcessBlocks(Vec<(u64, Vec<u8>)>, Vec<BitcoinBlockData>),
@@ -90,7 +93,7 @@ pub async fn bitcoind_download_blocks(
     }
 
     let moved_ctx: Context = ctx.clone();
-    let moved_bitcoin_network = config.bitcoind.network.clone();
+    let moved_bitcoin_network = config.bitcoind.network;
 
     let mut tx_thread_pool = vec![];
     let mut rx_thread_pool = vec![];
@@ -105,7 +108,7 @@ pub async fn bitcoind_download_blocks(
     for (thread_index, rx) in rx_thread_pool.into_iter().enumerate() {
         let block_compressed_tx_moved = block_compressed_tx.clone();
         let moved_ctx: Context = moved_ctx.clone();
-        let moved_bitcoin_network = moved_bitcoin_network.clone();
+        let moved_bitcoin_network_inner = moved_bitcoin_network;
 
         let handle = hiro_system_kit::thread_named("Block data compression")
             .spawn(move || {
@@ -118,7 +121,7 @@ pub async fn bitcoind_download_blocks(
                     let block_data = if block_height >= start_sequencing_blocks_at_height {
                         let block = standardize_bitcoin_block(
                             raw_block_data,
-                            &BitcoinNetwork::from_network(moved_bitcoin_network),
+                            &BitcoinNetwork::from_network(moved_bitcoin_network_inner),
                             &moved_ctx,
                         )
                         .expect("unable to deserialize block");
@@ -227,7 +230,6 @@ pub async fn bitcoind_download_blocks(
                     stop_runloop = true;
                 }
             }
-            ()
         })
         .expect("unable to spawn thread");
 
@@ -290,7 +292,7 @@ pub async fn bitcoind_download_blocks(
     let _ = block_compressed_tx.send(None);
 
     let _ = storage_thread.join();
-    let _ = set.shutdown();
+    set.shutdown().await;
 
     try_info!(
         ctx,

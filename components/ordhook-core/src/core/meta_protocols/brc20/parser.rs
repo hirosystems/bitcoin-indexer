@@ -1,5 +1,7 @@
-use ord::inscription::Inscription;
-use ord::media::{Language, Media};
+use ord::{
+    inscription::Inscription,
+    media::{Language, Media},
+};
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct ParsedBrc20TokenDeployData {
@@ -203,12 +205,13 @@ pub fn parse_brc20_operation(
 
 #[cfg(test)]
 mod test {
+    use ord::inscription::Inscription;
+    use test_case::test_case;
+
     use super::{parse_brc20_operation, ParsedBrc20Operation};
     use crate::core::meta_protocols::brc20::parser::{
         ParsedBrc20BalanceData, ParsedBrc20TokenDeployData,
     };
-    use ord::inscription::Inscription;
-    use test_case::test_case;
 
     struct InscriptionBuilder {
         body: Option<Vec<u8>>,

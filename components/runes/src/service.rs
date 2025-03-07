@@ -1,61 +1,68 @@
-use std::sync::mpsc::channel;
+use std::{cmp::Ordering, sync::mpsc::channel};
 
-use crate::db::cache::index_cache::IndexCache;
-use crate::db::index::{get_rune_genesis_block_height, index_block, roll_back_block};
-use crate::db::{pg_connect, pg_get_block_height};
-use crate::scan::bitcoin::scan_blocks;
-use crate::{try_error, try_info};
-use chainhook_sdk::observer::BitcoinBlockDataCached;
-use chainhook_sdk::utils::bitcoind::bitcoind_get_block_height;
 use chainhook_sdk::{
-    observer::{start_event_observer, ObserverEvent, ObserverSidecar},
-    utils::Context,
+    observer::{start_event_observer, BitcoinBlockDataCached, ObserverEvent, ObserverSidecar},
+    utils::{bitcoind::bitcoind_get_block_height, Context},
 };
 use chainhook_types::BlockIdentifier;
 use config::Config;
 use crossbeam_channel::select;
 
+use crate::{
+    db::{
+        cache::index_cache::IndexCache,
+        index::{get_rune_genesis_block_height, index_block, roll_back_block},
+        pg_connect, pg_get_block_height,
+    },
+    scan::bitcoin::scan_blocks,
+    try_error, try_info,
+};
+
 pub async fn get_index_chain_tip(config: &Config, ctx: &Context) -> u64 {
-    let mut pg_client = pg_connect(&config, true, ctx).await;
+    let mut pg_client = pg_connect(config, true, ctx).await;
     pg_get_block_height(&mut pg_client, ctx)
         .await
         .unwrap_or(get_rune_genesis_block_height(config.bitcoind.network) - 1)
 }
 
 pub async fn catch_up_to_bitcoin_chain_tip(config: &Config, ctx: &Context) -> Result<(), String> {
-    let mut pg_client = pg_connect(&config, true, ctx).await;
+    let mut pg_client = pg_connect(config, true, ctx).await;
     let mut index_cache = IndexCache::new(config, &mut pg_client, ctx).await;
     loop {
         let chain_tip = pg_get_block_height(&mut pg_client, ctx)
             .await
             .unwrap_or(get_rune_genesis_block_height(config.bitcoind.network) - 1);
         let bitcoind_chain_tip = bitcoind_get_block_height(&config.bitcoind, ctx);
-        if bitcoind_chain_tip < chain_tip {
-            try_info!(
-                ctx,
-                "Waiting for bitcoind to reach height {}, currently at {}",
-                chain_tip,
-                bitcoind_chain_tip
-            );
-            std::thread::sleep(std::time::Duration::from_secs(10));
-        } else if bitcoind_chain_tip > chain_tip {
-            try_info!(
-                ctx,
-                "Block height is behind bitcoind, scanning block range {} to {}",
-                chain_tip + 1,
-                bitcoind_chain_tip
-            );
-            scan_blocks(
-                ((chain_tip + 1)..=bitcoind_chain_tip).collect(),
-                config,
-                &mut pg_client,
-                &mut index_cache,
-                ctx,
-            )
-            .await?;
-        } else {
-            try_info!(ctx, "Caught up to bitcoind chain tip at {}", chain_tip);
-            break;
+        match bitcoind_chain_tip.cmp(&chain_tip) {
+            Ordering::Less => {
+                try_info!(
+                    ctx,
+                    "Waiting for bitcoind to reach height {}, currently at {}",
+                    chain_tip,
+                    bitcoind_chain_tip
+                );
+                std::thread::sleep(std::time::Duration::from_secs(10));
+            }
+            Ordering::Greater => {
+                try_info!(
+                    ctx,
+                    "Block height is behind bitcoind, scanning block range {} to {}",
+                    chain_tip + 1,
+                    bitcoind_chain_tip
+                );
+                scan_blocks(
+                    ((chain_tip + 1)..=bitcoind_chain_tip).collect(),
+                    config,
+                    &mut pg_client,
+                    &mut index_cache,
+                    ctx,
+                )
+                .await?;
+            }
+            Ordering::Equal => {
+                try_info!(ctx, "Caught up to bitcoind chain tip at {}", chain_tip);
+                break;
+            }
         }
     }
     Ok(())
@@ -95,12 +102,9 @@ pub async fn start_service(config: &Config, ctx: &Context) -> Result<(), String>
                 break;
             }
         };
-        match event {
-            ObserverEvent::Terminate => {
-                try_info!(ctx, "Received termination event from Chainhook SDK");
-                break;
-            }
-            _ => {}
+        if let ObserverEvent::Terminate = event {
+            try_info!(ctx, "Received termination event from Chainhook SDK");
+            break;
         }
     }
     Ok(())
@@ -156,13 +160,13 @@ pub async fn set_up_observer_sidecar_runloop(
 
 pub async fn chainhook_sidecar_mutate_blocks(
     index_cache: &mut IndexCache,
-    blocks_to_mutate: &mut Vec<BitcoinBlockDataCached>,
-    block_ids_to_rollback: &Vec<BlockIdentifier>,
+    blocks_to_mutate: &mut [BitcoinBlockDataCached],
+    block_ids_to_rollback: &[BlockIdentifier],
     config: &Config,
     ctx: &Context,
 ) {
     try_info!(ctx, "Received mutate blocks message from Chainhook SDK");
-    let mut pg_client = pg_connect(&config, false, &ctx).await;
+    let mut pg_client = pg_connect(config, false, ctx).await;
     for block_id in block_ids_to_rollback.iter() {
         roll_back_block(&mut pg_client, block_id.index, ctx).await;
     }

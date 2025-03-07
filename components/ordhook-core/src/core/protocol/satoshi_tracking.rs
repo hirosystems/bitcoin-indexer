@@ -8,14 +8,13 @@ use chainhook_types::{
 };
 use deadpool_postgres::Transaction;
 
+use super::inscription_sequencing::get_bitcoin_network;
 use crate::{
     core::{compute_next_satpoint_data, SatPosition},
     db::ordinals_pg,
     try_info,
     utils::format_outpoint_to_watch,
 };
-
-use super::inscription_sequencing::get_bitcoin_network;
 
 pub const UNBOUND_INSCRIPTION_SATPOINT: &str =
     "0000000000000000000000000000000000000000000000000000000000000000:0";
@@ -31,7 +30,7 @@ pub fn parse_output_and_offset_from_satpoint(
 ) -> Result<(String, Option<u64>), String> {
     let parts: Vec<&str> = satpoint.split(':').collect();
     let tx_id = parts
-        .get(0)
+        .first()
         .ok_or("get_output_and_offset_from_satpoint: tx_id not found")?;
     let output = parts
         .get(1)
@@ -80,8 +79,13 @@ pub fn compute_satpoint_post_transfer(
         .inputs
         .iter()
         .map(|o| o.previous_output.value)
-        .collect::<_>();
-    let outputs = tx.metadata.outputs.iter().map(|o| o.value).collect::<_>();
+        .collect::<Vec<_>>();
+    let outputs = tx
+        .metadata
+        .outputs
+        .iter()
+        .map(|o| o.value)
+        .collect::<Vec<_>>();
     let post_transfer_data = compute_next_satpoint_data(
         input_index,
         &inputs,
@@ -95,8 +99,8 @@ pub fn compute_satpoint_post_transfer(
             SatPosition::Output((output_index, offset)) => {
                 let outpoint = format_outpoint_to_watch(&tx.transaction_identifier, output_index);
                 let script_pub_key_hex = tx.metadata.outputs[output_index].get_script_pubkey_hex();
-                let updated_address = match ScriptBuf::from_hex(&script_pub_key_hex) {
-                    Ok(script) => match Address::from_script(&script, network.clone()) {
+                let updated_address = match ScriptBuf::from_hex(script_pub_key_hex) {
+                    Ok(script) => match Address::from_script(&script, network) {
                         Ok(address) => {
                             OrdinalInscriptionTransferDestination::Transferred(address.to_string())
                         }
@@ -192,7 +196,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
         let Some(entries) = input_satpoints.get(&input_index) else {
             continue;
         };
-        for watched_satpoint in entries.into_iter() {
+        for watched_satpoint in entries.iter() {
             if updated_sats.contains(&watched_satpoint.ordinal_number) {
                 continue;
             }
@@ -207,7 +211,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
 
             let (destination, satpoint_post_transfer, post_transfer_output_value) =
                 compute_satpoint_post_transfer(
-                    &&*tx,
+                    &*tx,
                     input_index,
                     watched_satpoint.offset,
                     network,
@@ -224,9 +228,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
             };
             // Keep an in-memory copy of this watchpoint at its new tx output for later retrieval.
             let (output, _) = parse_output_and_offset_from_satpoint(&satpoint_post_transfer)?;
-            let entry = block_transferred_satpoints
-                .entry(output)
-                .or_insert(vec![]);
+            let entry = block_transferred_satpoints.entry(output).or_default();
             entry.push(watched_satpoint.clone());
 
             try_info!(
@@ -256,6 +258,7 @@ mod test {
         OrdinalInscriptionTransferDestination, OrdinalOperation,
     };
 
+    use super::compute_satpoint_post_transfer;
     use crate::{
         core::{
             protocol::satoshi_tracking::augment_block_with_transfers,
@@ -265,8 +268,6 @@ mod test {
         },
         db::{ordinals_pg, pg_reset_db, pg_test_connection, pg_test_connection_pool},
     };
-
-    use super::compute_satpoint_post_transfer;
 
     #[tokio::test]
     async fn tracks_chained_satoshi_transfers_in_block() -> Result<(), String> {

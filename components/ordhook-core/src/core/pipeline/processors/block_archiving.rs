@@ -1,12 +1,13 @@
+use std::{
+    thread::{sleep, JoinHandle},
+    time::Duration,
+};
+
 use chainhook_sdk::utils::Context;
 use chainhook_types::BitcoinBlockData;
 use config::Config;
 use crossbeam_channel::{Sender, TryRecvError};
 use rocksdb::DB;
-use std::{
-    thread::{sleep, JoinHandle},
-    time::Duration,
-};
 
 use crate::{
     core::pipeline::{PostProcessorCommand, PostProcessorController, PostProcessorEvent},
@@ -83,8 +84,8 @@ pub fn store_compacted_blocks(
             block_height as u32,
             &compacted_block,
             update_tip,
-            &blocks_db_rw,
-            &ctx,
+            blocks_db_rw,
+            ctx,
         );
         try_info!(ctx, "Block #{block_height} saved to disk");
     }

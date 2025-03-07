@@ -37,7 +37,7 @@ impl DbCurrentLocation {
             tx_index: PgBigIntU32(tx_index as u32),
             address: reveal.inscriber_address.clone(),
             output,
-            offset: offset.map(|o| PgNumericU64(o)),
+            offset: offset.map(PgNumericU64),
         }
     }
 
@@ -62,7 +62,7 @@ impl DbCurrentLocation {
                 OrdinalInscriptionTransferDestination::Burnt(_) => None,
             },
             output,
-            offset: offset.map(|o| PgNumericU64(o)),
+            offset: offset.map(PgNumericU64),
         }
     }
 }

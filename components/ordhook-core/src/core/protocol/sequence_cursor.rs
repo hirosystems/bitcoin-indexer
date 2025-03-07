@@ -2,9 +2,8 @@ use bitcoin::Network;
 use chainhook_types::OrdinalInscriptionNumber;
 use deadpool_postgres::GenericClient;
 
-use crate::db::ordinals_pg;
-
 use super::inscription_sequencing;
+use crate::db::ordinals_pg;
 
 /// Helper caching inscription sequence cursor
 ///
@@ -18,6 +17,12 @@ pub struct SequenceCursor {
     jubilee_cursor: Option<i64>,
     unbound_cursor: Option<i64>,
     current_block_height: u64,
+}
+
+impl Default for SequenceCursor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SequenceCursor {
@@ -56,8 +61,7 @@ impl SequenceCursor {
             false => self.pick_next_pos_classic(client).await?,
         };
 
-        let jubilee = if block_height >= inscription_sequencing::get_jubilee_block_height(&network)
-        {
+        let jubilee = if block_height >= inscription_sequencing::get_jubilee_block_height(network) {
             self.pick_next_jubilee_number(client).await?
         } else {
             classic
@@ -107,8 +111,8 @@ impl SequenceCursor {
         match self.jubilee_cursor {
             None => match ordinals_pg::get_highest_inscription_number(client).await? {
                 Some(inscription_number) => {
-                    self.jubilee_cursor = Some(inscription_number as i64);
-                    Ok(inscription_number as i64 + 1)
+                    self.jubilee_cursor = Some(inscription_number);
+                    Ok(inscription_number + 1)
                 }
                 _ => Ok(0),
             },
@@ -167,10 +171,10 @@ impl SequenceCursor {
 mod test {
     use bitcoin::Network;
     use chainhook_postgres::{pg_begin, pg_pool_client};
-
     use chainhook_types::OrdinalOperation;
     use test_case::test_case;
 
+    use super::SequenceCursor;
     use crate::{
         core::test_builders::{TestBlockBuilder, TestTransactionBuilder},
         db::{
@@ -178,8 +182,6 @@ mod test {
             pg_reset_db, pg_test_connection, pg_test_connection_pool,
         },
     };
-
-    use super::SequenceCursor;
 
     #[test_case((780000, false) => Ok((2, 2)); "with blessed pre jubilee")]
     #[test_case((780000, true) => Ok((-2, -2)); "with cursed pre jubilee")]

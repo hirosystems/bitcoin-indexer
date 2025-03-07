@@ -8,6 +8,9 @@ edition = "2021"
 name = "bitcoin-indexer"
 path = "src/main.rs"
 
+[lib]
+path = "src/lib.rs"
+
 [dependencies]
 config = { path = "../config" }
 ordhook = { path = "../ordhook-core" }

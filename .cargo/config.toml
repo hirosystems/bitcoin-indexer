@@ -1,5 +1,8 @@
 [alias]
-bitcoin-indexer-install = "install --path components/cli --locked --force"
+bitcoin-indexer-install = "install --path components/ordhook-cli --locked --force"
+bitcoin-indexer-fmt = "fmt -- --config group_imports=StdExternalCrate,imports_granularity=Crate"
+bitcoin-indexer-clippy = "clippy --tests --all-features --all-targets -- -A clippy::too_many_arguments -A clippy::needless_return -A clippy::type_complexity -A clippy::ptr_arg"
+bitcoin-indexer-clippy-cli = "clippy --tests --all-features --all-targets --message-format=short -- -A clippy::too_many_arguments -A clippy::needless_return -A clippy::type_complexity -A clippy::ptr_arg -D warnings"
 
 [env]
 RUST_TEST_THREADS = "1"

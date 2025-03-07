@@ -1,5 +1,7 @@
-use std::fs::File;
-use std::io::{BufReader, Read};
+use std::{
+    fs::File,
+    io::{BufReader, Read},
+};
 
 use bitcoin::Network;
 
@@ -22,14 +24,14 @@ pub struct PgDatabaseConfigToml {
 }
 
 impl PgDatabaseConfigToml {
-    fn to_config(self) -> PgDatabaseConfig {
+    fn to_config(&self) -> PgDatabaseConfig {
         PgDatabaseConfig {
-            dbname: self.database,
-            host: self.host,
+            dbname: self.database.clone(),
+            host: self.host.clone(),
             port: self.port,
-            user: self.username,
-            password: self.password,
-            search_path: self.search_path,
+            user: self.username.clone(),
+            password: self.password.clone(),
+            search_path: self.search_path.clone(),
             pool_max_size: self.pool_max_size,
         }
     }
@@ -153,13 +155,11 @@ impl ConfigToml {
             }),
             None => None,
         };
-        let metrics = match toml.metrics {
-            Some(metrics) => Some(MetricsConfig {
-                enabled: metrics.enabled,
-                prometheus_port: metrics.prometheus_port,
-            }),
-            None => None,
-        };
+        let metrics = toml.metrics.map(|metrics| MetricsConfig {
+            enabled: metrics.enabled,
+            prometheus_port: metrics.prometheus_port,
+        });
+
         let config = Config {
             storage: StorageConfig {
                 working_dir: toml

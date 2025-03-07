@@ -1,11 +1,10 @@
 use std::{thread::sleep, time::Duration};
 
-use crate::utils::Context;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use config::BitcoindConfig;
 use hiro_system_kit::slog;
 
-use crate::{try_error, try_info};
+use crate::{try_error, try_info, utils::Context};
 
 fn bitcoind_get_client(config: &BitcoindConfig, ctx: &Context) -> Client {
     loop {
@@ -49,7 +48,7 @@ pub fn bitcoind_wait_for_chain_tip(config: &BitcoindConfig, ctx: &Context) {
     loop {
         match bitcoin_rpc.get_blockchain_info() {
             Ok(result) => {
-                if result.initial_block_download == false && result.blocks == result.headers {
+                if !result.initial_block_download && result.blocks == result.headers {
                     confirmations += 1;
                     // Wait for 10 confirmations before declaring node is at chain tip, just in case it's still connecting to
                     // peers.

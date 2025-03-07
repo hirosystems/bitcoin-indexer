@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
+    hash::BuildHasherDefault,
     sync::Arc,
     thread::{sleep, JoinHandle},
     time::Duration,
@@ -10,10 +11,8 @@ use chainhook_sdk::utils::Context;
 use chainhook_types::{BitcoinBlockData, TransactionIdentifier};
 use config::Config;
 use crossbeam_channel::TryRecvError;
-
 use dashmap::DashMap;
 use fxhash::FxHasher;
-use std::hash::BuildHasherDefault;
 
 use crate::{
     core::{
@@ -22,7 +21,11 @@ use crate::{
             cache::{brc20_new_cache, Brc20MemoryCache},
             index::index_block_and_insert_brc20_operations,
         },
-        pipeline::processors::block_archiving::store_compacted_blocks,
+        new_traversals_lazy_cache,
+        pipeline::{
+            processors::block_archiving::store_compacted_blocks, PostProcessorCommand,
+            PostProcessorController, PostProcessorEvent,
+        },
         protocol::{
             inscription_parsing::parse_inscriptions_in_standardized_block,
             inscription_sequencing::{
@@ -39,11 +42,6 @@ use crate::{
     service::PgConnectionPools,
     try_crit, try_debug, try_info,
     utils::monitoring::PrometheusMonitoring,
-};
-
-use crate::core::{
-    new_traversals_lazy_cache,
-    pipeline::{PostProcessorCommand, PostProcessorController, PostProcessorEvent},
 };
 
 pub fn start_inscription_indexing_processor(
@@ -166,7 +164,7 @@ async fn process_blocks(
 
         index_block(
             &mut block,
-            &next_blocks,
+            next_blocks,
             sequence_cursor,
             &mut cache_l1,
             cache_l2,
@@ -212,11 +210,11 @@ pub async fn index_block(
 
         // Parsed BRC20 ops will be deposited here for this block.
         let mut brc20_operation_map = HashMap::new();
-        parse_inscriptions_in_standardized_block(block, &mut brc20_operation_map, config, &ctx);
+        parse_inscriptions_in_standardized_block(block, &mut brc20_operation_map, config, ctx);
 
         let has_inscription_reveals = parallelize_inscription_data_computations(
-            &block,
-            &next_blocks,
+            block,
+            next_blocks,
             cache_l1,
             cache_l2,
             config,
@@ -247,7 +245,7 @@ pub async fn index_block(
                 &mut brc20_operation_map,
                 brc20_cache,
                 &brc20_tx,
-                &ctx,
+                ctx,
             )
             .await?;
 

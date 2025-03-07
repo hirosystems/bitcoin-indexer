@@ -1,17 +1,19 @@
 use std::collections::HashMap;
 
+use chainhook_sdk::utils::Context;
 use chainhook_types::{
     BitcoinNetwork, BlockIdentifier, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
     OrdinalInscriptionTransferDestination, TransactionIdentifier,
 };
-use chainhook_sdk::utils::Context;
 use deadpool_postgres::Transaction;
 
+use super::{
+    brc20_self_mint_activation_height,
+    cache::Brc20MemoryCache,
+    decimals_str_amount_to_u128,
+    parser::{amt_has_valid_decimals, ParsedBrc20Operation},
+};
 use crate::try_debug;
-
-use super::cache::Brc20MemoryCache;
-use super::parser::{amt_has_valid_decimals, ParsedBrc20Operation};
-use super::{brc20_self_mint_activation_height, decimals_str_amount_to_u128};
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct VerifiedBrc20TokenDeployData {
@@ -106,7 +108,7 @@ pub async fn verify_brc20_operation(
                 return Ok(None);
             };
             if data.tick.len() == 5 {
-                if reveal.parents.len() == 0 {
+                if reveal.parents.is_empty() {
                     try_debug!(
                         ctx,
                         "BRC-20: Attempting to mint self-minted token {} without a parent ref",
@@ -185,7 +187,7 @@ pub async fn verify_brc20_operation(
                 return Ok(None);
             }
             let Some(avail_balance) = cache
-                .get_token_address_avail_balance(&token.ticker, &inscriber_address, db_tx)
+                .get_token_address_avail_balance(&token.ticker, inscriber_address, db_tx)
                 .await?
             else {
                 try_debug!(
@@ -291,7 +293,7 @@ pub async fn verify_brc20_transfers(
             (*tx_identifier).clone(),
         ));
     }
-    return Ok(results);
+    Ok(results)
 }
 
 #[cfg(test)]
@@ -304,6 +306,7 @@ mod test {
     };
     use test_case::test_case;
 
+    use super::{verify_brc20_operation, verify_brc20_transfers, VerifiedBrc20TransferData};
     use crate::{
         core::meta_protocols::brc20::{
             brc20_pg,
@@ -316,8 +319,6 @@ mod test {
         },
         db::{pg_reset_db, pg_test_connection, pg_test_connection_pool},
     };
-
-    use super::{verify_brc20_operation, verify_brc20_transfers, VerifiedBrc20TransferData};
 
     #[test_case(
         ParsedBrc20Operation::Deploy(ParsedBrc20TokenDeployData {

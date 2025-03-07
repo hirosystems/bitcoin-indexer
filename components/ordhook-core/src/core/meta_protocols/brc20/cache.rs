@@ -13,19 +13,16 @@ use deadpool_postgres::GenericClient;
 use lru::LruCache;
 use maplit::hashmap;
 
-use crate::core::protocol::satoshi_tracking::parse_output_and_offset_from_satpoint;
-
 use super::{
     brc20_pg,
     models::{DbOperation, DbToken},
     verifier::{VerifiedBrc20BalanceData, VerifiedBrc20TokenDeployData, VerifiedBrc20TransferData},
 };
+use crate::core::protocol::satoshi_tracking::parse_output_and_offset_from_satpoint;
 
 /// If the given `config` has BRC-20 enabled, returns a BRC-20 memory cache.
 pub fn brc20_new_cache(config: &Config) -> Option<Brc20MemoryCache> {
-    let Some(brc20) = config.ordinals_brc20_config() else {
-        return None;
-    };
+    let brc20 = config.ordinals_brc20_config()?;
     if !brc20.enabled {
         return None;
     }
@@ -117,7 +114,7 @@ impl Brc20MemoryCache {
         client: &T,
     ) -> Result<Option<u128>, String> {
         if let Some(minted) = self.token_minted_supplies.get(tick) {
-            return Ok(Some(minted.clone()));
+            return Ok(Some(*minted));
         }
         self.handle_cache_miss(client).await?;
         if let Some(minted_supply) = brc20_pg::get_token_minted_supply(tick, client).await? {
@@ -136,7 +133,7 @@ impl Brc20MemoryCache {
     ) -> Result<Option<u128>, String> {
         let key = format!("{}:{}", tick, address);
         if let Some(balance) = self.token_addr_avail_balances.get(&key) {
-            return Ok(Some(balance.clone()));
+            return Ok(Some(*balance));
         }
         self.handle_cache_miss(client).await?;
         if let Some(balance) =
@@ -157,7 +154,7 @@ impl Brc20MemoryCache {
         let mut cache_missed_ordinal_numbers = HashSet::new();
         for ordinal_number in ordinal_numbers.iter() {
             // Use `get` instead of `contains` so we promote this value in the LRU.
-            if let Some(_) = self.ignored_inscriptions.get(*ordinal_number) {
+            if self.ignored_inscriptions.get(*ordinal_number).is_some() {
                 continue;
             }
             if let Some(row) = self.unsent_transfers.get(*ordinal_number) {
@@ -493,6 +490,7 @@ mod test {
     use chainhook_types::{BitcoinNetwork, BlockIdentifier, TransactionIdentifier};
     use test_case::test_case;
 
+    use super::Brc20MemoryCache;
     use crate::{
         core::meta_protocols::brc20::{
             brc20_pg,
@@ -505,8 +503,6 @@ mod test {
         },
         db::{pg_reset_db, pg_test_connection, pg_test_connection_pool},
     };
-
-    use super::Brc20MemoryCache;
 
     #[tokio::test]
     async fn test_brc20_memory_cache_transfer_miss() -> Result<(), String> {

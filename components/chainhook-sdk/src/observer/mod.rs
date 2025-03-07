@@ -1,24 +1,27 @@
 mod zmq;
 
-use crate::indexer::bitcoin::{
-    build_http_client, download_and_parse_block_with_retry, standardize_bitcoin_block,
-    BitcoinBlockFullBreakdown,
+use std::{
+    collections::HashMap,
+    error::Error,
+    str,
+    sync::mpsc::{Receiver, Sender},
 };
-use crate::utils::Context;
 
 use chainhook_types::{
     BitcoinBlockData, BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData,
     BitcoinChainUpdatedWithReorgData, BitcoinNetwork, BlockIdentifier, BlockchainEvent,
 };
 use config::BitcoindConfig;
-use hiro_system_kit;
-use hiro_system_kit::slog;
-use rocket::serde::Deserialize;
-use rocket::Shutdown;
-use std::collections::HashMap;
-use std::error::Error;
-use std::str;
-use std::sync::mpsc::{Receiver, Sender};
+use hiro_system_kit::{self, slog};
+use rocket::{serde::Deserialize, Shutdown};
+
+use crate::{
+    indexer::bitcoin::{
+        build_http_client, download_and_parse_block_with_retry, standardize_bitcoin_block,
+        BitcoinBlockFullBreakdown,
+    },
+    utils::Context,
+};
 
 #[derive(Deserialize)]
 pub struct NewTransaction {
@@ -80,12 +83,14 @@ pub struct BitcoinBlockDataCached {
     pub processed_by_sidecar: bool,
 }
 
+type BlockMutationSender =
+    crossbeam_channel::Sender<(Vec<BitcoinBlockDataCached>, Vec<BlockIdentifier>)>;
+type BlockMutationReceiver = crossbeam_channel::Receiver<Vec<BitcoinBlockDataCached>>;
+type BlockEventHandlerSender = crossbeam_channel::Sender<HandleBlock>;
+
 pub struct ObserverSidecar {
-    pub bitcoin_blocks_mutator: Option<(
-        crossbeam_channel::Sender<(Vec<BitcoinBlockDataCached>, Vec<BlockIdentifier>)>,
-        crossbeam_channel::Receiver<Vec<BitcoinBlockDataCached>>,
-    )>,
-    pub bitcoin_chain_event_notifier: Option<crossbeam_channel::Sender<HandleBlock>>,
+    pub bitcoin_blocks_mutator: Option<(BlockMutationSender, BlockMutationReceiver)>,
+    pub bitcoin_chain_event_notifier: Option<BlockEventHandlerSender>,
 }
 
 impl ObserverSidecar {

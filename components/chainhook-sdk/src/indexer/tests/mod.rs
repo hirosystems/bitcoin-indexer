@@ -1,8 +1,8 @@
 pub mod helpers;
-use crate::utils::{AbstractBlock, Context};
+use chainhook_types::{BitcoinBlockData, BlockchainEvent};
 
 use super::fork_scratch_pad::ForkScratchPad;
-use chainhook_types::{BitcoinBlockData, BlockchainEvent};
+use crate::utils::{AbstractBlock, Context};
 
 pub type BlockchainEventExpectation = Box<dyn Fn(Option<BlockchainEvent>)>;
 

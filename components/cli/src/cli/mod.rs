@@ -1,16 +1,11 @@
+use std::{path::PathBuf, process, thread::sleep, time::Duration};
+
 use chainhook_sdk::utils::Context;
 use clap::Parser;
 use commands::{Command, ConfigCommand, DatabaseCommand, IndexCommand, Protocol, ServiceCommand};
-use config::generator::generate_toml_config;
-use config::Config;
-use hiro_system_kit;
-use ordhook::db::migrate_dbs;
-use ordhook::service::Service;
-use ordhook::try_info;
-use std::path::PathBuf;
-use std::thread::sleep;
-use std::time::Duration;
-use std::{process, u64};
+use config::{generator::generate_toml_config, Config};
+use hiro_system_kit::{self, error, info};
+use ordhook::{db::migrate_dbs, service::Service, try_info};
 
 mod commands;
 
@@ -134,12 +129,12 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                     let chain_tip = runes::service::get_index_chain_tip(&config, ctx).await;
                     confirm_rollback(chain_tip, cmd.blocks)?;
 
-                    let mut pg_client = runes::db::pg_connect(&config, false, &ctx).await;
+                    let mut pg_client = runes::db::pg_connect(&config, false, ctx).await;
                     runes::scan::bitcoin::drop_blocks(
                         chain_tip - cmd.blocks as u64,
                         chain_tip,
                         &mut pg_client,
-                        &ctx,
+                        ctx,
                     )
                     .await;
                 }
@@ -154,8 +149,7 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
         },
         Protocol::Config(subcmd) => match subcmd {
             ConfigCommand::New(cmd) => {
-                use std::fs::File;
-                use std::io::Write;
+                use std::{fs::File, io::Write};
                 let network = match (cmd.mainnet, cmd.testnet, cmd.regtest) {
                     (true, false, false) => "mainnet",
                     (false, true, false) => "testnet",

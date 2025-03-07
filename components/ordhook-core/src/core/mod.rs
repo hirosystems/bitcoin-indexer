@@ -4,15 +4,14 @@ pub mod protocol;
 #[cfg(test)]
 pub mod test_builders;
 
+use std::{hash::BuildHasherDefault, ops::Div};
+
 use bitcoin::Network;
 use chainhook_postgres::pg_pool_client;
+use chainhook_sdk::utils::{bitcoind::bitcoind_get_block_height, Context};
 use config::Config;
 use dashmap::DashMap;
 use fxhash::{FxBuildHasher, FxHasher};
-use std::hash::BuildHasherDefault;
-use std::ops::Div;
-
-use chainhook_sdk::utils::Context;
 
 use crate::{
     db::{
@@ -25,7 +24,6 @@ use crate::{
     },
     service::PgConnectionPools,
 };
-use chainhook_sdk::utils::bitcoind::bitcoind_get_block_height;
 
 pub fn first_inscription_height(config: &Config) -> u64 {
     match config.bitcoind.network {
@@ -62,7 +60,7 @@ pub enum SatPosition {
     Fee(u64),
 }
 
-pub fn resolve_absolute_pointer(inputs: &Vec<u64>, absolute_pointer_value: u64) -> (usize, u64) {
+pub fn resolve_absolute_pointer(inputs: &[u64], absolute_pointer_value: u64) -> (usize, u64) {
     let mut selected_index = 0;
     let mut cumulated_input_value = 0;
     // Check for overflow
@@ -84,8 +82,8 @@ pub fn resolve_absolute_pointer(inputs: &Vec<u64>, absolute_pointer_value: u64) 
 
 pub fn compute_next_satpoint_data(
     input_index: usize,
-    inputs: &Vec<u64>,
-    outputs: &Vec<u64>,
+    inputs: &[u64],
+    outputs: &[u64],
     relative_pointer_value: u64,
     _ctx: Option<&Context>,
 ) -> SatPosition {
@@ -125,13 +123,11 @@ pub async fn should_sync_rocks_db(
     pg_pools: &PgConnectionPools,
     ctx: &Context,
 ) -> Result<Option<(u64, u64)>, String> {
-    let blocks_db = open_blocks_db_with_retry(true, &config, &ctx);
+    let blocks_db = open_blocks_db_with_retry(true, config, ctx);
     let last_compressed_block = find_last_block_inserted(&blocks_db) as u64;
     let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
-    let last_indexed_block = match ordinals_pg::get_chain_tip_block_height(&ord_client).await? {
-        Some(last_indexed_block) => last_indexed_block,
-        None => 0,
-    };
+    let last_indexed_block =
+        (ordinals_pg::get_chain_tip_block_height(&ord_client).await?).unwrap_or_default();
 
     let res = if last_compressed_block < last_indexed_block {
         Some((last_compressed_block, last_indexed_block))
@@ -146,13 +142,13 @@ pub async fn should_sync_ordinals_db(
     pg_pools: &PgConnectionPools,
     ctx: &Context,
 ) -> Result<Option<(u64, u64, usize)>, String> {
-    let blocks_db = open_blocks_db_with_retry(true, &config, &ctx);
+    let blocks_db = open_blocks_db_with_retry(true, config, ctx);
     let mut start_block = find_last_block_inserted(&blocks_db) as u64;
 
     let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
     match ordinals_pg::get_chain_tip_block_height(&ord_client).await? {
         Some(height) => {
-            if find_pinned_block_bytes_at_block_height(height as u32, 3, &blocks_db, &ctx).is_none()
+            if find_pinned_block_bytes_at_block_height(height as u32, 3, &blocks_db, ctx).is_none()
             {
                 start_block = start_block.min(height);
             } else {

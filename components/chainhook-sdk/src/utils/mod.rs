@@ -4,7 +4,7 @@ use std::{
     collections::{BTreeSet, VecDeque},
     fs::{self, OpenOptions},
     io::{Read, Write},
-    path::PathBuf,
+    path::Path,
 };
 
 use chainhook_types::{BitcoinBlockData, BlockHeader, BlockIdentifier};
@@ -293,11 +293,10 @@ fn test_block_heights_blocks_limits_entries() {
     };
 }
 
-pub fn read_file_content_at_path(file_path: &PathBuf) -> Result<Vec<u8>, String> {
-    use std::fs::File;
-    use std::io::BufReader;
+pub fn read_file_content_at_path(file_path: &Path) -> Result<Vec<u8>, String> {
+    use std::{fs::File, io::BufReader};
 
-    let file = File::open(file_path.clone())
+    let file = File::open(file_path)
         .map_err(|e| format!("unable to read file {}\n{:?}", file_path.display(), e))?;
     let mut file_reader = BufReader::new(file);
     let mut file_buffer = vec![];
@@ -307,9 +306,9 @@ pub fn read_file_content_at_path(file_path: &PathBuf) -> Result<Vec<u8>, String>
     Ok(file_buffer)
 }
 
-pub fn write_file_content_at_path(file_path: &PathBuf, content: &[u8]) -> Result<(), String> {
+pub fn write_file_content_at_path(file_path: &Path, content: &[u8]) -> Result<(), String> {
     use std::fs::File;
-    let mut parent_directory = file_path.clone();
+    let mut parent_directory = file_path.to_path_buf();
     parent_directory.pop();
     fs::create_dir_all(&parent_directory).map_err(|e| {
         format!(

@@ -1,7 +1,7 @@
 use std::process::Command;
 
 fn current_git_hash() -> Option<String> {
-    if option_env!("GIT_COMMIT") == None {
+    if option_env!("GIT_COMMIT").is_none() {
         let commit = Command::new("git")
             .arg("log")
             .arg("-1")

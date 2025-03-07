@@ -1,25 +1,14 @@
-use crate::core::meta_protocols::brc20::cache::{brc20_new_cache, Brc20MemoryCache};
-use crate::core::pipeline::bitcoind_download_blocks;
-use crate::core::pipeline::processors::block_archiving::start_block_archiving_processor;
-use crate::core::pipeline::processors::inscription_indexing::{
-    index_block, rollback_block, start_inscription_indexing_processor,
+use std::{
+    collections::BTreeMap,
+    hash::BuildHasherDefault,
+    sync::{mpsc::channel, Arc},
 };
-use crate::core::protocol::sequence_cursor::SequenceCursor;
-use crate::core::{
-    first_inscription_height, new_traversals_lazy_cache, should_sync_ordinals_db,
-    should_sync_rocks_db,
-};
-use crate::db::blocks::{self, find_missing_blocks, open_blocks_db_with_retry, run_compaction};
-use crate::db::cursor::{BlockBytesCursor, TransactionBytesCursor};
-use crate::db::ordinals_pg;
-use crate::utils::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring};
-use crate::{try_crit, try_error, try_info};
+
 use chainhook_postgres::{pg_begin, pg_pool, pg_pool_client};
-use chainhook_sdk::observer::{
-    start_event_observer, BitcoinBlockDataCached, ObserverEvent, ObserverSidecar,
+use chainhook_sdk::{
+    observer::{start_event_observer, BitcoinBlockDataCached, ObserverEvent, ObserverSidecar},
+    utils::{bitcoind::bitcoind_wait_for_chain_tip, BlockHeights, Context},
 };
-use chainhook_sdk::utils::bitcoind::bitcoind_wait_for_chain_tip;
-use chainhook_sdk::utils::{BlockHeights, Context};
 use chainhook_types::BlockIdentifier;
 use config::{Config, OrdinalsMetaProtocolsConfig};
 use crossbeam_channel::select;
@@ -27,10 +16,31 @@ use dashmap::DashMap;
 use deadpool_postgres::Pool;
 use fxhash::FxHasher;
 
-use std::collections::BTreeMap;
-use std::hash::BuildHasherDefault;
-use std::sync::mpsc::channel;
-use std::sync::Arc;
+use crate::{
+    core::{
+        first_inscription_height,
+        meta_protocols::brc20::cache::{brc20_new_cache, Brc20MemoryCache},
+        new_traversals_lazy_cache,
+        pipeline::{
+            bitcoind_download_blocks,
+            processors::{
+                block_archiving::start_block_archiving_processor,
+                inscription_indexing::{
+                    index_block, rollback_block, start_inscription_indexing_processor,
+                },
+            },
+        },
+        protocol::sequence_cursor::SequenceCursor,
+        should_sync_ordinals_db, should_sync_rocks_db,
+    },
+    db::{
+        blocks::{self, find_missing_blocks, open_blocks_db_with_retry, run_compaction},
+        cursor::{BlockBytesCursor, TransactionBytesCursor},
+        ordinals_pg,
+    },
+    try_crit, try_error, try_info,
+    utils::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring},
+};
 
 #[derive(Debug, Clone)]
 pub struct PgConnectionPools {
@@ -97,7 +107,7 @@ impl Service {
                 let ctx_cloned = self.ctx.clone();
                 let port = metrics.prometheus_port;
                 let _ = std::thread::spawn(move || {
-                    let _ = hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
+                    hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
                         port,
                         registry_moved,
                         ctx_cloned,
@@ -151,19 +161,16 @@ impl Service {
                     break;
                 }
             };
-            match event {
-                ObserverEvent::Terminate => {
-                    try_info!(&self.ctx, "Terminating runloop");
-                    break;
-                }
-                _ => {}
+            if let ObserverEvent::Terminate = event {
+                try_info!(&self.ctx, "Terminating runloop");
+                break;
             }
         }
         Ok(())
     }
 
     /// Rolls back index data for the specified block heights.
-    pub async fn rollback(&self, block_heights: &Vec<u64>) -> Result<(), String> {
+    pub async fn rollback(&self, block_heights: &[u64]) -> Result<(), String> {
         for block_height in block_heights.iter() {
             rollback_block(*block_height, &self.config, &self.pg_pools, &self.ctx).await?;
         }
@@ -251,7 +258,7 @@ impl Service {
             bitcoind_download_blocks(
                 &self.config,
                 missing_blocks.into_iter().map(|x| x as u64).collect(),
-                tip.into(),
+                tip,
                 &block_ingestion_processor,
                 10_000,
                 &self.ctx,
@@ -281,7 +288,7 @@ impl Service {
                 start_block_archiving_processor(&self.config, &self.ctx, true, None);
             let blocks = BlockHeights::BlockRange(start_block, end_block)
                 .get_sorted_entries()
-                .map_err(|_e| format!("Block start / end block spec invalid"))?;
+                .map_err(|_e| "Block start / end block spec invalid".to_string())?;
             bitcoind_download_blocks(
                 &self.config,
                 blocks.into(),
@@ -314,7 +321,7 @@ impl Service {
             );
             let blocks = BlockHeights::BlockRange(start_block, end_block)
                 .get_sorted_entries()
-                .map_err(|_e| format!("Block start / end block spec invalid"))?;
+                .map_err(|_e| "Block start / end block spec invalid".to_string())?;
             bitcoind_download_blocks(
                 &self.config,
                 blocks.into(),
@@ -333,8 +340,8 @@ impl Service {
 }
 
 pub async fn chainhook_sidecar_mutate_blocks(
-    blocks_to_mutate: &mut Vec<BitcoinBlockDataCached>,
-    block_ids_to_rollback: &Vec<BlockIdentifier>,
+    blocks_to_mutate: &mut [BitcoinBlockDataCached],
+    block_ids_to_rollback: &[BlockIdentifier],
     cache_l2: &Arc<DashMap<(u32, [u8; 8]), TransactionBytesCursor, BuildHasherDefault<FxHasher>>>,
     brc20_cache: &mut Option<Brc20MemoryCache>,
     prometheus: &PrometheusMonitoring,
@@ -342,14 +349,14 @@ pub async fn chainhook_sidecar_mutate_blocks(
     pg_pools: &PgConnectionPools,
     ctx: &Context,
 ) -> Result<(), String> {
-    if block_ids_to_rollback.len() > 0 {
-        let blocks_db_rw = open_blocks_db_with_retry(true, &config, ctx);
+    if !block_ids_to_rollback.is_empty() {
+        let blocks_db_rw = open_blocks_db_with_retry(true, config, ctx);
         for block_id in block_ids_to_rollback.iter() {
             blocks::delete_blocks_in_block_range(
                 block_id.index as u32,
                 block_id.index as u32,
                 &blocks_db_rw,
-                &ctx,
+                ctx,
             );
             rollback_block(block_id.index, config, pg_pools, ctx).await?;
         }
@@ -372,13 +379,13 @@ pub async fn chainhook_sidecar_mutate_blocks(
             }
         };
         {
-            let blocks_db_rw = open_blocks_db_with_retry(true, &config, ctx);
+            let blocks_db_rw = open_blocks_db_with_retry(true, config, ctx);
             blocks::insert_entry_in_blocks(
                 cached_block.block.block_identifier.index as u32,
                 &block_bytes,
                 true,
                 &blocks_db_rw,
-                &ctx,
+                ctx,
             );
             blocks_db_rw
                 .flush()
@@ -391,12 +398,12 @@ pub async fn chainhook_sidecar_mutate_blocks(
             &vec![],
             &mut sequence_cursor,
             &mut cache_l1,
-            &cache_l2,
+            cache_l2,
             brc20_cache.as_mut(),
             prometheus,
-            &config,
+            config,
             pg_pools,
-            &ctx,
+            ctx,
         )
         .await?;
         cached_block.processed_by_sidecar = true;

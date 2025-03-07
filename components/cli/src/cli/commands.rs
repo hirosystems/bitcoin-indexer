@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 
+/// Protocol command enum
 #[derive(Parser, Debug)]
 #[clap(name = "bitcoin-indexer", author, version, about, long_about = None)]
 pub enum Protocol {
