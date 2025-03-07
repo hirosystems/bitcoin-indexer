@@ -4,16 +4,17 @@ pub mod fork_scratch_pad;
 
 use std::{
     collections::{HashMap, VecDeque},
-    sync::Arc,
+    sync::{Arc, Mutex},
     thread::{sleep, JoinHandle},
     time::Duration,
 };
 
 use crate::{
-    try_crit, try_debug, try_info, utils::{
+    try_crit, try_debug, try_info,
+    utils::{
         bitcoind::{bitcoind_get_chain_tip, bitcoind_wait_for_chain_tip},
         AbstractBlock, BlockHeights, Context,
-    }
+    },
 };
 
 use bitcoin::{
@@ -25,7 +26,7 @@ use bitcoin::{
     standardize_bitcoin_block,
 };
 use chainhook_types::{
-    BitcoinBlockData, BitcoinNetwork, BlockHeader, BlockIdentifier, BlockchainEvent,
+    BitcoinBlockData, BitcoinNetwork, BlockIdentifier, BlockchainEvent,
 };
 use config::Config;
 use crossbeam_channel::{Sender, TryRecvError};
@@ -33,44 +34,9 @@ use reqwest::Client;
 
 use self::fork_scratch_pad::ForkScratchPad;
 
-// pub struct Indexer {
-//     pub config: BitcoindConfig,
-//     bitcoin_blocks_pool: ForkScratchPad,
-// }
-
-// impl Indexer {
-//     pub fn new(config: BitcoindConfig) -> Indexer {
-//         let bitcoin_blocks_pool = ForkScratchPad::new();
-
-//         Indexer {
-//             config,
-//             bitcoin_blocks_pool,
-//         }
-//     }
-
-//     pub fn handle_bitcoin_header(
-//         &mut self,
-//         header: BlockHeader,
-//         ctx: &Context,
-//     ) -> Result<Option<BlockchainEvent>, String> {
-//         self.bitcoin_blocks_pool.process_header(header, ctx)
-//     }
-// }
-
-// pub trait Indexer {
-//     async fn get_chain_tip(&self) -> Result<BlockIdentifier, String>;
-//     async fn index_blocks(
-//         &self,
-//         config: &Config,
-//         blocks: &Vec<BitcoinBlockData>,
-//         rollback: &Vec<BlockIdentifier>,
-//         ctx: &Context,
-//     ) -> Result<(), String>;
-// }
-
 pub struct BlockBundle {
-    apply_blocks: Vec<BitcoinBlockData>,
-    rollback_blocks: Vec<BlockIdentifier>,
+    pub apply_blocks: Vec<BitcoinBlockData>,
+    pub rollback_block_ids: Vec<BlockIdentifier>,
 }
 
 pub enum IndexerCommand {
@@ -84,49 +50,62 @@ pub struct Indexer {
 
 /// Moves our block pool with a newly received standardized block
 async fn advance_block_pool(
-    block: &BitcoinBlockData,
-    block_pool: &ForkScratchPad,
-    block_store: &mut HashMap<BlockHeader, BitcoinBlockData>,
+    block: BitcoinBlockData,
+    block_pool: &Arc<Mutex<ForkScratchPad>>,
+    block_store: &Arc<Mutex<HashMap<BlockIdentifier, BitcoinBlockData>>>,
     http_client: &Client,
     indexer_commands_tx: &Sender<IndexerCommand>,
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
     let network = BitcoinNetwork::from_network(config.bitcoind.network);
-    let mut blocks: VecDeque<&BitcoinBlockData> = VecDeque::new();
-    blocks.push_front(block);
+    let mut block_ids = VecDeque::new();
+    block_ids.push_front(block.block_identifier.clone());
 
-    while let Some(block) = blocks.pop_front() {
-        // let block =
-        //     match download_and_parse_block_with_retry(&http_client, &block_hash, &config, ctx)
-        //         .await
-        //     {
-        //         Ok(block) => block,
-        //         Err(e) => {
-        //             try_warn!(ctx, "zmq: Unable to download block: {e}");
-        //             continue;
-        //         }
-        //     };
+    let block_pool_ref = block_pool.clone();
+    let mut pool = block_pool_ref.lock().unwrap();
 
-        // let header = block.get_block_header();
-        // try_info!(ctx, "zmq: Standardizing bitcoin block #{}", block.height);
-        // let _ = observer_commands_tx.send(ObserverCommand::StandardizeBitcoinBlock(block));
+    let block_store_ref = block_store.clone();
+    let mut block_store_obj = block_store_ref.lock().unwrap();
+    block_store_obj.insert(block.block_identifier.clone(), block);
 
+    while let Some(block_id) = block_ids.pop_front() {
+        let block = block_store_obj.get(&block_id).unwrap();
         let header = block.get_header();
-        if block_pool.can_process_header(&header) {
-            match block_pool.process_header(header, ctx)? {
+        if pool.can_process_header(&header) {
+            match pool.process_header(header, ctx)? {
                 Some(event) => match event {
                     BlockchainEvent::BlockchainUpdatedWithHeaders(event) => {
                         let mut apply_blocks = vec![];
                         for header in event.new_headers.iter() {
-                            // let block = block_store.insert();
+                            apply_blocks
+                                .push(block_store_obj.remove(&header.block_identifier).unwrap());
                         }
-                        indexer_commands_tx.send(IndexerCommand::IndexBlocks(BlockBundle {
-                            apply_blocks,
-                            rollback_blocks: vec![],
-                        }));
+                        indexer_commands_tx
+                            .send(IndexerCommand::IndexBlocks(BlockBundle {
+                                apply_blocks,
+                                rollback_block_ids: vec![],
+                            }))
+                            .map_err(|e| e.to_string())?;
                     }
-                    BlockchainEvent::BlockchainUpdatedWithReorg(event) => todo!(),
+                    BlockchainEvent::BlockchainUpdatedWithReorg(event) => {
+                        let mut apply_blocks = vec![];
+                        for header in event.headers_to_apply.iter() {
+                            apply_blocks
+                                .push(block_store_obj.remove(&header.block_identifier).unwrap());
+                        }
+                        let rollback_block_ids: Vec<BlockIdentifier> = event
+                            .headers_to_rollback
+                            .iter()
+                            .map(|h| h.block_identifier.clone())
+                            .collect();
+                        indexer_commands_tx
+                            .send(IndexerCommand::IndexBlocks(BlockBundle {
+                                apply_blocks,
+                                rollback_block_ids,
+                            }))
+                            .map_err(|e| e.to_string())?;
+                    }
                 },
                 None => {
                     // try_warn!(ctx, "zmq: Unable to append block");
@@ -144,10 +123,10 @@ async fn advance_block_pool(
                 .parent_block_identifier
                 .get_hash_bytes_str()
                 .to_string();
-            try_info!(
-                ctx,
-                "zmq: Re-org detected, retrieving parent block {parent_block_hash}"
-            );
+            // try_info!(
+            //     ctx,
+            //     "zmq: Re-org detected, retrieving parent block {parent_block_hash}"
+            // );
             let parent_block = download_and_parse_block_with_retry(
                 &http_client,
                 &parent_block_hash,
@@ -158,18 +137,18 @@ async fn advance_block_pool(
             let parent_block =
                 standardize_bitcoin_block(parent_block, &network, ctx).map_err(|(e, _)| e)?;
 
-            blocks.push_front(block);
-            blocks.push_front(&parent_block);
+            block_ids.push_front(block_id);
+            block_ids.push_front(parent_block.block_identifier.clone());
+            block_store_obj.insert(parent_block.block_identifier.clone(), parent_block);
         }
     }
-
     Ok(())
 }
 
 /// Initialize our block pool with the current index's last seen block, so we can detect any re-orgs or gaps that may come our
 /// way with the next blocks.
 async fn prime_block_pool(
-    block_pool: &ForkScratchPad,
+    block_pool: &Arc<Mutex<ForkScratchPad>>,
     index_chain_tip: &BlockIdentifier,
     http_client: &Client,
     config: &Config,
@@ -182,7 +161,9 @@ async fn prime_block_pool(
         ctx,
     )
     .await?;
-    match block_pool.process_header(last_block.get_block_header(), ctx) {
+    let block_pool_ref = block_pool.clone();
+    let mut pool = block_pool_ref.lock().unwrap();
+    match pool.process_header(last_block.get_block_header(), ctx) {
         Ok(_) => {
             try_debug!(
                 ctx,
@@ -194,13 +175,15 @@ async fn prime_block_pool(
     Ok(())
 }
 
-/// Starts a bitcoind block download pipeline and feeds blocks into an indexer.
+/// Starts a bitcoind block download pipeline that will send us all historical bitcoin blocks in a parallel fashion. We will then
+/// stream these blocks into our block pool so they can be fed into the configured indexer. This will eventually bring the index
+/// chain tip to `target_block_height`.
 async fn sync_to_block_height(
     indexer: &Indexer,
-    block_pool: &Arc<ForkScratchPad>,
-    block_store: &Arc<HashMap<BlockHeader, BitcoinBlockData>>,
+    block_pool: &Arc<Mutex<ForkScratchPad>>,
+    block_store: &Arc<Mutex<HashMap<BlockIdentifier, BitcoinBlockData>>>,
     http_client: &Client,
-    block_height: u64,
+    target_block_height: u64,
     sequence_start_block_height: u64,
     config: &Config,
     ctx: &Context,
@@ -220,7 +203,7 @@ async fn sync_to_block_height(
             hiro_system_kit::nestable_block_on(async move {
                 let mut empty_cycles = 0;
                 loop {
-                    let (compacted_blocks, mut blocks) = match commands_rx.try_recv() {
+                    let (compacted_blocks, blocks) = match commands_rx.try_recv() {
                         Ok(BlockDownloadCommand::ProcessDownloadedBlocks(
                             compacted_blocks,
                             blocks,
@@ -229,7 +212,7 @@ async fn sync_to_block_height(
                             (compacted_blocks, blocks)
                         }
                         Ok(BlockDownloadCommand::Terminate) => {
-                            events_tx.send(BlockDownloadProcessorEvent::Terminated);
+                            let _ = events_tx.send(BlockDownloadProcessorEvent::Terminated);
                             break;
                         }
                         Err(e) => match e {
@@ -237,7 +220,7 @@ async fn sync_to_block_height(
                                 empty_cycles += 1;
                                 if empty_cycles == 180 {
                                     try_info!(&ctx_moved, "Block processor reached expiration");
-                                    events_tx.send(BlockDownloadProcessorEvent::Expired);
+                                    let _ = events_tx.send(BlockDownloadProcessorEvent::Expired);
                                     break;
                                 }
                                 sleep(Duration::from_secs(1));
@@ -250,14 +233,14 @@ async fn sync_to_block_height(
                     };
 
                     if !compacted_blocks.is_empty() {
-                        indexer_commands_tx_moved
+                        let _ = indexer_commands_tx_moved
                             .send(IndexerCommand::StoreCompactedBlocks(compacted_blocks));
                     }
-                    for block in blocks.iter() {
+                    for block in blocks.into_iter() {
                         if let Err(e) = advance_block_pool(
                             block,
                             &block_pool_moved,
-                            &mut block_store_moved,
+                            &block_store_moved,
                             &http_client_moved,
                             &indexer_commands_tx_moved,
                             &config_moved,
@@ -265,7 +248,7 @@ async fn sync_to_block_height(
                         )
                         .await
                         {
-                            try_crit!(ctx, "Error indexing blocks: {e}");
+                            try_crit!(ctx_moved, "Error indexing blocks: {e}");
                             std::process::exit(1);
                         };
                     }
@@ -279,10 +262,14 @@ async fn sync_to_block_height(
         thread_handle: handle,
     };
 
-    let start_block = block_pool.canonical_chain_tip().unwrap().index;
-    let blocks = BlockHeights::BlockRange(start_block, block_height)
-        .get_sorted_entries()
-        .map_err(|_e| format!("Block start / end block spec invalid"))?;
+    let blocks = {
+        let block_pool_ref = block_pool.clone();
+        let pool = block_pool_ref.lock().unwrap();
+        let start_block = pool.canonical_chain_tip().unwrap().index;
+        BlockHeights::BlockRange(start_block, target_block_height)
+            .get_sorted_entries()
+            .map_err(|_e| format!("Block start / end block spec invalid"))?
+    };
     start_block_download_pipeline(
         config,
         http_client,
@@ -290,7 +277,7 @@ async fn sync_to_block_height(
         sequence_start_block_height,
         &processor,
         1000,
-        &ctx_moved,
+        ctx,
     )
     .await
 }
@@ -306,20 +293,26 @@ pub async fn start(
     let mut bitcoind_chain_tip = bitcoind_wait_for_chain_tip(&config.bitcoind, ctx);
 
     try_info!(ctx, "Index chain tip is at {index_chain_tip}");
-    let block_pool = ForkScratchPad::new();
-    let block_store = HashMap::new();
     let http_client = build_http_client();
-    prime_block_pool(&block_pool, index_chain_tip, &http_client, config, ctx).await?;
 
-    let block_pool_arc = Arc::new(block_pool);
-    let block_store_arc = Arc::new(block_store);
+    // Block pool that will track the canonical chain and detect any reorgs that may happen.
+    let block_pool_arc = Arc::new(Mutex::new(ForkScratchPad::new()));
+    let block_pool = block_pool_arc.clone();
+    prime_block_pool(&block_pool_arc, index_chain_tip, &http_client, config, ctx).await?;
+
+    // Block cache that will keep block data in memory while it is prepared to be sent to indexers.
+    let block_store_arc = Arc::new(Mutex::new(HashMap::new()));
+
     loop {
-        if bitcoind_chain_tip == *block_pool.canonical_chain_tip().unwrap() {
-            try_info!(
-                ctx,
-                "Index has reached bitcoind chain tip at {bitcoind_chain_tip}"
-            );
-            break;
+        {
+            let pool = block_pool.lock().unwrap();
+            if bitcoind_chain_tip == *pool.canonical_chain_tip().unwrap() {
+                try_info!(
+                    ctx,
+                    "Index has reached bitcoind chain tip at {bitcoind_chain_tip}"
+                );
+                break;
+            }
         }
         sync_to_block_height(
             indexer,

@@ -1,6 +1,5 @@
 use chainhook_types::BlockIdentifier;
 use config::BitcoindConfig;
-use hiro_system_kit::slog;
 use std::sync::mpsc::Sender;
 use zmq::Socket;
 
