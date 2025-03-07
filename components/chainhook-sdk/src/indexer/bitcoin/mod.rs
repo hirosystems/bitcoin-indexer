@@ -1,3 +1,6 @@
+pub mod cursor;
+pub mod pipeline;
+
 use std::time::Duration;
 
 use crate::try_debug;

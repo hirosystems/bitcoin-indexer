@@ -8,7 +8,7 @@ use std::{
 };
 
 use chainhook_types::{BitcoinBlockData, BlockHeader, BlockIdentifier};
-use hiro_system_kit::slog::{self, Logger};
+use hiro_system_kit::{slog, Logger};
 use reqwest::RequestBuilder;
 
 #[derive(Clone)]
@@ -329,39 +329,49 @@ pub fn write_file_content_at_path(file_path: &PathBuf, content: &[u8]) -> Result
 #[macro_export]
 macro_rules! try_info {
     ($a:expr, $tag:expr, $($args:tt)*) => {
-        $a.try_log(|l| slog::info!(l, $tag, $($args)*));
+        $a.try_log(|l| hiro_system_kit::slog::info!(l, $tag, $($args)*));
     };
     ($a:expr, $tag:expr) => {
-        $a.try_log(|l| slog::info!(l, $tag));
+        $a.try_log(|l| hiro_system_kit::slog::info!(l, $tag));
     };
 }
 
 #[macro_export]
 macro_rules! try_debug {
     ($a:expr, $tag:expr, $($args:tt)*) => {
-        $a.try_log(|l| slog::debug!(l, $tag, $($args)*));
+        $a.try_log(|l| hiro_system_kit::slog::debug!(l, $tag, $($args)*));
     };
     ($a:expr, $tag:expr) => {
-        $a.try_log(|l| slog::debug!(l, $tag));
+        $a.try_log(|l| hiro_system_kit::slog::debug!(l, $tag));
     };
 }
 
 #[macro_export]
 macro_rules! try_warn {
     ($a:expr, $tag:expr, $($args:tt)*) => {
-        $a.try_log(|l| slog::warn!(l, $tag, $($args)*));
+        $a.try_log(|l| hiro_system_kit::slog::warn!(l, $tag, $($args)*));
     };
     ($a:expr, $tag:expr) => {
-        $a.try_log(|l| slog::warn!(l, $tag));
+        $a.try_log(|l| hiro_system_kit::slog::warn!(l, $tag));
     };
 }
 
 #[macro_export]
 macro_rules! try_error {
     ($a:expr, $tag:expr, $($args:tt)*) => {
-        $a.try_log(|l| slog::error!(l, $tag, $($args)*));
+        $a.try_log(|l| hiro_system_kit::slog::error!(l, $tag, $($args)*));
     };
     ($a:expr, $tag:expr) => {
-        $a.try_log(|l| slog::error!(l, $tag));
+        $a.try_log(|l| hiro_system_kit::slog::error!(l, $tag));
+    };
+}
+
+#[macro_export]
+macro_rules! try_crit {
+    ($a:expr, $tag:expr, $($args:tt)*) => {
+        $a.try_log(|l| hiro_system_kit::slog::crit!(l, $tag, $($args)*));
+    };
+    ($a:expr, $tag:expr) => {
+        $a.try_log(|l| hiro_system_kit::slog::crit!(l, $tag));
     };
 }

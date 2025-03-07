@@ -123,7 +123,7 @@ impl Service {
         if check_blocks_integrity {
             self.check_blocks_db_integrity().await?;
         }
-        self.catch_up_to_bitcoin_chain_tip().await?;
+        let x = self.catch_up_to_bitcoin_chain_tip().await?;
         try_info!(self.ctx, "Service: Streaming blocks start");
 
         // 3: Set up the real-time ZMQ Bitcoin block streaming channels and start listening.
@@ -134,6 +134,7 @@ impl Service {
 
         let _ = start_event_observer(
             self.config.bitcoind.clone(),
+            &x,
             observer_command_tx.clone(),
             observer_command_rx,
             Some(observer_event_tx),

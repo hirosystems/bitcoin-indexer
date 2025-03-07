@@ -43,9 +43,13 @@ pub async fn start_zeromq_runloop(
 
     // Initialize the `ForkScratchPad` with the current index's last seen block, so we can detect any re-orgs or gaps that may
     // come our way with the next ZMQ messages.
-    let last_block =
-        download_and_parse_block_with_retry(&http_client, index_chain_tip.get_hash_bytes_str(), config, ctx)
-            .await?;
+    let last_block = download_and_parse_block_with_retry(
+        &http_client,
+        index_chain_tip.get_hash_bytes_str(),
+        config,
+        ctx,
+    )
+    .await?;
     match bitcoin_blocks_pool.process_header(last_block.get_block_header(), ctx) {
         Ok(_) => {
             try_debug!(
