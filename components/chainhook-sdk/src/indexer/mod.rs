@@ -29,33 +29,36 @@ use reqwest::Client;
 
 use self::fork_scratch_pad::ForkScratchPad;
 
-pub enum BlockDownloadCommand {
-    ProcessDownloadedBlocks(Vec<(u64, Vec<u8>)>, Vec<BitcoinBlockData>),
+pub enum BlockProcessorCommand {
+    ProcessBlocks {
+        compacted_blocks: Vec<(u64, Vec<u8>)>,
+        blocks: Vec<BitcoinBlockData>,
+    },
     Terminate,
 }
 
-pub enum BlockDownloadProcessorEvent {
+pub enum BlockProcessorEvent {
     Terminated,
     Expired,
 }
 
-/// Object that will receive any parsed blocks as they come from a parallelized bitcoind download pipeline.
-pub struct BlockDownloadProcessor {
-    pub commands_tx: crossbeam_channel::Sender<BlockDownloadCommand>,
-    pub events_rx: crossbeam_channel::Receiver<BlockDownloadProcessorEvent>,
+/// Object that will receive any blocks as they come from bitcoind. These messages do not track any canonical chain alterations.
+pub struct BlockProcessor {
+    pub commands_tx: crossbeam_channel::Sender<BlockProcessorCommand>,
+    pub events_rx: crossbeam_channel::Receiver<BlockProcessorEvent>,
     pub thread_handle: JoinHandle<()>,
-}
-
-pub struct BlockBundle {
-    pub apply_blocks: Vec<BitcoinBlockData>,
-    pub rollback_block_ids: Vec<BlockIdentifier>,
 }
 
 pub enum IndexerCommand {
     StoreCompactedBlocks(Vec<(u64, Vec<u8>)>),
-    IndexBlocks(BlockBundle),
+    IndexBlocks {
+        apply_blocks: Vec<BitcoinBlockData>,
+        rollback_block_ids: Vec<BlockIdentifier>,
+    },
 }
 
+/// Object that will receive standardized blocks ready to be indexer or rolled back. Blocks can come from historical downloads or
+/// recent block streams.
 pub struct Indexer {
     pub commands_tx: crossbeam_channel::Sender<IndexerCommand>,
 }
@@ -94,10 +97,10 @@ async fn advance_block_pool(
                                 .push(block_store_obj.remove(&header.block_identifier).unwrap());
                         }
                         indexer_commands_tx
-                            .send(IndexerCommand::IndexBlocks(BlockBundle {
+                            .send(IndexerCommand::IndexBlocks {
                                 apply_blocks,
                                 rollback_block_ids: vec![],
-                            }))
+                            })
                             .map_err(|e| e.to_string())?;
                     }
                     BlockchainEvent::BlockchainUpdatedWithReorg(event) => {
@@ -112,10 +115,10 @@ async fn advance_block_pool(
                             .map(|h| h.block_identifier.clone())
                             .collect();
                         indexer_commands_tx
-                            .send(IndexerCommand::IndexBlocks(BlockBundle {
+                            .send(IndexerCommand::IndexBlocks {
                                 apply_blocks,
                                 rollback_block_ids,
-                            }))
+                            })
                             .map_err(|e| e.to_string())?;
                     }
                 },
@@ -187,10 +190,12 @@ async fn prime_block_pool(
     Ok(())
 }
 
+/// Runloop designed to receive Bitcoin blocks through a [BlockProcessor] and send them to a [ForkScratchPad] so it can advance
+/// the canonical chain.
 async fn block_ingestion_runloop(
     indexer_commands_tx: &Sender<IndexerCommand>,
-    block_commands_rx: &Receiver<BlockDownloadCommand>,
-    block_events_tx: &Sender<BlockDownloadProcessorEvent>,
+    block_commands_rx: &Receiver<BlockProcessorCommand>,
+    block_events_tx: &Sender<BlockProcessorEvent>,
     block_pool: &Arc<Mutex<ForkScratchPad>>,
     block_store: &Arc<Mutex<HashMap<BlockIdentifier, BitcoinBlockData>>>,
     http_client: &Client,
@@ -200,12 +205,12 @@ async fn block_ingestion_runloop(
     let mut empty_cycles = 0;
     loop {
         let (compacted_blocks, blocks) = match block_commands_rx.try_recv() {
-            Ok(BlockDownloadCommand::ProcessDownloadedBlocks(compacted_blocks, blocks)) => {
+            Ok(BlockProcessorCommand::ProcessBlocks { compacted_blocks, blocks }) => {
                 empty_cycles = 0;
                 (compacted_blocks, blocks)
             }
-            Ok(BlockDownloadCommand::Terminate) => {
-                let _ = block_events_tx.send(BlockDownloadProcessorEvent::Terminated);
+            Ok(BlockProcessorCommand::Terminate) => {
+                let _ = block_events_tx.send(BlockProcessorEvent::Terminated);
                 break;
             }
             Err(e) => match e {
@@ -213,7 +218,7 @@ async fn block_ingestion_runloop(
                     empty_cycles += 1;
                     if empty_cycles == 180 {
                         try_info!(ctx, "Block processor reached expiration");
-                        let _ = block_events_tx.send(BlockDownloadProcessorEvent::Expired);
+                        let _ = block_events_tx.send(BlockProcessorEvent::Expired);
                         break;
                     }
                     sleep(Duration::from_secs(1));
@@ -248,10 +253,10 @@ async fn block_ingestion_runloop(
     }
 }
 
-/// Starts a bitcoind block download pipeline that will send us all historical bitcoin blocks in a parallel fashion. We will then
-/// stream these blocks into our block pool so they can be fed into the configured indexer. This will eventually bring the index
-/// chain tip to `target_block_height`.
-async fn sync_to_block_height(
+/// Starts a bitcoind RPC block download pipeline that will send us all historical bitcoin blocks in a parallel fashion. We will
+/// then stream these blocks into our block pool so they can be fed into the configured [Indexer]. This will eventually bring the
+/// index chain tip to `target_block_height`.
+async fn download_rpc_blocks(
     indexer: &Indexer,
     block_pool: &Arc<Mutex<ForkScratchPad>>,
     block_store: &Arc<Mutex<HashMap<BlockIdentifier, BitcoinBlockData>>>,
@@ -261,8 +266,8 @@ async fn sync_to_block_height(
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
-    let (commands_tx, commands_rx) = crossbeam_channel::bounded::<BlockDownloadCommand>(2);
-    let (events_tx, events_rx) = crossbeam_channel::unbounded::<BlockDownloadProcessorEvent>();
+    let (commands_tx, commands_rx) = crossbeam_channel::bounded::<BlockProcessorCommand>(2);
+    let (events_tx, events_rx) = crossbeam_channel::unbounded::<BlockProcessorEvent>();
 
     let ctx_moved = ctx.clone();
     let config_moved = config.clone();
@@ -286,7 +291,7 @@ async fn sync_to_block_height(
         })
         .expect("unable to spawn thread");
 
-    let processor = BlockDownloadProcessor {
+    let processor = BlockProcessor {
         commands_tx,
         events_rx,
         thread_handle: handle,
@@ -311,7 +316,10 @@ async fn sync_to_block_height(
     .await
 }
 
-async fn stream_blocks(
+/// Streams all upcoming blocks from bitcoind through its ZeroMQ interface and pipes them onto the [Indexer] once processed
+/// through our block pool. This process will run indefinitely and will make sure our index keeps advancing as new Bitcoin blocks
+/// get mined.
+async fn stream_zmq_blocks(
     indexer: &Indexer,
     block_pool: &Arc<Mutex<ForkScratchPad>>,
     block_store: &Arc<Mutex<HashMap<BlockIdentifier, BitcoinBlockData>>>,
@@ -320,8 +328,8 @@ async fn stream_blocks(
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
-    let (commands_tx, commands_rx) = crossbeam_channel::bounded::<BlockDownloadCommand>(2);
-    let (events_tx, events_rx) = crossbeam_channel::unbounded::<BlockDownloadProcessorEvent>();
+    let (commands_tx, commands_rx) = crossbeam_channel::bounded::<BlockProcessorCommand>(2);
+    let (events_tx, events_rx) = crossbeam_channel::unbounded::<BlockProcessorEvent>();
 
     let ctx_moved = ctx.clone();
     let config_moved = config.clone();
@@ -345,7 +353,7 @@ async fn stream_blocks(
         })
         .expect("unable to spawn thread");
 
-    let processor = BlockDownloadProcessor {
+    let processor = BlockProcessor {
         commands_tx,
         events_rx,
         thread_handle: handle,
@@ -353,7 +361,8 @@ async fn stream_blocks(
     start_zeromq_pipeline(&processor, sequence_start_block_height, config, ctx).await
 }
 
-pub async fn start_bitcoind_indexer(
+/// Starts a Bitcoin block indexer pipeline.
+pub async fn start_bitcoin_indexer(
     indexer: &Indexer,
     index_chain_tip: &BlockIdentifier,
     sequence_start_block_height: u64,
@@ -369,6 +378,7 @@ pub async fn start_bitcoind_indexer(
     // Block pool that will track the canonical chain and detect any reorgs that may happen.
     let block_pool_arc = Arc::new(Mutex::new(ForkScratchPad::new()));
     let block_pool = block_pool_arc.clone();
+    // TODO: Do this only after sequence height
     prime_block_pool(&block_pool_arc, index_chain_tip, &http_client, config, ctx).await?;
 
     // Block cache that will keep block data in memory while it is prepared to be sent to indexers.
@@ -386,7 +396,7 @@ pub async fn start_bitcoind_indexer(
                 break;
             }
         }
-        sync_to_block_height(
+        download_rpc_blocks(
             indexer,
             &block_pool_arc,
             &block_store_arc,
@@ -403,7 +413,7 @@ pub async fn start_bitcoind_indexer(
 
     // Stream new incoming blocks.
     if stream_blocks_at_chain_tip {
-        stream_blocks(
+        stream_zmq_blocks(
             indexer,
             &block_pool_arc,
             &block_store_arc,

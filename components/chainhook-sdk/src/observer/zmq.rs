@@ -10,7 +10,7 @@ use crate::{
             cursor::BlockBytesCursor,
             download_and_parse_block_with_retry,
             standardize_bitcoin_block,
-        }, fork_scratch_pad::ForkScratchPad, BlockDownloadCommand, BlockDownloadProcessor
+        }, fork_scratch_pad::ForkScratchPad, BlockProcessorCommand, BlockProcessor
     },
     try_debug, try_info, try_warn,
     utils::Context,
@@ -36,7 +36,7 @@ fn new_zmq_socket() -> Socket {
 }
 
 pub async fn start_zeromq_pipeline(
-    blocks_post_processor: &BlockDownloadProcessor,
+    blocks_post_processor: &BlockProcessor,
     start_sequencing_blocks_at_height: u64,
     config: &Config,
     ctx: &Context,
@@ -106,7 +106,7 @@ pub async fn start_zeromq_pipeline(
         };
         let _ = blocks_post_processor
             .commands_tx
-            .send(BlockDownloadCommand::ProcessDownloadedBlocks(
+            .send(BlockProcessorCommand::ProcessBlocks(
                 vec![(block_height, compressed_block.to_vec())],
                 block_data,
             ));

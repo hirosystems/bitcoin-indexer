@@ -11,10 +11,13 @@ use reqwest::Client;
 use tokio::task::JoinSet;
 
 use crate::{
-    indexer::{bitcoin::{
-        cursor::BlockBytesCursor, parse_downloaded_block, standardize_bitcoin_block,
-        try_download_block_bytes_with_retry,
-    }, BlockDownloadCommand, BlockDownloadProcessor, BlockDownloadProcessorEvent},
+    indexer::{
+        bitcoin::{
+            cursor::BlockBytesCursor, parse_downloaded_block, standardize_bitcoin_block,
+            try_download_block_bytes_with_retry,
+        },
+        BlockProcessor, BlockProcessorCommand, BlockProcessorEvent,
+    },
     try_debug, try_info,
     utils::Context,
 };
@@ -26,7 +29,7 @@ pub async fn start_block_download_pipeline(
     http_client: &Client,
     blocks: Vec<u64>,
     start_sequencing_blocks_at_height: u64,
-    blocks_post_processor: &BlockDownloadProcessor,
+    blocks_post_processor: &BlockProcessor,
     speed: usize,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -141,7 +144,8 @@ pub async fn start_block_download_pipeline(
                         cloned_ctx,
                         "#{blocks_processed} blocks successfully sent to processor"
                     );
-                    let _ = blocks_post_processor_commands_tx.send(BlockDownloadCommand::Terminate);
+                    let _ =
+                        blocks_post_processor_commands_tx.send(BlockProcessorCommand::Terminate);
                     break;
                 }
 
@@ -185,7 +189,10 @@ pub async fn start_block_download_pipeline(
                 if !ooo_compacted_blocks.is_empty() {
                     blocks_processed += ooo_compacted_blocks.len() as u64;
                     let _ = blocks_post_processor_commands_tx.send(
-                        BlockDownloadCommand::ProcessDownloadedBlocks(ooo_compacted_blocks, vec![]),
+                        BlockProcessorCommand::ProcessBlocks {
+                            compacted_blocks: ooo_compacted_blocks,
+                            blocks: vec![],
+                        },
                     );
                 }
 
@@ -206,7 +213,10 @@ pub async fn start_block_download_pipeline(
 
                 if !blocks.is_empty() {
                     let _ = blocks_post_processor_commands_tx.send(
-                        BlockDownloadCommand::ProcessDownloadedBlocks(compacted_blocks, blocks),
+                        BlockProcessorCommand::ProcessBlocks {
+                            compacted_blocks,
+                            blocks,
+                        },
                     );
                 }
 
@@ -269,9 +279,7 @@ pub async fn start_block_download_pipeline(
     loop {
         if let Ok(signal) = blocks_post_processor.events_rx.recv() {
             match signal {
-                BlockDownloadProcessorEvent::Terminated | BlockDownloadProcessorEvent::Expired => {
-                    break
-                }
+                BlockProcessorEvent::Terminated | BlockProcessorEvent::Expired => break,
             }
         }
     }
