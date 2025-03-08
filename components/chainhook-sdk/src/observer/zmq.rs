@@ -1,12 +1,16 @@
-use chainhook_types::BlockIdentifier;
-use config::BitcoindConfig;
+use chainhook_types::{BitcoinNetwork, BlockIdentifier};
+use config::{BitcoindConfig, Config};
 use std::sync::mpsc::Sender;
 use zmq::Socket;
 
 use crate::{
     indexer::{
-        bitcoin::{build_http_client, download_and_parse_block_with_retry},
-        fork_scratch_pad::ForkScratchPad,
+        bitcoin::{
+            build_http_client,
+            cursor::BlockBytesCursor,
+            download_and_parse_block_with_retry,
+            standardize_bitcoin_block,
+        }, fork_scratch_pad::ForkScratchPad, BlockDownloadCommand, BlockDownloadProcessor
     },
     try_debug, try_info, try_warn,
     utils::Context,
@@ -29,6 +33,84 @@ fn new_zmq_socket() -> Socket {
     // 120 times
     assert!(socket.set_tcp_keepalive_cnt(120).is_ok());
     socket
+}
+
+pub async fn start_zeromq_pipeline(
+    blocks_post_processor: &BlockDownloadProcessor,
+    start_sequencing_blocks_at_height: u64,
+    config: &Config,
+    ctx: &Context,
+) -> Result<(), String> {
+    let http_client = build_http_client();
+    let bitcoind_zmq_url = config.bitcoind.zmq_url.clone();
+    let network = BitcoinNetwork::from_network(config.bitcoind.network);
+    try_info!(
+        ctx,
+        "zmq: Waiting for ZMQ connection acknowledgment from bitcoind"
+    );
+
+    let mut socket = new_zmq_socket();
+    assert!(socket.connect(&bitcoind_zmq_url).is_ok());
+    try_info!(
+        ctx,
+        "zmq: Connected, waiting for ZMQ messages from bitcoind"
+    );
+
+    loop {
+        let msg = match socket.recv_multipart(0) {
+            Ok(msg) => msg,
+            Err(e) => {
+                try_warn!(ctx, "zmq: Unable to receive ZMQ message: {e}");
+                socket = new_zmq_socket();
+                assert!(socket.connect(&bitcoind_zmq_url).is_ok());
+                continue;
+            }
+        };
+        let (topic, data, _sequence) = (&msg[0], &msg[1], &msg[2]);
+
+        if !topic.eq(b"hashblock") {
+            try_warn!(
+                ctx,
+                "zmq: {} Topic not supported",
+                String::from_utf8(topic.clone()).unwrap()
+            );
+            continue;
+        }
+
+        let block_hash = hex::encode(data);
+
+        try_info!(ctx, "zmq: Bitcoin block hash announced {block_hash}");
+        let raw_block_data = match download_and_parse_block_with_retry(
+            &http_client,
+            &block_hash,
+            &config.bitcoind,
+            ctx,
+        )
+        .await
+        {
+            Ok(block) => block,
+            Err(e) => {
+                try_warn!(ctx, "zmq: Unable to download block: {e}");
+                continue;
+            }
+        };
+        let compressed_block =
+            BlockBytesCursor::from_full_block(&raw_block_data).expect("unable to compress block");
+        let block_height = raw_block_data.height as u64;
+        let block_data = if block_height >= start_sequencing_blocks_at_height {
+            let block = standardize_bitcoin_block(raw_block_data, &network, ctx)
+                .expect("unable to deserialize block");
+            vec![block]
+        } else {
+            vec![]
+        };
+        let _ = blocks_post_processor
+            .commands_tx
+            .send(BlockDownloadCommand::ProcessDownloadedBlocks(
+                vec![(block_height, compressed_block.to_vec())],
+                block_data,
+            ));
+    }
 }
 
 pub async fn start_zeromq_runloop(

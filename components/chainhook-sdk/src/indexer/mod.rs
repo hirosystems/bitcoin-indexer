@@ -10,6 +10,7 @@ use std::{
 };
 
 use crate::{
+    observer::zmq::start_zeromq_pipeline,
     try_crit, try_debug, try_info,
     utils::{
         bitcoind::{bitcoind_get_chain_tip, bitcoind_wait_for_chain_tip},
@@ -19,20 +20,31 @@ use crate::{
 
 use bitcoin::{
     build_http_client, download_and_parse_block_with_retry,
-    pipeline::{
-        start_block_download_pipeline, BlockDownloadCommand, BlockDownloadProcessor,
-        BlockDownloadProcessorEvent,
-    },
-    standardize_bitcoin_block,
+    pipeline::start_block_download_pipeline, standardize_bitcoin_block,
 };
-use chainhook_types::{
-    BitcoinBlockData, BitcoinNetwork, BlockIdentifier, BlockchainEvent,
-};
+use chainhook_types::{BitcoinBlockData, BitcoinNetwork, BlockIdentifier, BlockchainEvent};
 use config::Config;
-use crossbeam_channel::{Sender, TryRecvError};
+use crossbeam_channel::{Receiver, Sender, TryRecvError};
 use reqwest::Client;
 
 use self::fork_scratch_pad::ForkScratchPad;
+
+pub enum BlockDownloadCommand {
+    ProcessDownloadedBlocks(Vec<(u64, Vec<u8>)>, Vec<BitcoinBlockData>),
+    Terminate,
+}
+
+pub enum BlockDownloadProcessorEvent {
+    Terminated,
+    Expired,
+}
+
+/// Object that will receive any parsed blocks as they come from a parallelized bitcoind download pipeline.
+pub struct BlockDownloadProcessor {
+    pub commands_tx: crossbeam_channel::Sender<BlockDownloadCommand>,
+    pub events_rx: crossbeam_channel::Receiver<BlockDownloadProcessorEvent>,
+    pub thread_handle: JoinHandle<()>,
+}
 
 pub struct BlockBundle {
     pub apply_blocks: Vec<BitcoinBlockData>,
@@ -175,6 +187,67 @@ async fn prime_block_pool(
     Ok(())
 }
 
+async fn block_ingestion_runloop(
+    indexer_commands_tx: &Sender<IndexerCommand>,
+    block_commands_rx: &Receiver<BlockDownloadCommand>,
+    block_events_tx: &Sender<BlockDownloadProcessorEvent>,
+    block_pool: &Arc<Mutex<ForkScratchPad>>,
+    block_store: &Arc<Mutex<HashMap<BlockIdentifier, BitcoinBlockData>>>,
+    http_client: &Client,
+    config: &Config,
+    ctx: &Context,
+) {
+    let mut empty_cycles = 0;
+    loop {
+        let (compacted_blocks, blocks) = match block_commands_rx.try_recv() {
+            Ok(BlockDownloadCommand::ProcessDownloadedBlocks(compacted_blocks, blocks)) => {
+                empty_cycles = 0;
+                (compacted_blocks, blocks)
+            }
+            Ok(BlockDownloadCommand::Terminate) => {
+                let _ = block_events_tx.send(BlockDownloadProcessorEvent::Terminated);
+                break;
+            }
+            Err(e) => match e {
+                TryRecvError::Empty => {
+                    empty_cycles += 1;
+                    if empty_cycles == 180 {
+                        try_info!(ctx, "Block processor reached expiration");
+                        let _ = block_events_tx.send(BlockDownloadProcessorEvent::Expired);
+                        break;
+                    }
+                    sleep(Duration::from_secs(1));
+                    continue;
+                }
+                _ => {
+                    break;
+                }
+            },
+        };
+
+        if !compacted_blocks.is_empty() {
+            let _ =
+                indexer_commands_tx.send(IndexerCommand::StoreCompactedBlocks(compacted_blocks));
+        }
+        for block in blocks.into_iter() {
+            if let Err(e) = advance_block_pool(
+                block,
+                block_pool,
+                block_store,
+                http_client,
+                indexer_commands_tx,
+                config,
+                ctx,
+            )
+            .await
+            {
+                try_crit!(ctx, "Error indexing blocks: {e}");
+                std::process::exit(1);
+            };
+        }
+    }
+}
+
 /// Starts a bitcoind block download pipeline that will send us all historical bitcoin blocks in a parallel fashion. We will then
 /// stream these blocks into our block pool so they can be fed into the configured indexer. This will eventually bring the index
 /// chain tip to `target_block_height`.
@@ -200,68 +273,24 @@ async fn sync_to_block_height(
 
     let handle: JoinHandle<()> = hiro_system_kit::thread_named("block_download_processor")
         .spawn(move || {
-            hiro_system_kit::nestable_block_on(async move {
-                let mut empty_cycles = 0;
-                loop {
-                    let (compacted_blocks, blocks) = match commands_rx.try_recv() {
-                        Ok(BlockDownloadCommand::ProcessDownloadedBlocks(
-                            compacted_blocks,
-                            blocks,
-                        )) => {
-                            empty_cycles = 0;
-                            (compacted_blocks, blocks)
-                        }
-                        Ok(BlockDownloadCommand::Terminate) => {
-                            let _ = events_tx.send(BlockDownloadProcessorEvent::Terminated);
-                            break;
-                        }
-                        Err(e) => match e {
-                            TryRecvError::Empty => {
-                                empty_cycles += 1;
-                                if empty_cycles == 180 {
-                                    try_info!(&ctx_moved, "Block processor reached expiration");
-                                    let _ = events_tx.send(BlockDownloadProcessorEvent::Expired);
-                                    break;
-                                }
-                                sleep(Duration::from_secs(1));
-                                continue;
-                            }
-                            _ => {
-                                break;
-                            }
-                        },
-                    };
-
-                    if !compacted_blocks.is_empty() {
-                        let _ = indexer_commands_tx_moved
-                            .send(IndexerCommand::StoreCompactedBlocks(compacted_blocks));
-                    }
-                    for block in blocks.into_iter() {
-                        if let Err(e) = advance_block_pool(
-                            block,
-                            &block_pool_moved,
-                            &block_store_moved,
-                            &http_client_moved,
-                            &indexer_commands_tx_moved,
-                            &config_moved,
-                            &ctx_moved,
-                        )
-                        .await
-                        {
-                            try_crit!(ctx_moved, "Error indexing blocks: {e}");
-                            std::process::exit(1);
-                        };
-                    }
-                }
-            });
+            hiro_system_kit::nestable_block_on(block_ingestion_runloop(
+                &indexer_commands_tx_moved,
+                &commands_rx,
+                &events_tx,
+                &block_pool_moved,
+                &block_store_moved,
+                &http_client_moved,
+                &config_moved,
+                &ctx_moved,
+            ));
         })
         .expect("unable to spawn thread");
+
     let processor = BlockDownloadProcessor {
         commands_tx,
         events_rx,
         thread_handle: handle,
     };
-
     let blocks = {
         let block_pool_ref = block_pool.clone();
         let pool = block_pool_ref.lock().unwrap();
@@ -282,11 +311,53 @@ async fn sync_to_block_height(
     .await
 }
 
-pub async fn start(
+async fn stream_blocks(
+    indexer: &Indexer,
+    block_pool: &Arc<Mutex<ForkScratchPad>>,
+    block_store: &Arc<Mutex<HashMap<BlockIdentifier, BitcoinBlockData>>>,
+    http_client: &Client,
+    sequence_start_block_height: u64,
+    config: &Config,
+    ctx: &Context,
+) -> Result<(), String> {
+    let (commands_tx, commands_rx) = crossbeam_channel::bounded::<BlockDownloadCommand>(2);
+    let (events_tx, events_rx) = crossbeam_channel::unbounded::<BlockDownloadProcessorEvent>();
+
+    let ctx_moved = ctx.clone();
+    let config_moved = config.clone();
+    let block_pool_moved = block_pool.clone();
+    let block_store_moved = block_store.clone();
+    let http_client_moved = http_client.clone();
+    let indexer_commands_tx_moved = indexer.commands_tx.clone();
+
+    let handle: JoinHandle<()> = hiro_system_kit::thread_named("block_stream_processor")
+        .spawn(move || {
+            hiro_system_kit::nestable_block_on(block_ingestion_runloop(
+                &indexer_commands_tx_moved,
+                &commands_rx,
+                &events_tx,
+                &block_pool_moved,
+                &block_store_moved,
+                &http_client_moved,
+                &config_moved,
+                &ctx_moved,
+            ));
+        })
+        .expect("unable to spawn thread");
+
+    let processor = BlockDownloadProcessor {
+        commands_tx,
+        events_rx,
+        thread_handle: handle,
+    };
+    start_zeromq_pipeline(&processor, sequence_start_block_height, config, ctx).await
+}
+
+pub async fn start_bitcoind_indexer(
     indexer: &Indexer,
     index_chain_tip: &BlockIdentifier,
     sequence_start_block_height: u64,
-    stop_at_chain_tip: bool,
+    stream_blocks_at_chain_tip: bool,
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -303,6 +374,7 @@ pub async fn start(
     // Block cache that will keep block data in memory while it is prepared to be sent to indexers.
     let block_store_arc = Arc::new(Mutex::new(HashMap::new()));
 
+    // Sync index until chain tip is reached.
     loop {
         {
             let pool = block_pool.lock().unwrap();
@@ -329,8 +401,18 @@ pub async fn start(
         bitcoind_chain_tip = bitcoind_get_chain_tip(&config.bitcoind, ctx);
     }
 
-    if !stop_at_chain_tip {
-        // zmq
+    // Stream new incoming blocks.
+    if stream_blocks_at_chain_tip {
+        stream_blocks(
+            indexer,
+            &block_pool_arc,
+            &block_store_arc,
+            &http_client,
+            sequence_start_block_height,
+            config,
+            ctx,
+        )
+        .await?;
     }
 
     Ok(())

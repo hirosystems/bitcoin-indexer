@@ -1,39 +1,23 @@
 use std::{
     collections::{HashMap, VecDeque},
-    thread::{sleep, JoinHandle},
+    thread::sleep,
     time::Duration,
 };
 
-use chainhook_types::{BitcoinBlockData, BitcoinNetwork};
+use chainhook_types::BitcoinNetwork;
 use config::Config;
 use crossbeam_channel::bounded;
 use reqwest::Client;
 use tokio::task::JoinSet;
 
 use crate::{
-    indexer::bitcoin::{
-        cursor::BlockBytesCursor, parse_downloaded_block, standardize_bitcoin_block, try_download_block_bytes_with_retry
-    },
+    indexer::{bitcoin::{
+        cursor::BlockBytesCursor, parse_downloaded_block, standardize_bitcoin_block,
+        try_download_block_bytes_with_retry,
+    }, BlockDownloadCommand, BlockDownloadProcessor, BlockDownloadProcessorEvent},
     try_debug, try_info,
     utils::Context,
 };
-
-pub enum BlockDownloadCommand {
-    ProcessDownloadedBlocks(Vec<(u64, Vec<u8>)>, Vec<BitcoinBlockData>),
-    Terminate,
-}
-
-pub enum BlockDownloadProcessorEvent {
-    Terminated,
-    Expired,
-}
-
-/// Object that will receive any parsed blocks as they come from a parallelized bitcoind download pipeline.
-pub struct BlockDownloadProcessor {
-    pub commands_tx: crossbeam_channel::Sender<BlockDownloadCommand>,
-    pub events_rx: crossbeam_channel::Receiver<BlockDownloadProcessorEvent>,
-    pub thread_handle: JoinHandle<()>,
-}
 
 /// Downloads historical blocks from bitcoind's RPC interface and pushes them to a [BlockDownloadProcessor] so they can be indexed
 /// or ingested as needed.
@@ -221,8 +205,9 @@ pub async fn start_block_download_pipeline(
                 blocks_processed += blocks.len() as u64;
 
                 if !blocks.is_empty() {
-                    let _ = blocks_post_processor_commands_tx
-                        .send(BlockDownloadCommand::ProcessDownloadedBlocks(compacted_blocks, blocks));
+                    let _ = blocks_post_processor_commands_tx.send(
+                        BlockDownloadCommand::ProcessDownloadedBlocks(compacted_blocks, blocks),
+                    );
                 }
 
                 if inbox_cursor > end_block {

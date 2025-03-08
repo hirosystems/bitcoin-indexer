@@ -1,4 +1,4 @@
-mod zmq;
+pub mod zmq;
 
 use crate::indexer::bitcoin::{
     build_http_client, download_and_parse_block_with_retry, standardize_bitcoin_block,
