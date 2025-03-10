@@ -3,6 +3,7 @@ use std::{collections::HashMap, process, str::FromStr};
 use cache::input_rune_balance::InputRuneBalance;
 use chainhook_postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
 use chainhook_sdk::utils::Context;
+use chainhook_types::BlockIdentifier;
 use config::Config;
 use models::{
     db_balance_change::DbBalanceChange, db_ledger_entry::DbLedgerEntry, db_rune::DbRune,
@@ -385,6 +386,28 @@ pub async fn pg_get_block_height(client: &mut Client, _ctx: &Context) -> Option<
     } else {
         None
     }
+}
+
+pub async fn get_chain_tip(client: &mut Client, _ctx: &Context) -> Option<BlockIdentifier> {
+    let row = client
+        .query_opt(
+            "SELECT block_height, block_hash
+            FROM ledger
+            ORDER BY block_height DESC
+            LIMIT 1",
+            &[],
+        )
+        .await
+        .expect("get_chain_tip");
+    let Some(row) = row else {
+        return None;
+    };
+    let block_height: PgNumericU64 = row.get("block_height");
+    let block_hash: String = row.get("block_hash");
+    Some(BlockIdentifier {
+        index: block_height.0,
+        hash: format!("0x{block_hash}"),
+    })
 }
 
 pub async fn pg_get_rune_by_id(

@@ -183,7 +183,7 @@ async fn advance_block_pool(
 
 /// Initialize our block pool with the current index's last seen block, so we can detect any re-orgs or gaps that may come our
 /// way with the next blocks.
-async fn prime_block_pool(
+async fn initialize_block_pool(
     block_pool: &Arc<Mutex<ForkScratchPad>>,
     index_chain_tip: &BlockIdentifier,
     http_client: &Client,
@@ -407,7 +407,7 @@ pub async fn start_bitcoin_indexer(
     if let Some(index_chain_tip) = &indexer.chain_tip {
         try_info!(ctx, "Index chain tip is at {}", index_chain_tip);
         // TODO: Do this only after sequence height
-        prime_block_pool(&block_pool_arc, index_chain_tip, &http_client, config, ctx).await?;
+        initialize_block_pool(&block_pool_arc, index_chain_tip, &http_client, config, ctx).await?;
     } else {
         try_info!(ctx, "Index is empty");
     }

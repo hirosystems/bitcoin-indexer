@@ -107,29 +107,29 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                     check_maintenance_mode(ctx);
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_runes_config()?;
-                    return runes::service::start_service(&config, ctx).await;
+                    runes::start_runes_indexer(true, &config, ctx).await?
                 }
             },
             Command::Index(index_command) => match index_command {
                 IndexCommand::Sync(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_runes_config()?;
-                    runes::service::catch_up_to_bitcoin_chain_tip(&config, ctx).await?;
+                    runes::start_runes_indexer(false, &config, ctx).await?
                 }
                 IndexCommand::Rollback(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_runes_config()?;
-                    let chain_tip = runes::service::get_index_chain_tip(&config, ctx).await;
-                    confirm_rollback(chain_tip, cmd.blocks)?;
+                    // let chain_tip = runes::service::get_index_chain_tip(&config, ctx).await;
+                    // confirm_rollback(chain_tip, cmd.blocks)?;
 
-                    let mut pg_client = runes::db::pg_connect(&config, false, &ctx).await;
-                    runes::scan::bitcoin::drop_blocks(
-                        chain_tip - cmd.blocks as u64,
-                        chain_tip,
-                        &mut pg_client,
-                        &ctx,
-                    )
-                    .await;
+                    // let mut pg_client = runes::db::pg_connect(&config, false, &ctx).await;
+                    // runes::scan::bitcoin::drop_blocks(
+                    //     chain_tip - cmd.blocks as u64,
+                    //     chain_tip,
+                    //     &mut pg_client,
+                    //     &ctx,
+                    // )
+                    // .await;
                 }
             },
             Command::Database(database_command) => match database_command {
