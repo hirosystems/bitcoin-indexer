@@ -14,61 +14,61 @@ use crate::{
     try_error, try_info,
 };
 
-pub fn start_block_archiving_processor(
-    config: &Config,
-    ctx: &Context,
-    update_tip: bool,
-    _post_processor: Option<Sender<BitcoinBlockData>>,
-) -> PostProcessorController {
-    let (commands_tx, commands_rx) = crossbeam_channel::bounded::<PostProcessorCommand>(2);
-    let (events_tx, events_rx) = crossbeam_channel::unbounded::<PostProcessorEvent>();
+// pub fn start_block_archiving_processor(
+//     config: &Config,
+//     ctx: &Context,
+//     update_tip: bool,
+//     _post_processor: Option<Sender<BitcoinBlockData>>,
+// ) -> PostProcessorController {
+//     let (commands_tx, commands_rx) = crossbeam_channel::bounded::<PostProcessorCommand>(2);
+//     let (events_tx, events_rx) = crossbeam_channel::unbounded::<PostProcessorEvent>();
 
-    let config = config.clone();
-    let ctx = ctx.clone();
-    let handle: JoinHandle<()> = hiro_system_kit::thread_named("Processor Runloop")
-        .spawn(move || {
-            let blocks_db_rw = open_blocks_db_with_retry(true, &config, &ctx);
-            let mut processed_blocks = 0;
+//     let config = config.clone();
+//     let ctx = ctx.clone();
+//     let handle: JoinHandle<()> = hiro_system_kit::thread_named("Processor Runloop")
+//         .spawn(move || {
+//             let blocks_db_rw = open_blocks_db_with_retry(true, &config, &ctx);
+//             let mut processed_blocks = 0;
 
-            loop {
-                let (compacted_blocks, _) = match commands_rx.try_recv() {
-                    Ok(PostProcessorCommand::ProcessBlocks(compacted_blocks, blocks)) => {
-                        (compacted_blocks, blocks)
-                    }
-                    Ok(PostProcessorCommand::Terminate) => {
-                        let _ = events_tx.send(PostProcessorEvent::Terminated);
-                        break;
-                    }
-                    Err(e) => match e {
-                        TryRecvError::Empty => {
-                            sleep(Duration::from_secs(1));
-                            continue;
-                        }
-                        _ => {
-                            break;
-                        }
-                    },
-                };
-                processed_blocks += compacted_blocks.len();
-                store_compacted_blocks(compacted_blocks, update_tip, &blocks_db_rw, &ctx);
+//             loop {
+//                 let (compacted_blocks, _) = match commands_rx.try_recv() {
+//                     Ok(PostProcessorCommand::ProcessBlocks(compacted_blocks, blocks)) => {
+//                         (compacted_blocks, blocks)
+//                     }
+//                     Ok(PostProcessorCommand::Terminate) => {
+//                         let _ = events_tx.send(PostProcessorEvent::Terminated);
+//                         break;
+//                     }
+//                     Err(e) => match e {
+//                         TryRecvError::Empty => {
+//                             sleep(Duration::from_secs(1));
+//                             continue;
+//                         }
+//                         _ => {
+//                             break;
+//                         }
+//                     },
+//                 };
+//                 processed_blocks += compacted_blocks.len();
+//                 store_compacted_blocks(compacted_blocks, update_tip, &blocks_db_rw, &ctx);
 
-                if processed_blocks % 10_000 == 0 {
-                    let _ = blocks_db_rw.flush_wal(true);
-                }
-            }
+//                 if processed_blocks % 10_000 == 0 {
+//                     let _ = blocks_db_rw.flush_wal(true);
+//                 }
+//             }
 
-            if let Err(e) = blocks_db_rw.flush() {
-                try_error!(ctx, "{}", e.to_string());
-            }
-        })
-        .expect("unable to spawn thread");
+//             if let Err(e) = blocks_db_rw.flush() {
+//                 try_error!(ctx, "{}", e.to_string());
+//             }
+//         })
+//         .expect("unable to spawn thread");
 
-    PostProcessorController {
-        commands_tx,
-        events_rx,
-        thread_handle: handle,
-    }
-}
+//     PostProcessorController {
+//         commands_tx,
+//         events_rx,
+//         thread_handle: handle,
+//     }
+// }
 
 pub fn store_compacted_blocks(
     mut compacted_blocks: Vec<(u64, Vec<u8>)>,

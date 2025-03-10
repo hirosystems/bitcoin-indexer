@@ -14,16 +14,13 @@ use std::ops::Div;
 
 use chainhook_sdk::utils::Context;
 
-use crate::{
-    db::{
-        blocks::{
-            find_last_block_inserted, find_pinned_block_bytes_at_block_height,
-            open_blocks_db_with_retry,
-        },
-        cursor::TransactionBytesCursor,
-        ordinals_pg,
+use crate::db::{
+    blocks::{
+        find_last_block_inserted, find_pinned_block_bytes_at_block_height,
+        open_blocks_db_with_retry,
     },
-    service::PgConnectionPools,
+    cursor::TransactionBytesCursor,
+    ordinals_pg,
 };
 use chainhook_sdk::utils::bitcoind::bitcoind_get_block_height;
 
@@ -120,71 +117,71 @@ pub fn compute_next_satpoint_data(
     SatPosition::Output((selected_output_index, relative_offset_in_selected_output))
 }
 
-pub async fn should_sync_rocks_db(
-    config: &Config,
-    pg_pools: &PgConnectionPools,
-    ctx: &Context,
-) -> Result<Option<(u64, u64)>, String> {
-    let blocks_db = open_blocks_db_with_retry(true, &config, &ctx);
-    let last_compressed_block = find_last_block_inserted(&blocks_db) as u64;
-    let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
-    let last_indexed_block = match ordinals_pg::get_chain_tip_block_height(&ord_client).await? {
-        Some(last_indexed_block) => last_indexed_block,
-        None => 0,
-    };
+// pub async fn should_sync_rocks_db(
+//     config: &Config,
+//     pg_pools: &PgConnectionPools,
+//     ctx: &Context,
+// ) -> Result<Option<(u64, u64)>, String> {
+//     let blocks_db = open_blocks_db_with_retry(true, &config, &ctx);
+//     let last_compressed_block = find_last_block_inserted(&blocks_db) as u64;
+//     let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
+//     let last_indexed_block = match ordinals_pg::get_chain_tip_block_height(&ord_client).await? {
+//         Some(last_indexed_block) => last_indexed_block,
+//         None => 0,
+//     };
 
-    let res = if last_compressed_block < last_indexed_block {
-        Some((last_compressed_block, last_indexed_block))
-    } else {
-        None
-    };
-    Ok(res)
-}
+//     let res = if last_compressed_block < last_indexed_block {
+//         Some((last_compressed_block, last_indexed_block))
+//     } else {
+//         None
+//     };
+//     Ok(res)
+// }
 
-pub async fn should_sync_ordinals_db(
-    config: &Config,
-    pg_pools: &PgConnectionPools,
-    ctx: &Context,
-) -> Result<Option<(u64, u64, usize)>, String> {
-    let blocks_db = open_blocks_db_with_retry(true, &config, &ctx);
-    let mut start_block = find_last_block_inserted(&blocks_db) as u64;
+// pub async fn should_sync_ordinals_db(
+//     config: &Config,
+//     pg_pools: &PgConnectionPools,
+//     ctx: &Context,
+// ) -> Result<Option<(u64, u64, usize)>, String> {
+//     let blocks_db = open_blocks_db_with_retry(true, &config, &ctx);
+//     let mut start_block = find_last_block_inserted(&blocks_db) as u64;
 
-    let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
-    match ordinals_pg::get_chain_tip_block_height(&ord_client).await? {
-        Some(height) => {
-            if find_pinned_block_bytes_at_block_height(height as u32, 3, &blocks_db, &ctx).is_none()
-            {
-                start_block = start_block.min(height);
-            } else {
-                start_block = height;
-            }
-            start_block += 1;
-        }
-        None => {
-            start_block = start_block.min(first_inscription_height(config));
-        }
-    };
+//     let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
+//     match ordinals_pg::get_chain_tip_block_height(&ord_client).await? {
+//         Some(height) => {
+//             if find_pinned_block_bytes_at_block_height(height as u32, 3, &blocks_db, &ctx).is_none()
+//             {
+//                 start_block = start_block.min(height);
+//             } else {
+//                 start_block = height;
+//             }
+//             start_block += 1;
+//         }
+//         None => {
+//             start_block = start_block.min(first_inscription_height(config));
+//         }
+//     };
 
-    // TODO: Gracefully handle Regtest, Testnet and Signet
-    let end_block = bitcoind_get_block_height(&config.bitcoind, ctx);
-    let (mut end_block, speed) = if start_block < 200_000 {
-        (end_block.min(200_000), 10_000)
-    } else if start_block < 550_000 {
-        (end_block.min(550_000), 1_000)
-    } else {
-        (end_block, 100)
-    };
+//     // TODO: Gracefully handle Regtest, Testnet and Signet
+//     let end_block = bitcoind_get_block_height(&config.bitcoind, ctx);
+//     let (mut end_block, speed) = if start_block < 200_000 {
+//         (end_block.min(200_000), 10_000)
+//     } else if start_block < 550_000 {
+//         (end_block.min(550_000), 1_000)
+//     } else {
+//         (end_block, 100)
+//     };
 
-    if start_block < 767430 && end_block > 767430 {
-        end_block = 767430;
-    }
+//     if start_block < 767430 && end_block > 767430 {
+//         end_block = 767430;
+//     }
 
-    if start_block <= end_block {
-        Ok(Some((start_block, end_block, speed)))
-    } else {
-        Ok(None)
-    }
-}
+//     if start_block <= end_block {
+//         Ok(Some((start_block, end_block, speed)))
+//     } else {
+//         Ok(None)
+//     }
+// }
 
 #[test]
 fn test_identify_next_output_index_destination() {

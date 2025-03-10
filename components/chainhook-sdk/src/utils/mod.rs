@@ -10,6 +10,7 @@ use std::{
 use chainhook_types::{BitcoinBlockData, BlockHeader, BlockIdentifier};
 use hiro_system_kit::{slog, Logger};
 use reqwest::RequestBuilder;
+use crate::try_crit;
 
 #[derive(Clone)]
 pub struct Context {
@@ -220,6 +221,29 @@ impl BlockHeights {
             }
         }
         Ok(entries)
+    }
+}
+
+pub fn future_block_on<F>(ctx: &Context, future: F)
+where
+    F: std::future::Future<Output = Result<(), String>> + Send + 'static,
+{
+    let (handle, _rt) = match tokio::runtime::Handle::try_current() {
+        Ok(h) => (h, None),
+        Err(_) => {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            (rt.handle().clone(), Some(rt))
+        }
+    };
+    let thread = std::thread::current();
+    let thread_name = thread.name().unwrap_or("unknown");
+    let result = handle.block_on(future);
+    match result {
+        Ok(value) => value,
+        Err(e) => {
+            try_crit!(ctx, "[{thread_name}]: {e}");
+            std::process::exit(1);
+        }
     }
 }
 

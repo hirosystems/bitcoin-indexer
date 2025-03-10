@@ -4,7 +4,6 @@ use crate::utils::Context;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::BlockIdentifier;
 use config::BitcoindConfig;
-use hiro_system_kit::slog;
 
 use crate::{try_error, try_info};
 

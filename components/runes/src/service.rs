@@ -77,6 +77,7 @@ pub async fn start_service(config: &Config, ctx: &Context) -> Result<(), String>
     let _ = std::thread::spawn(move || {
         start_event_observer(
             event_observer_config,
+            &BlockIdentifier { index: 100, hash: "test".into() },
             observer_cmd_tx_moved,
             observer_cmd_rx,
             Some(observer_event_tx),

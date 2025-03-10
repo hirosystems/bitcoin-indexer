@@ -11,10 +11,10 @@ use std::{
 
 use crate::{
     observer::zmq::start_zeromq_pipeline,
-    try_crit, try_debug, try_info,
+    try_debug, try_info,
     utils::{
         bitcoind::{bitcoind_get_chain_tip, bitcoind_wait_for_chain_tip},
-        AbstractBlock, BlockHeights, Context,
+        future_block_on, AbstractBlock, BlockHeights, Context,
     },
 };
 
@@ -60,7 +60,11 @@ pub enum IndexerCommand {
 /// Object that will receive standardized blocks ready to be indexer or rolled back. Blocks can come from historical downloads or
 /// recent block streams.
 pub struct Indexer {
+    /// Sender for emitting indexer commands.
     pub commands_tx: crossbeam_channel::Sender<IndexerCommand>,
+    /// Current index chain tip at launch time.
+    pub chain_tip: Option<BlockIdentifier>,
+    pub thread_handle: JoinHandle<()>,
 }
 
 /// Moves our block pool with a newly received standardized block
@@ -78,83 +82,100 @@ async fn advance_block_pool(
     block_ids.push_front(block.block_identifier.clone());
 
     let block_pool_ref = block_pool.clone();
-    let mut pool = block_pool_ref.lock().unwrap();
-
     let block_store_ref = block_store.clone();
-    let mut block_store_obj = block_store_ref.lock().unwrap();
-    block_store_obj.insert(block.block_identifier.clone(), block);
+
+    // Keep incoming block before sending.
+    {
+        let mut block_store_guard = block_store_ref.lock().unwrap();
+        block_store_guard.insert(block.block_identifier.clone(), block);
+    }
 
     while let Some(block_id) = block_ids.pop_front() {
-        let block = block_store_obj.get(&block_id).unwrap();
-        let header = block.get_header();
-        if pool.can_process_header(&header) {
-            match pool.process_header(header, ctx)? {
-                Some(event) => match event {
-                    BlockchainEvent::BlockchainUpdatedWithHeaders(event) => {
-                        let mut apply_blocks = vec![];
-                        for header in event.new_headers.iter() {
-                            apply_blocks
-                                .push(block_store_obj.remove(&header.block_identifier).unwrap());
+        let (header, canonical) = {
+            let mut pool_guard = block_pool_ref.lock().unwrap();
+            let mut block_store_guard = block_store_ref.lock().unwrap();
+            let block = block_store_guard.get(&block_id).unwrap();
+            let header = block.get_header();
+            if pool_guard.can_process_header(&header) {
+                match pool_guard.process_header(header.clone(), ctx)? {
+                    Some(event) => match event {
+                        BlockchainEvent::BlockchainUpdatedWithHeaders(event) => {
+                            let mut apply_blocks = vec![];
+                            for header in event.new_headers.iter() {
+                                apply_blocks.push(
+                                    block_store_guard.remove(&header.block_identifier).unwrap(),
+                                );
+                            }
+                            indexer_commands_tx
+                                .send(IndexerCommand::IndexBlocks {
+                                    apply_blocks,
+                                    rollback_block_ids: vec![],
+                                })
+                                .map_err(|e| e.to_string())?;
+                            (header, true)
                         }
-                        indexer_commands_tx
-                            .send(IndexerCommand::IndexBlocks {
-                                apply_blocks,
-                                rollback_block_ids: vec![],
-                            })
-                            .map_err(|e| e.to_string())?;
-                    }
-                    BlockchainEvent::BlockchainUpdatedWithReorg(event) => {
-                        let mut apply_blocks = vec![];
-                        for header in event.headers_to_apply.iter() {
-                            apply_blocks
-                                .push(block_store_obj.remove(&header.block_identifier).unwrap());
+                        BlockchainEvent::BlockchainUpdatedWithReorg(event) => {
+                            let mut apply_blocks = vec![];
+                            for header in event.headers_to_apply.iter() {
+                                apply_blocks.push(
+                                    block_store_guard.remove(&header.block_identifier).unwrap(),
+                                );
+                            }
+                            let rollback_block_ids: Vec<BlockIdentifier> = event
+                                .headers_to_rollback
+                                .iter()
+                                .map(|h| h.block_identifier.clone())
+                                .collect();
+                            indexer_commands_tx
+                                .send(IndexerCommand::IndexBlocks {
+                                    apply_blocks,
+                                    rollback_block_ids,
+                                })
+                                .map_err(|e| e.to_string())?;
+                            (header, true)
                         }
-                        let rollback_block_ids: Vec<BlockIdentifier> = event
-                            .headers_to_rollback
-                            .iter()
-                            .map(|h| h.block_identifier.clone())
-                            .collect();
-                        indexer_commands_tx
-                            .send(IndexerCommand::IndexBlocks {
-                                apply_blocks,
-                                rollback_block_ids,
-                            })
-                            .map_err(|e| e.to_string())?;
-                    }
-                },
-                None => {
-                    // try_warn!(ctx, "zmq: Unable to append block");
+                    },
+                    None => return Err("Unable to append block".into()),
                 }
+            } else {
+                try_info!(ctx, "Received non-canonical block {}", header.block_identifier);
+                (header, false)
+            }
+        };
+        if !canonical {
+            let parent_block = {
+                // Handle a behaviour specific to ZMQ usage in bitcoind.
+                // Considering a simple re-org:
+                // A (1) - B1 (2) - C1 (3)
+                //       \ B2 (4) - C2 (5) - D2 (6)
+                // When D2 is being discovered (making A -> B2 -> C2 -> D2 the new canonical fork)
+                // it looks like ZMQ is only publishing D2.
+                // Without additional operation, we end up with a block that we can't append.
+                let parent_block_hash = header
+                    .parent_block_identifier
+                    .get_hash_bytes_str()
+                    .to_string();
+                // try_info!(
+                //     ctx,
+                //     "zmq: Re-org detected, retrieving parent block {parent_block_hash}"
+                // );
+                let parent_block = download_and_parse_block_with_retry(
+                    &http_client,
+                    &parent_block_hash,
+                    &config.bitcoind,
+                    ctx,
+                )
+                .await?;
+                standardize_bitcoin_block(parent_block, &network, ctx).map_err(|(e, _)| e)?
             };
-        } else {
-            // Handle a behaviour specific to ZMQ usage in bitcoind.
-            // Considering a simple re-org:
-            // A (1) - B1 (2) - C1 (3)
-            //       \ B2 (4) - C2 (5) - D2 (6)
-            // When D2 is being discovered (making A -> B2 -> C2 -> D2 the new canonical fork)
-            // it looks like ZMQ is only publishing D2.
-            // Without additional operation, we end up with a block that we can't append.
-            let parent_block_hash = header
-                .parent_block_identifier
-                .get_hash_bytes_str()
-                .to_string();
-            // try_info!(
-            //     ctx,
-            //     "zmq: Re-org detected, retrieving parent block {parent_block_hash}"
-            // );
-            let parent_block = download_and_parse_block_with_retry(
-                &http_client,
-                &parent_block_hash,
-                &config.bitcoind,
-                ctx,
-            )
-            .await?;
-            let parent_block =
-                standardize_bitcoin_block(parent_block, &network, ctx).map_err(|(e, _)| e)?;
-
+            // Keep parent block and repeat the cycle
+            {
+                let mut block_store_guard = block_store_ref.lock().unwrap();
+                block_store_guard
+                    .insert(parent_block.block_identifier.clone(), parent_block.clone());
+            }
             block_ids.push_front(block_id);
             block_ids.push_front(parent_block.block_identifier.clone());
-            block_store_obj.insert(parent_block.block_identifier.clone(), parent_block);
         }
     }
     Ok(())
@@ -201,17 +222,20 @@ async fn block_ingestion_runloop(
     http_client: &Client,
     config: &Config,
     ctx: &Context,
-) {
+) -> Result<(), String> {
     let mut empty_cycles = 0;
     loop {
         let (compacted_blocks, blocks) = match block_commands_rx.try_recv() {
-            Ok(BlockProcessorCommand::ProcessBlocks { compacted_blocks, blocks }) => {
+            Ok(BlockProcessorCommand::ProcessBlocks {
+                compacted_blocks,
+                blocks,
+            }) => {
                 empty_cycles = 0;
                 (compacted_blocks, blocks)
             }
             Ok(BlockProcessorCommand::Terminate) => {
                 let _ = block_events_tx.send(BlockProcessorEvent::Terminated);
-                break;
+                return Ok(());
             }
             Err(e) => match e {
                 TryRecvError::Empty => {
@@ -219,23 +243,24 @@ async fn block_ingestion_runloop(
                     if empty_cycles == 180 {
                         try_info!(ctx, "Block processor reached expiration");
                         let _ = block_events_tx.send(BlockProcessorEvent::Expired);
-                        break;
+                        return Ok(());
                     }
                     sleep(Duration::from_secs(1));
                     continue;
                 }
                 _ => {
-                    break;
+                    return Ok(());
                 }
             },
         };
 
         if !compacted_blocks.is_empty() {
-            let _ =
-                indexer_commands_tx.send(IndexerCommand::StoreCompactedBlocks(compacted_blocks));
+            indexer_commands_tx
+                .send(IndexerCommand::StoreCompactedBlocks(compacted_blocks))
+                .map_err(|e| e.to_string())?;
         }
         for block in blocks.into_iter() {
-            if let Err(e) = advance_block_pool(
+            advance_block_pool(
                 block,
                 block_pool,
                 block_store,
@@ -244,11 +269,7 @@ async fn block_ingestion_runloop(
                 config,
                 ctx,
             )
-            .await
-            {
-                try_crit!(ctx, "Error indexing blocks: {e}");
-                std::process::exit(1);
-            };
+            .await?;
         }
     }
 }
@@ -278,16 +299,19 @@ async fn download_rpc_blocks(
 
     let handle: JoinHandle<()> = hiro_system_kit::thread_named("block_download_processor")
         .spawn(move || {
-            hiro_system_kit::nestable_block_on(block_ingestion_runloop(
-                &indexer_commands_tx_moved,
-                &commands_rx,
-                &events_tx,
-                &block_pool_moved,
-                &block_store_moved,
-                &http_client_moved,
-                &config_moved,
-                &ctx_moved,
-            ));
+            future_block_on(&ctx_moved.clone(), async move {
+                block_ingestion_runloop(
+                    &indexer_commands_tx_moved,
+                    &commands_rx,
+                    &events_tx,
+                    &block_pool_moved,
+                    &block_store_moved,
+                    &http_client_moved,
+                    &config_moved,
+                    &ctx_moved,
+                )
+                .await
+            });
         })
         .expect("unable to spawn thread");
 
@@ -299,11 +323,12 @@ async fn download_rpc_blocks(
     let blocks = {
         let block_pool_ref = block_pool.clone();
         let pool = block_pool_ref.lock().unwrap();
-        let start_block = pool.canonical_chain_tip().unwrap().index;
+        let start_block = pool.canonical_chain_tip().unwrap().index + 1;
         BlockHeights::BlockRange(start_block, target_block_height)
             .get_sorted_entries()
             .map_err(|_e| format!("Block start / end block spec invalid"))?
     };
+    try_debug!(ctx, "Downloading blocks from #{} to #{}", blocks.front().unwrap(), blocks.back().unwrap());
     start_block_download_pipeline(
         config,
         http_client,
@@ -340,16 +365,19 @@ async fn stream_zmq_blocks(
 
     let handle: JoinHandle<()> = hiro_system_kit::thread_named("block_stream_processor")
         .spawn(move || {
-            hiro_system_kit::nestable_block_on(block_ingestion_runloop(
-                &indexer_commands_tx_moved,
-                &commands_rx,
-                &events_tx,
-                &block_pool_moved,
-                &block_store_moved,
-                &http_client_moved,
-                &config_moved,
-                &ctx_moved,
-            ));
+            future_block_on(&ctx_moved.clone(), async move {
+                block_ingestion_runloop(
+                    &indexer_commands_tx_moved,
+                    &commands_rx,
+                    &events_tx,
+                    &block_pool_moved,
+                    &block_store_moved,
+                    &http_client_moved,
+                    &config_moved,
+                    &ctx_moved,
+                )
+                .await
+            });
         })
         .expect("unable to spawn thread");
 
@@ -364,22 +392,25 @@ async fn stream_zmq_blocks(
 /// Starts a Bitcoin block indexer pipeline.
 pub async fn start_bitcoin_indexer(
     indexer: &Indexer,
-    index_chain_tip: &BlockIdentifier,
     sequence_start_block_height: u64,
     stream_blocks_at_chain_tip: bool,
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
     let mut bitcoind_chain_tip = bitcoind_wait_for_chain_tip(&config.bitcoind, ctx);
-
-    try_info!(ctx, "Index chain tip is at {index_chain_tip}");
     let http_client = build_http_client();
 
     // Block pool that will track the canonical chain and detect any reorgs that may happen.
     let block_pool_arc = Arc::new(Mutex::new(ForkScratchPad::new()));
     let block_pool = block_pool_arc.clone();
-    // TODO: Do this only after sequence height
-    prime_block_pool(&block_pool_arc, index_chain_tip, &http_client, config, ctx).await?;
+
+    if let Some(index_chain_tip) = &indexer.chain_tip {
+        try_info!(ctx, "Index chain tip is at {}", index_chain_tip);
+        // TODO: Do this only after sequence height
+        prime_block_pool(&block_pool_arc, index_chain_tip, &http_client, config, ctx).await?;
+    } else {
+        try_info!(ctx, "Index is empty");
+    }
 
     // Block cache that will keep block data in memory while it is prepared to be sent to indexers.
     let block_store_arc = Arc::new(Mutex::new(HashMap::new()));

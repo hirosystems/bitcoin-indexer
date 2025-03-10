@@ -6,11 +6,11 @@ use zmq::Socket;
 use crate::{
     indexer::{
         bitcoin::{
-            build_http_client,
-            cursor::BlockBytesCursor,
-            download_and_parse_block_with_retry,
+            build_http_client, cursor::BlockBytesCursor, download_and_parse_block_with_retry,
             standardize_bitcoin_block,
-        }, fork_scratch_pad::ForkScratchPad, BlockProcessorCommand, BlockProcessor
+        },
+        fork_scratch_pad::ForkScratchPad,
+        BlockProcessor, BlockProcessorCommand,
     },
     try_debug, try_info, try_warn,
     utils::Context,
@@ -106,10 +106,10 @@ pub async fn start_zeromq_pipeline(
         };
         let _ = blocks_post_processor
             .commands_tx
-            .send(BlockProcessorCommand::ProcessBlocks(
-                vec![(block_height, compressed_block.to_vec())],
-                block_data,
-            ));
+            .send(BlockProcessorCommand::ProcessBlocks {
+                compacted_blocks: vec![(block_height, compressed_block.to_vec())],
+                blocks: block_data,
+            });
     }
 }
 

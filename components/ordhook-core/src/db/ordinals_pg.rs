@@ -5,7 +5,7 @@ use chainhook_postgres::{
     utils,
 };
 use chainhook_types::{
-    bitcoin::TxIn, BitcoinBlockData, OrdinalInscriptionNumber, OrdinalOperation,
+    bitcoin::TxIn, BitcoinBlockData, BlockIdentifier, OrdinalInscriptionNumber, OrdinalOperation,
     TransactionIdentifier,
 };
 use deadpool_postgres::GenericClient;
@@ -34,6 +34,21 @@ pub async fn migrate(client: &mut Client) -> Result<(), String> {
         Ok(_) => Ok(()),
         Err(e) => Err(format!("Error running pg migrations: {e}")),
     };
+}
+
+pub async fn get_chain_tip<T: GenericClient>(
+    client: &T,
+) -> Result<Option<BlockIdentifier>, String> {
+    let row = client
+        .query_opt("SELECT block_height, block_hash FROM chain_tip", &[])
+        .await
+        .map_err(|e| format!("get_chain_tip: {e}"))?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    let max: PgNumericU64 = row.get("block_height");
+    let hash: String = row.get("block_hash");
+    Ok(Some(BlockIdentifier { index: max.0, hash: format!("0x{hash}") }))
 }
 
 pub async fn get_chain_tip_block_height<T: GenericClient>(
@@ -719,13 +734,13 @@ async fn update_counts_by_block<T: GenericClient>(
 }
 
 pub async fn update_chain_tip<T: GenericClient>(
-    block_height: u64,
+    chain_tip: &BlockIdentifier,
     client: &T,
 ) -> Result<(), String> {
     client
         .query(
-            "UPDATE chain_tip SET block_height = $1",
-            &[&PgNumericU64(block_height)],
+            "UPDATE chain_tip SET block_height = $1, block_hash = $2",
+            &[&PgNumericU64(chain_tip.index), &chain_tip.hash],
         )
         .await
         .map_err(|e| format!("update_chain_tip: {e}"))?;
@@ -874,11 +889,13 @@ pub async fn insert_block<T: GenericClient>(
         client,
     )
     .await?;
-    update_chain_tip(block.block_identifier.index, client).await?;
+    update_chain_tip(&block.block_identifier, client).await?;
 
     Ok(())
 }
 
+/// Rolls back a previously-indexed block. It is the responsibility of the caller to make sure `block_height` is the last block
+/// that was indexed.
 pub async fn rollback_block<T: GenericClient>(block_height: u64, client: &T) -> Result<(), String> {
     // Delete previous current locations, deduct owner counts, remove orphaned sats
     let moved_sat_rows = client
@@ -1014,7 +1031,8 @@ pub async fn rollback_block<T: GenericClient>(block_height: u64, client: &T) -> 
         )
         .await
         .map_err(|e| format!("rollback_block (4): {e}"))?;
-    update_chain_tip(block_height - 1, client).await?;
+    // FIXME: this
+    // update_chain_tip(block_height - 1, client).await?;
     Ok(())
 }
 

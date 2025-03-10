@@ -1,12 +1,10 @@
+use chainhook_sdk::try_info;
 use chainhook_sdk::utils::Context;
 use clap::Parser;
 use commands::{Command, ConfigCommand, DatabaseCommand, IndexCommand, Protocol, ServiceCommand};
 use config::generator::generate_toml_config;
 use config::Config;
 use hiro_system_kit;
-use ordhook::db::migrate_dbs;
-use ordhook::service::Service;
-use ordhook::try_info;
 use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
@@ -71,37 +69,27 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                     check_maintenance_mode(ctx);
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    migrate_dbs(&config, ctx).await?;
-
-                    let mut service = Service::new(&config, ctx);
-                    // TODO(rafaelcr): This only works if there's a rocksdb file already containing blocks previous to the first
-                    // inscription height.
-                    let start_block = service.get_index_chain_tip().await?;
-                    try_info!(ctx, "Index chain tip is at #{start_block}");
-
-                    return service.run(false).await;
+                    ordhook::start_ordinals_indexer(true, &config, &ctx).await?
                 }
             },
             Command::Index(index_command) => match index_command {
                 IndexCommand::Sync(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    migrate_dbs(&config, ctx).await?;
-                    let service = Service::new(&config, ctx);
-                    service.catch_up_to_bitcoin_chain_tip().await?;
+                    ordhook::start_ordinals_indexer(false, &config, &ctx).await?
                 }
                 IndexCommand::Rollback(cmd) => {
-                    let config = Config::from_file_path(&cmd.config_path)?;
-                    config.assert_ordinals_config()?;
+                    // let config = Config::from_file_path(&cmd.config_path)?;
+                    // config.assert_ordinals_config()?;
 
-                    let service = Service::new(&config, ctx);
-                    let chain_tip = service.get_index_chain_tip().await?;
-                    confirm_rollback(chain_tip, cmd.blocks)?;
+                    // let service = Service::new(&config, ctx);
+                    // let chain_tip = service.get_index_chain_tip().await?;
+                    // confirm_rollback(chain_tip, cmd.blocks)?;
 
-                    let service = Service::new(&config, ctx);
-                    let block_heights: Vec<u64> =
-                        ((chain_tip - cmd.blocks as u64)..=chain_tip).collect();
-                    service.rollback(&block_heights).await?;
+                    // let service = Service::new(&config, ctx);
+                    // let block_heights: Vec<u64> =
+                    //     ((chain_tip - cmd.blocks as u64)..=chain_tip).collect();
+                    // service.rollback(&block_heights).await?;
                     println!("{} blocks dropped", cmd.blocks);
                 }
             },
@@ -109,7 +97,7 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                 DatabaseCommand::Migrate(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    migrate_dbs(&config, ctx).await?;
+                    ordhook::db::migrate_dbs(&config, ctx).await?;
                 }
             },
         },
