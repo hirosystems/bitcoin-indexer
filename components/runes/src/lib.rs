@@ -134,6 +134,7 @@ pub async fn start_runes_indexer(
         &indexer,
         get_rune_genesis_block_height(config.bitcoind.network),
         stream_blocks_at_chain_tip,
+        false,
         config,
         ctx,
     )

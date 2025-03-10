@@ -38,6 +38,7 @@ fn new_zmq_socket() -> Socket {
 pub async fn start_zeromq_pipeline(
     blocks_post_processor: &BlockProcessor,
     start_sequencing_blocks_at_height: u64,
+    compress_blocks: bool,
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -94,22 +95,30 @@ pub async fn start_zeromq_pipeline(
                 continue;
             }
         };
-        let compressed_block =
-            BlockBytesCursor::from_full_block(&raw_block_data).expect("unable to compress block");
         let block_height = raw_block_data.height as u64;
-        let block_data = if block_height >= start_sequencing_blocks_at_height {
+        let compacted_blocks = if compress_blocks {
+            vec![(
+                block_height,
+                BlockBytesCursor::from_full_block(&raw_block_data)
+                    .expect("unable to compress block"),
+            )]
+        } else {
+            vec![]
+        };
+        let blocks = if block_height >= start_sequencing_blocks_at_height {
             let block = standardize_bitcoin_block(raw_block_data, &network, ctx)
                 .expect("unable to deserialize block");
             vec![block]
         } else {
             vec![]
         };
-        let _ = blocks_post_processor
+        blocks_post_processor
             .commands_tx
             .send(BlockProcessorCommand::ProcessBlocks {
-                compacted_blocks: vec![(block_height, compressed_block.to_vec())],
-                blocks: block_data,
-            });
+                compacted_blocks,
+                blocks,
+            })
+            .map_err(|e| e.to_string())?;
     }
 }
 

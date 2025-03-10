@@ -171,6 +171,7 @@ pub async fn start_ordinals_indexer(
         &indexer,
         first_inscription_height(&config),
         stream_blocks_at_chain_tip,
+        true,
         &config,
         ctx,
     )

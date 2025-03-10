@@ -138,7 +138,11 @@ async fn advance_block_pool(
                     None => return Err("Unable to append block".into()),
                 }
             } else {
-                try_info!(ctx, "Received non-canonical block {}", header.block_identifier);
+                try_info!(
+                    ctx,
+                    "Received non-canonical block {}",
+                    header.block_identifier
+                );
                 (header, false)
             }
         };
@@ -284,6 +288,7 @@ async fn download_rpc_blocks(
     http_client: &Client,
     target_block_height: u64,
     sequence_start_block_height: u64,
+    compress_blocks: bool,
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -328,12 +333,18 @@ async fn download_rpc_blocks(
             .get_sorted_entries()
             .map_err(|_e| format!("Block start / end block spec invalid"))?
     };
-    try_debug!(ctx, "Downloading blocks from #{} to #{}", blocks.front().unwrap(), blocks.back().unwrap());
+    try_debug!(
+        ctx,
+        "Downloading blocks from #{} to #{}",
+        blocks.front().unwrap(),
+        blocks.back().unwrap()
+    );
     start_block_download_pipeline(
         config,
         http_client,
         blocks.into(),
         sequence_start_block_height,
+        compress_blocks,
         &processor,
         1000,
         ctx,
@@ -350,6 +361,7 @@ async fn stream_zmq_blocks(
     block_store: &Arc<Mutex<HashMap<BlockIdentifier, BitcoinBlockData>>>,
     http_client: &Client,
     sequence_start_block_height: u64,
+    compress_blocks: bool,
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -386,7 +398,14 @@ async fn stream_zmq_blocks(
         events_rx,
         thread_handle: handle,
     };
-    start_zeromq_pipeline(&processor, sequence_start_block_height, config, ctx).await
+    start_zeromq_pipeline(
+        &processor,
+        sequence_start_block_height,
+        compress_blocks,
+        config,
+        ctx,
+    )
+    .await
 }
 
 /// Starts a Bitcoin block indexer pipeline.
@@ -394,6 +413,7 @@ pub async fn start_bitcoin_indexer(
     indexer: &Indexer,
     sequence_start_block_height: u64,
     stream_blocks_at_chain_tip: bool,
+    compress_blocks: bool,
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -434,6 +454,7 @@ pub async fn start_bitcoin_indexer(
             &http_client,
             bitcoind_chain_tip.index,
             sequence_start_block_height,
+            compress_blocks,
             config,
             ctx,
         )
@@ -450,6 +471,7 @@ pub async fn start_bitcoin_indexer(
             &block_store_arc,
             &http_client,
             sequence_start_block_height,
+            compress_blocks,
             config,
             ctx,
         )

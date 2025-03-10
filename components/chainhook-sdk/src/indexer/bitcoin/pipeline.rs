@@ -29,6 +29,7 @@ pub async fn start_block_download_pipeline(
     http_client: &Client,
     blocks: Vec<u64>,
     start_sequencing_blocks_at_height: u64,
+    compress_blocks: bool,
     blocks_post_processor: &BlockProcessor,
     speed: usize,
     ctx: &Context,
@@ -102,8 +103,12 @@ pub async fn start_block_download_pipeline(
                 while let Ok(Some(block_bytes)) = rx.recv() {
                     let raw_block_data =
                         parse_downloaded_block(block_bytes).expect("unable to parse block");
-                    let compressed_block = BlockBytesCursor::from_full_block(&raw_block_data)
-                        .expect("unable to compress block");
+                    let compressed_block = if compress_blocks {
+                        Some(BlockBytesCursor::from_full_block(&raw_block_data)
+                            .expect("unable to compress block"))
+                    } else {
+                        None
+                    };
                     let block_height = raw_block_data.height as u64;
                     let block_data = if block_height >= start_sequencing_blocks_at_height {
                         let block = standardize_bitcoin_block(
@@ -179,9 +184,9 @@ pub async fn start_block_download_pipeline(
                 let mut ooo_compacted_blocks = vec![];
                 for (block_height, block_opt, compacted_block) in new_blocks.into_iter() {
                     if let Some(block) = block_opt {
-                        inbox.insert(block_height, (block, compacted_block.to_vec()));
-                    } else {
-                        ooo_compacted_blocks.push((block_height, compacted_block.to_vec()));
+                        inbox.insert(block_height, (block, compacted_block));
+                    } else if let Some(compacted_block) = compacted_block {
+                        ooo_compacted_blocks.push((block_height, compacted_block));
                     }
                 }
 
@@ -204,7 +209,9 @@ pub async fn start_block_download_pipeline(
                 let mut compacted_blocks = vec![];
                 let mut blocks = vec![];
                 while let Some((block, compacted_block)) = inbox.remove(&inbox_cursor) {
-                    compacted_blocks.push((inbox_cursor, compacted_block));
+                    if let Some(compacted_block) = compacted_block {
+                        compacted_blocks.push((inbox_cursor, compacted_block));
+                    }
                     blocks.push(block);
                     inbox_cursor += 1;
                 }
