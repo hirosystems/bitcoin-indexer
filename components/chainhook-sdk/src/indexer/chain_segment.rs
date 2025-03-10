@@ -73,7 +73,7 @@ impl ChainSegment {
             Some(tip) => tip,
             None => return Ok(()),
         };
-        try_info!(ctx, "Comparing {} with {}", tip, block.get_identifier());
+        try_debug!(ctx, "Comparing {} with {}", tip, block.get_identifier());
         if tip.index == block.get_parent_identifier().index {
             match tip.hash == block.get_parent_identifier().hash {
                 true => return Ok(()),
@@ -190,7 +190,7 @@ impl ChainSegment {
     ) -> (bool, Option<ChainSegment>) {
         let mut block_appended = false;
         let mut fork = None;
-        try_info!(
+        try_debug!(
             ctx,
             "Trying to append {} to {}",
             block.get_identifier(),

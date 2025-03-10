@@ -1,4 +1,4 @@
-use crate::{try_error, try_info, try_warn, utils::Context};
+use crate::{try_debug, try_error, try_info, try_warn, utils::Context};
 use chainhook_types::{
     BlockHeader, BlockIdentifier, BlockchainEvent, BlockchainUpdatedWithHeaders,
     BlockchainUpdatedWithReorg,
@@ -52,7 +52,7 @@ impl ForkScratchPad {
         header: BlockHeader,
         ctx: &Context,
     ) -> Result<Option<BlockchainEvent>, String> {
-        try_info!(
+        try_debug!(
             ctx,
             "ForkScratchPad: Start processing {}",
             header.block_identifier
@@ -70,7 +70,7 @@ impl ForkScratchPad {
         }
 
         for (i, fork) in self.forks.iter() {
-            try_info!(ctx, "ForkScratchPad: Active fork {}: {}", i, fork);
+            try_debug!(ctx, "ForkScratchPad: Active fork {}: {}", i, fork);
         }
         // Retrieve previous canonical fork
         let previous_canonical_fork_id = self.canonical_fork_id;
@@ -164,13 +164,13 @@ impl ForkScratchPad {
         let mut canonical_fork_id = 0;
         let mut highest_height = 0;
         for (fork_id, fork) in self.forks.iter() {
-            try_info!(ctx, "ForkScratchPad: Active fork: {} - {}", fork_id, fork);
+            try_debug!(ctx, "ForkScratchPad: Active fork: {} - {}", fork_id, fork);
             if fork.get_length() >= highest_height {
                 highest_height = fork.get_length();
                 canonical_fork_id = *fork_id;
             }
         }
-        try_info!(
+        try_debug!(
             ctx,
             "ForkScratchPad: Active fork selected as canonical: {}",
             canonical_fork_id

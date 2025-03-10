@@ -740,7 +740,7 @@ pub async fn update_chain_tip<T: GenericClient>(
     client
         .query(
             "UPDATE chain_tip SET block_height = $1, block_hash = $2",
-            &[&PgNumericU64(chain_tip.index), &chain_tip.hash],
+            &[&PgNumericU64(chain_tip.index), &chain_tip.hash[2..].to_string()],
         )
         .await
         .map_err(|e| format!("update_chain_tip: {e}"))?;
