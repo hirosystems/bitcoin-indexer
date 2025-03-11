@@ -177,21 +177,17 @@ pub fn parse_brc20_operation(
                         }
                         match op_str {
                             "mint" => {
-                                Ok(Some(ParsedBrc20Operation::Mint(
-                                    ParsedBrc20BalanceData {
-                                        tick: json.tick.to_lowercase(),
-                                        amt: json.amt.clone(),
-                                    },
-                                )))
+                                Ok(Some(ParsedBrc20Operation::Mint(ParsedBrc20BalanceData {
+                                    tick: json.tick.to_lowercase(),
+                                    amt: json.amt.clone(),
+                                })))
                             }
-                            "transfer" => {
-                                Ok(Some(ParsedBrc20Operation::Transfer(
-                                    ParsedBrc20BalanceData {
-                                        tick: json.tick.to_lowercase(),
-                                        amt: json.amt.clone(),
-                                    },
-                                )))
-                            }
+                            "transfer" => Ok(Some(ParsedBrc20Operation::Transfer(
+                                ParsedBrc20BalanceData {
+                                    tick: json.tick.to_lowercase(),
+                                    amt: json.amt.clone(),
+                                },
+                            ))),
                             _ => Ok(None),
                         }
                     }

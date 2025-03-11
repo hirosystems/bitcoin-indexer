@@ -48,7 +48,9 @@ pub struct PgConnectionPools {
 fn pg_pools(config: &Config) -> PgConnectionPools {
     PgConnectionPools {
         ordinals: pg_pool(&config.ordinals.as_ref().unwrap().db).unwrap(),
-        brc20: config.ordinals_brc20_config().map(|brc20| pg_pool(&brc20.db).unwrap()),
+        brc20: config
+            .ordinals_brc20_config()
+            .map(|brc20| pg_pool(&brc20.db).unwrap()),
     }
 }
 
