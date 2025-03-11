@@ -5,6 +5,7 @@ pub mod protocol;
 pub mod test_builders;
 
 use bitcoin::Network;
+use chainhook_sdk::indexer::bitcoin::cursor::TransactionBytesCursor;
 use config::Config;
 use dashmap::DashMap;
 use fxhash::{FxBuildHasher, FxHasher};
@@ -12,8 +13,6 @@ use std::hash::BuildHasherDefault;
 use std::ops::Div;
 
 use chainhook_sdk::utils::Context;
-
-use crate::db::cursor::TransactionBytesCursor;
 
 pub fn first_inscription_height(config: &Config) -> u64 {
     match config.bitcoind.network {

@@ -1,5 +1,4 @@
 pub mod blocks;
-pub mod cursor;
 pub mod models;
 pub mod ordinals_pg;
 

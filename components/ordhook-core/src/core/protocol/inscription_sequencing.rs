@@ -5,7 +5,7 @@ use std::{
 };
 
 use bitcoin::Network;
-use chainhook_sdk::utils::Context;
+use chainhook_sdk::{indexer::bitcoin::cursor::TransactionBytesCursor, utils::Context};
 use chainhook_types::{
     BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
     OrdinalInscriptionCurseType, OrdinalInscriptionTransferDestination, OrdinalOperation,
@@ -20,7 +20,7 @@ use fxhash::FxHasher;
 use crate::core::protocol::satoshi_tracking::UNBOUND_INSCRIPTION_SATPOINT;
 use crate::{
     core::resolve_absolute_pointer,
-    db::{self, cursor::TransactionBytesCursor, ordinals_pg},
+    db::{self, ordinals_pg},
     try_debug, try_error, try_info,
     utils::format_inscription_id,
 };

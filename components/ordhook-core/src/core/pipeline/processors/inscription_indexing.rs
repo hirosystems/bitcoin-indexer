@@ -4,7 +4,7 @@ use std::{
 };
 
 use chainhook_postgres::{pg_begin, pg_pool_client};
-use chainhook_sdk::utils::Context;
+use chainhook_sdk::{indexer::bitcoin::cursor::TransactionBytesCursor, utils::Context};
 use chainhook_types::{BitcoinBlockData, TransactionIdentifier};
 use config::Config;
 
@@ -29,7 +29,7 @@ use crate::{
             sequence_cursor::SequenceCursor,
         },
     },
-    db::{cursor::TransactionBytesCursor, ordinals_pg},
+    db::ordinals_pg,
     try_info,
     utils::monitoring::PrometheusMonitoring,
     PgConnectionPools,

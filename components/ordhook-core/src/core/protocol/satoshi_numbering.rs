@@ -1,3 +1,4 @@
+use chainhook_sdk::indexer::bitcoin::cursor::{BlockBytesCursor, TransactionBytesCursor};
 use chainhook_sdk::utils::Context;
 use chainhook_types::{BlockIdentifier, OrdinalInscriptionNumber, TransactionIdentifier};
 use dashmap::DashMap;
@@ -8,7 +9,6 @@ use std::sync::Arc;
 use crate::db::blocks::find_pinned_block_bytes_at_block_height;
 use config::Config;
 
-use crate::db::cursor::{BlockBytesCursor, TransactionBytesCursor};
 use crate::try_error;
 use ord::height::Height;
 use ord::sat::Sat;
@@ -313,7 +313,10 @@ pub fn compute_satoshi_number(
 mod test {
     use std::{hash::BuildHasherDefault, sync::Arc};
 
-    use chainhook_sdk::utils::Context;
+    use chainhook_sdk::{
+        indexer::bitcoin::cursor::{TransactionBytesCursor, TransactionInputBytesCursor},
+        utils::Context,
+    };
     use chainhook_types::{bitcoin::TxOut, BlockIdentifier, TransactionIdentifier};
     use dashmap::DashMap;
     use fxhash::FxHasher;
@@ -325,7 +328,6 @@ mod test {
         },
         db::{
             blocks::{insert_standardized_block, open_blocks_db_with_retry},
-            cursor::{TransactionBytesCursor, TransactionInputBytesCursor},
             drop_all_dbs,
         },
     };

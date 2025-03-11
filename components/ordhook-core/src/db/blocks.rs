@@ -242,7 +242,7 @@ pub fn insert_standardized_block(
     blocks_db_rw: &DB,
     ctx: &Context,
 ) {
-    let block_bytes = match super::cursor::BlockBytesCursor::from_standardized_block(&block) {
+    let block_bytes = match chainhook_sdk::indexer::bitcoin::cursor::BlockBytesCursor::from_standardized_block(&block) {
         Ok(block_bytes) => block_bytes,
         Err(e) => {
             try_error!(
