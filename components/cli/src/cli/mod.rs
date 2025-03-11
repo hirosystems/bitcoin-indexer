@@ -1,5 +1,6 @@
 use chainhook_sdk::try_info;
 use chainhook_sdk::utils::Context;
+use chainhook_types::BlockIdentifier;
 use clap::Parser;
 use commands::{Command, ConfigCommand, DatabaseCommand, IndexCommand, Protocol, ServiceCommand};
 use config::generator::generate_toml_config;
@@ -46,12 +47,15 @@ fn check_maintenance_mode(ctx: &Context) {
     }
 }
 
-fn confirm_rollback(current_chain_tip: u64, blocks_to_rollback: u32) -> Result<(), String> {
+fn confirm_rollback(
+    current_chain_tip: &BlockIdentifier,
+    blocks_to_rollback: u32,
+) -> Result<(), String> {
     println!("Index chain tip is at #{current_chain_tip}");
     println!(
         "{} blocks will be dropped. New index chain tip will be at #{}. Confirm? [Y/n]",
         blocks_to_rollback,
-        current_chain_tip - blocks_to_rollback as u64
+        current_chain_tip.index - blocks_to_rollback as u64
     );
     let mut buffer = String::new();
     std::io::stdin().read_line(&mut buffer).unwrap();
@@ -79,17 +83,17 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                     ordhook::start_ordinals_indexer(false, &config, &ctx).await?
                 }
                 IndexCommand::Rollback(cmd) => {
-                    // let config = Config::from_file_path(&cmd.config_path)?;
-                    // config.assert_ordinals_config()?;
-
-                    // let service = Service::new(&config, ctx);
-                    // let chain_tip = service.get_index_chain_tip().await?;
-                    // confirm_rollback(chain_tip, cmd.blocks)?;
-
-                    // let service = Service::new(&config, ctx);
-                    // let block_heights: Vec<u64> =
-                    //     ((chain_tip - cmd.blocks as u64)..=chain_tip).collect();
-                    // service.rollback(&block_heights).await?;
+                    let config = Config::from_file_path(&cmd.config_path)?;
+                    config.assert_ordinals_config()?;
+                    let chain_tip = ordhook::get_chain_tip(&config).await?;
+                    confirm_rollback(&chain_tip, cmd.blocks)?;
+                    ordhook::rollback_block_range(
+                        chain_tip.index - cmd.blocks as u64,
+                        chain_tip.index,
+                        &config,
+                        ctx,
+                    )
+                    .await?;
                     println!("{} blocks dropped", cmd.blocks);
                 }
             },
@@ -119,24 +123,23 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                 IndexCommand::Rollback(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_runes_config()?;
-                    // let chain_tip = runes::service::get_index_chain_tip(&config, ctx).await;
-                    // confirm_rollback(chain_tip, cmd.blocks)?;
-
-                    // let mut pg_client = runes::db::pg_connect(&config, false, &ctx).await;
-                    // runes::scan::bitcoin::drop_blocks(
-                    //     chain_tip - cmd.blocks as u64,
-                    //     chain_tip,
-                    //     &mut pg_client,
-                    //     &ctx,
-                    // )
-                    // .await;
+                    let chain_tip = runes::get_chain_tip(&config, ctx).await?;
+                    confirm_rollback(&chain_tip, cmd.blocks)?;
+                    runes::rollback_block_range(
+                        chain_tip.index - cmd.blocks as u64,
+                        chain_tip.index,
+                        &config,
+                        ctx,
+                    )
+                    .await?;
+                    println!("{} blocks dropped", cmd.blocks);
                 }
             },
             Command::Database(database_command) => match database_command {
                 DatabaseCommand::Migrate(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_runes_config()?;
-                    let _ = runes::db::pg_connect(&config, true, ctx).await;
+                    runes::db::pg_connect(&config, true, ctx).await;
                 }
             },
         },

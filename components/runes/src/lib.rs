@@ -8,7 +8,6 @@ use chainhook_types::BlockIdentifier;
 use config::Config;
 use db::{
     cache::index_cache::IndexCache,
-    get_chain_tip,
     index::{get_rune_genesis_block_height, index_block, roll_back_block},
     pg_connect,
 };
@@ -109,7 +108,7 @@ async fn new_runes_indexer_runloop(config: &Config, ctx: &Context) -> Result<Ind
         .expect("unable to spawn thread");
 
     let mut pg_client = pg_connect(config, false, ctx).await;
-    let chain_tip = get_chain_tip(&mut pg_client, ctx)
+    let chain_tip = db::get_chain_tip(&mut pg_client, ctx)
         .await
         .unwrap_or(BlockIdentifier {
             index: 839999, // FIXME: Alter this for testnet, etc.
@@ -122,6 +121,26 @@ async fn new_runes_indexer_runloop(config: &Config, ctx: &Context) -> Result<Ind
     })
 }
 
+pub async fn get_chain_tip(config: &Config, ctx: &Context) -> Result<BlockIdentifier, String> {
+    let mut pg_client = pg_connect(config, false, ctx).await;
+    Ok(db::get_chain_tip(&mut pg_client, ctx).await.unwrap())
+}
+
+pub async fn rollback_block_range(
+    start_block: u64,
+    end_block: u64,
+    config: &Config,
+    ctx: &Context,
+) -> Result<(), String> {
+    let mut pg_client = pg_connect(config, false, ctx).await;
+    for block_id in start_block..=end_block {
+        roll_back_block(&mut pg_client, block_id, ctx).await;
+    }
+    Ok(())
+}
+
+/// Starts the runes indexing process. Will block the main thread indefinitely until explicitly stopped or it reaches chain tip
+/// and `stream_blocks_at_chain_tip` is set to false.
 pub async fn start_runes_indexer(
     stream_blocks_at_chain_tip: bool,
     config: &Config,

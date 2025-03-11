@@ -16,11 +16,11 @@ use chainhook_sdk::{
     indexer::{start_bitcoin_indexer, Indexer},
     utils::future_block_on,
 };
+use chainhook_types::BlockIdentifier;
 use config::Config;
 use db::{
     blocks::{self, open_blocks_db_with_retry},
     migrate_dbs,
-    ordinals_pg::get_chain_tip,
 };
 use deadpool_postgres::Pool;
 use utils::monitoring::PrometheusMonitoring;
@@ -46,20 +46,23 @@ pub struct PgConnectionPools {
     pub brc20: Option<Pool>,
 }
 
+fn pg_pools(config: &Config) -> PgConnectionPools {
+    PgConnectionPools {
+        ordinals: pg_pool(&config.ordinals.as_ref().unwrap().db).unwrap(),
+        brc20: match config.ordinals_brc20_config() {
+            Some(brc20) => Some(pg_pool(&brc20.db).unwrap()),
+            _ => None,
+        },
+    }
+}
+
 async fn new_ordinals_indexer_runloop(
     prometheus: &PrometheusMonitoring,
     config: &Config,
     ctx: &Context,
 ) -> Result<Indexer, String> {
     let (commands_tx, commands_rx) = crossbeam_channel::unbounded::<IndexerCommand>();
-    let ordinals_config = config.ordinals.as_ref().unwrap();
-    let pg_pools = PgConnectionPools {
-        ordinals: pg_pool(&ordinals_config.db).unwrap(),
-        brc20: match config.ordinals_brc20_config() {
-            Some(brc20) => Some(pg_pool(&brc20.db).unwrap()),
-            _ => None,
-        },
-    };
+    let pg_pools = pg_pools(config);
 
     let config_moved = config.clone();
     let ctx_moved = ctx.clone();
@@ -151,7 +154,7 @@ async fn new_ordinals_indexer_runloop(
         .expect("unable to spawn thread");
 
     let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
-    let chain_tip = get_chain_tip(&ord_client).await?;
+    let chain_tip = db::ordinals_pg::get_chain_tip(&ord_client).await?;
     Ok(Indexer {
         commands_tx,
         chain_tip,
@@ -159,6 +162,31 @@ async fn new_ordinals_indexer_runloop(
     })
 }
 
+pub async fn get_chain_tip(config: &Config) -> Result<BlockIdentifier, String> {
+    let pool = pg_pool(&config.ordinals.as_ref().unwrap().db).unwrap();
+    let ord_client = pg_pool_client(&pool).await?;
+    Ok(db::ordinals_pg::get_chain_tip(&ord_client).await?.unwrap())
+}
+
+pub async fn rollback_block_range(
+    start_block: u64,
+    end_block: u64,
+    config: &Config,
+    ctx: &Context,
+) -> Result<(), String> {
+    let blocks_db_rw = open_blocks_db_with_retry(true, config, ctx);
+    let pg_pools = pg_pools(config);
+    blocks::delete_blocks_in_block_range(start_block as u32, end_block as u32, &blocks_db_rw, ctx);
+    for block in start_block..=end_block {
+        rollback_block(block, config, &pg_pools, ctx).await?;
+    }
+    blocks_db_rw
+        .flush()
+        .map_err(|e| format!("error dropping rollback blocks from rocksdb: {e}"))
+}
+
+/// Starts the ordinals indexing process. Will block the main thread indefinitely until explicitly stopped or it reaches chain tip
+/// and `stream_blocks_at_chain_tip` is set to false.
 pub async fn start_ordinals_indexer(
     stream_blocks_at_chain_tip: bool,
     config: &Config,
