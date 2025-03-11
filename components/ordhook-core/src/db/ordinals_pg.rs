@@ -1029,8 +1029,21 @@ pub async fn rollback_block<T: GenericClient>(block_height: u64, client: &T) -> 
         )
         .await
         .map_err(|e| format!("rollback_block (4): {e}"))?;
-    // FIXME: this
-    // update_chain_tip(block_height - 1, client).await?;
+    client
+        .execute(
+            "WITH last_block AS (
+                SELECT block_height, block_hash
+                FROM locations
+                ORDER BY block_height DESC
+                LIMIT 1
+            )
+            UPDATE chain_tip SET
+                block_height = (SELECT block_height FROM last_block),
+                block_hash = (SELECT block_hash FROM last_block)",
+            &[],
+        )
+        .await
+        .map_err(|e| format!("rollback_block (5): {e}"))?;
     Ok(())
 }
 
@@ -1465,7 +1478,8 @@ mod test {
                 assert_eq!(0, get_type_count("blessed", &client).await);
                 assert_eq!(0, get_block_reveal_count(800000, &client).await);
                 assert_eq!(0, get_sat_rarity_count("common", &client).await);
-                assert_eq!(Some(799999), get_chain_tip_block_height(&client).await?);
+                // We don't have a previous block so it goes to none.
+                assert_eq!(None, get_chain_tip_block_height(&client).await?);
             }
         }
         pg_reset_db(&mut pg_client).await?;
