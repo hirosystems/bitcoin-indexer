@@ -89,11 +89,11 @@ async fn new_runes_indexer_runloop(config: &Config, ctx: &Context) -> Result<Ind
                                     roll_back_block(&mut pg_client, block_id.index, &ctx_moved)
                                         .await;
                                 }
-                                for mut block in apply_blocks.iter_mut() {
+                                for block in apply_blocks.iter_mut() {
                                     index_block(
                                         &mut pg_client,
                                         &mut index_cache,
-                                        &mut block,
+                                        block,
                                         &ctx_moved,
                                     )
                                     .await;
@@ -146,7 +146,7 @@ pub async fn start_runes_indexer(
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
-    pg_connect(&config, true, ctx).await;
+    pg_connect(config, true, ctx).await;
 
     let indexer = new_runes_indexer_runloop(config, ctx).await?;
     start_bitcoin_indexer(

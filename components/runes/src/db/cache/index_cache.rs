@@ -301,7 +301,7 @@ impl IndexCache {
         self.db_cache.flush(db_tx, ctx).await;
         let db_rune = pg_get_rune_by_id(rune_id, db_tx, ctx).await?;
         self.rune_cache.put(*rune_id, db_rune.clone());
-        return Some(db_rune);
+        Some(db_rune)
     }
 
     async fn get_cached_rune_total_mints(
@@ -323,7 +323,7 @@ impl IndexCache {
         self.db_cache.flush(db_tx, ctx).await;
         let total = pg_get_rune_total_mints(rune_id, db_tx, ctx).await?;
         self.rune_total_mints_cache.put(*rune_id, total);
-        return Some(total);
+        Some(total)
     }
 
     /// Take ledger entries returned by the `TransactionCache` and add them to the `DbCache`. Update global balances and counters

@@ -29,7 +29,7 @@ pub fn bitcoind_get_chain_tip(config: &BitcoindConfig, ctx: &Context) -> BlockId
             Ok(result) => {
                 return BlockIdentifier {
                     index: result.blocks,
-                    hash: format!("0x{}", result.best_block_hash.to_string()),
+                    hash: format!("0x{}", result.best_block_hash),
                 };
             }
             Err(e) => {
@@ -59,7 +59,7 @@ pub fn bitcoind_wait_for_chain_tip(config: &BitcoindConfig, ctx: &Context) -> Bl
                         try_info!(ctx, "bitcoind: Chain tip reached");
                         return BlockIdentifier {
                             index: result.blocks,
-                            hash: format!("0x{}", result.best_block_hash.to_string()),
+                            hash: format!("0x{}", result.best_block_hash),
                         };
                     }
                     try_info!(ctx, "bitcoind: Verifying chain tip");

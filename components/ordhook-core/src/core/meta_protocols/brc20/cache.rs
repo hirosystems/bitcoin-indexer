@@ -102,9 +102,9 @@ impl Brc20MemoryCache {
         match brc20_pg::get_token(tick, client).await? {
             Some(db_token) => {
                 self.tokens.put(tick.clone(), db_token.clone());
-                return Ok(Some(db_token));
+                Ok(Some(db_token))
             }
-            None => return Ok(None),
+            None => Ok(None),
         }
     }
 
@@ -122,7 +122,7 @@ impl Brc20MemoryCache {
                 .put(tick.to_string(), minted_supply);
             return Ok(Some(minted_supply));
         }
-        return Ok(None);
+        Ok(None)
     }
 
     pub async fn get_token_address_avail_balance<T: GenericClient>(
@@ -142,7 +142,7 @@ impl Brc20MemoryCache {
             self.token_addr_avail_balances.put(key, balance);
             return Ok(Some(balance));
         }
-        return Ok(None);
+        Ok(None)
     }
 
     pub async fn get_unsent_token_transfers<T: GenericClient>(
@@ -182,7 +182,7 @@ impl Brc20MemoryCache {
                 self.ignore_inscription(*irrelevant_number);
             }
         }
-        return Ok(results);
+        Ok(results)
     }
 
     /// Marks an ordinal number as ignored so we don't bother computing its transfers for BRC20 purposes.
@@ -474,7 +474,7 @@ impl Brc20MemoryCache {
             unreachable!("Invalid transfer ordinal number {}", ordinal_number)
         };
         self.unsent_transfers.put(ordinal_number, transfer.clone());
-        return Ok(transfer.clone());
+        Ok(transfer.clone())
     }
 
     async fn handle_cache_miss<T: GenericClient>(&mut self, client: &T) -> Result<(), String> {

@@ -395,9 +395,7 @@ pub async fn get_chain_tip(client: &mut Client, _ctx: &Context) -> Option<BlockI
         )
         .await
         .expect("get_chain_tip");
-    let Some(row) = row else {
-        return None;
-    };
+    let row = row?;
     let block_height: PgNumericU64 = row.get("block_height");
     let block_hash: String = row.get("block_hash");
     Some(BlockIdentifier {

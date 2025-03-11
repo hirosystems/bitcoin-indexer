@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process, thread::sleep, time::Duration, u64};
+use std::{path::PathBuf, process, thread::sleep, time::Duration};
 
 use chainhook_sdk::{try_error, try_info, utils::Context};
 use chainhook_types::BlockIdentifier;
@@ -69,14 +69,14 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                     check_maintenance_mode(ctx);
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    ordhook::start_ordinals_indexer(true, &config, &ctx).await?
+                    ordhook::start_ordinals_indexer(true, &config, ctx).await?
                 }
             },
             Command::Index(index_command) => match index_command {
                 IndexCommand::Sync(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    ordhook::start_ordinals_indexer(false, &config, &ctx).await?
+                    ordhook::start_ordinals_indexer(false, &config, ctx).await?
                 }
                 IndexCommand::Rollback(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;

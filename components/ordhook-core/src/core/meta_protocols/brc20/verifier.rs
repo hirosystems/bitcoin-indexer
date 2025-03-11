@@ -86,7 +86,7 @@ pub async fn verify_brc20_operation(
                 return Ok(None);
             }
             let decimals = data.dec.parse::<u8>().unwrap();
-            return Ok(Some(VerifiedBrc20Operation::TokenDeploy(
+            Ok(Some(VerifiedBrc20Operation::TokenDeploy(
                 VerifiedBrc20TokenDeployData {
                     tick: data.tick.clone(),
                     display_tick: data.display_tick.clone(),
@@ -96,7 +96,7 @@ pub async fn verify_brc20_operation(
                     address: inscriber_address.clone(),
                     self_mint: data.self_mint,
                 },
-            )));
+            )))
         }
         ParsedBrc20Operation::Mint(data) => {
             let Some(token) = cache.get_token(&data.tick, db_tx).await? else {
@@ -161,13 +161,13 @@ pub async fn verify_brc20_operation(
                 return Ok(None);
             }
             let real_mint_amt = amount.min(token.limit.0.min(remaining_supply));
-            return Ok(Some(VerifiedBrc20Operation::TokenMint(
+            Ok(Some(VerifiedBrc20Operation::TokenMint(
                 VerifiedBrc20BalanceData {
                     tick: token.ticker,
                     amt: real_mint_amt,
                     address: inscriber_address.clone(),
                 },
-            )));
+            )))
         }
         ParsedBrc20Operation::Transfer(data) => {
             let Some(token) = cache.get_token(&data.tick, db_tx).await? else {
@@ -207,15 +207,15 @@ pub async fn verify_brc20_operation(
                 );
                 return Ok(None);
             }
-            return Ok(Some(VerifiedBrc20Operation::TokenTransfer(
+            Ok(Some(VerifiedBrc20Operation::TokenTransfer(
                 VerifiedBrc20BalanceData {
                     tick: token.ticker,
                     amt: amount,
                     address: inscriber_address.clone(),
                 },
-            )));
+            )))
         }
-    };
+    }
 }
 
 /// Given a list of ordinal transfers, verify which of them are valid `transfer_send` BRC-20 operations we haven't yet processed.

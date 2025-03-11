@@ -150,7 +150,7 @@ pub fn parse_brc20_operation(
             } else {
                 limit = max.clone();
             }
-            return Ok(Some(ParsedBrc20Operation::Deploy(
+            Ok(Some(ParsedBrc20Operation::Deploy(
                 ParsedBrc20TokenDeployData {
                     tick: json.tick.to_lowercase(),
                     display_tick: json.tick.clone(),
@@ -159,7 +159,7 @@ pub fn parse_brc20_operation(
                     dec: decimals.to_string(),
                     self_mint,
                 },
-            )));
+            )))
         }
         Err(_) => match serde_json::from_slice::<Brc20MintOrTransferJson>(inscription_body) {
             Ok(json) => {
@@ -177,30 +177,30 @@ pub fn parse_brc20_operation(
                         }
                         match op_str {
                             "mint" => {
-                                return Ok(Some(ParsedBrc20Operation::Mint(
+                                Ok(Some(ParsedBrc20Operation::Mint(
                                     ParsedBrc20BalanceData {
                                         tick: json.tick.to_lowercase(),
                                         amt: json.amt.clone(),
                                     },
-                                )));
+                                )))
                             }
                             "transfer" => {
-                                return Ok(Some(ParsedBrc20Operation::Transfer(
+                                Ok(Some(ParsedBrc20Operation::Transfer(
                                     ParsedBrc20BalanceData {
                                         tick: json.tick.to_lowercase(),
                                         amt: json.amt.clone(),
                                     },
-                                )));
+                                )))
                             }
-                            _ => return Ok(None),
+                            _ => Ok(None),
                         }
                     }
-                    _ => return Ok(None),
+                    _ => Ok(None),
                 }
             }
-            Err(_) => return Ok(None),
+            Err(_) => Ok(None),
         },
-    };
+    }
 }
 
 #[cfg(test)]

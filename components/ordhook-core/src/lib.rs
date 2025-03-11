@@ -48,10 +48,7 @@ pub struct PgConnectionPools {
 fn pg_pools(config: &Config) -> PgConnectionPools {
     PgConnectionPools {
         ordinals: pg_pool(&config.ordinals.as_ref().unwrap().db).unwrap(),
-        brc20: match config.ordinals_brc20_config() {
-            Some(brc20) => Some(pg_pool(&brc20.db).unwrap()),
-            _ => None,
-        },
+        brc20: config.ordinals_brc20_config().map(|brc20| pg_pool(&brc20.db).unwrap()),
     }
 }
 
@@ -94,7 +91,7 @@ async fn new_ordinals_indexer_runloop(
                                 mut apply_blocks,
                                 rollback_block_ids,
                             } => {
-                                if rollback_block_ids.len() > 0 {
+                                if !rollback_block_ids.is_empty() {
                                     let blocks_db_rw =
                                         open_blocks_db_with_retry(true, &config_moved, &ctx_moved);
                                     for block_id in rollback_block_ids.iter() {
@@ -191,15 +188,15 @@ pub async fn start_ordinals_indexer(
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
-    migrate_dbs(&config, ctx).await?;
+    migrate_dbs(config, ctx).await?;
 
-    let indexer = new_ordinals_indexer_runloop(&PrometheusMonitoring::new(), &config, ctx).await?;
+    let indexer = new_ordinals_indexer_runloop(&PrometheusMonitoring::new(), config, ctx).await?;
     start_bitcoin_indexer(
         &indexer,
-        first_inscription_height(&config),
+        first_inscription_height(config),
         stream_blocks_at_chain_tip,
         true,
-        &config,
+        config,
         ctx,
     )
     .await

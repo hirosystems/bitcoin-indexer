@@ -163,7 +163,7 @@ async fn advance_block_pool(
                 //     "zmq: Re-org detected, retrieving parent block {parent_block_hash}"
                 // );
                 let parent_block = download_and_parse_block_with_retry(
-                    &http_client,
+                    http_client,
                     &parent_block_hash,
                     &config.bitcoind,
                     ctx,
@@ -330,7 +330,7 @@ async fn download_rpc_blocks(
         let start_block = pool.canonical_chain_tip().unwrap().index + 1;
         BlockHeights::BlockRange(start_block, target_block_height)
             .get_sorted_entries()
-            .map_err(|_e| format!("Block start / end block spec invalid"))?
+            .map_err(|_e| "Block start / end block spec invalid".to_string())?
     };
     try_debug!(
         ctx,
