@@ -104,8 +104,10 @@ pub async fn start_block_download_pipeline(
                     let raw_block_data =
                         parse_downloaded_block(block_bytes).expect("unable to parse block");
                     let compressed_block = if compress_blocks {
-                        Some(BlockBytesCursor::from_full_block(&raw_block_data)
-                            .expect("unable to compress block"))
+                        Some(
+                            BlockBytesCursor::from_full_block(&raw_block_data)
+                                .expect("unable to compress block"),
+                        )
                     } else {
                         None
                     };

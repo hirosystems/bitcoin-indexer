@@ -10,6 +10,7 @@ use std::{
 use chainhook_types::{BitcoinBlockData, BlockHeader, BlockIdentifier};
 use hiro_system_kit::{slog, Logger};
 use reqwest::RequestBuilder;
+
 use crate::try_crit;
 
 #[derive(Clone)]

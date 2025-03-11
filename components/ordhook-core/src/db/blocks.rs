@@ -241,18 +241,21 @@ pub fn insert_standardized_block(
     blocks_db_rw: &DB,
     ctx: &Context,
 ) {
-    let block_bytes = match chainhook_sdk::indexer::bitcoin::cursor::BlockBytesCursor::from_standardized_block(&block) {
-        Ok(block_bytes) => block_bytes,
-        Err(e) => {
-            try_error!(
-                ctx,
-                "Unable to compress block #{}: #{}",
-                block.block_identifier.index,
-                e.to_string()
-            );
-            return;
-        }
-    };
+    let block_bytes =
+        match chainhook_sdk::indexer::bitcoin::cursor::BlockBytesCursor::from_standardized_block(
+            &block,
+        ) {
+            Ok(block_bytes) => block_bytes,
+            Err(e) => {
+                try_error!(
+                    ctx,
+                    "Unable to compress block #{}: #{}",
+                    block.block_identifier.index,
+                    e.to_string()
+                );
+                return;
+            }
+        };
     insert_entry_in_blocks(
         block.block_identifier.index as u32,
         &block_bytes,
