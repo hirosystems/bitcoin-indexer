@@ -22,26 +22,6 @@ fn bitcoind_get_client(config: &BitcoindConfig, ctx: &Context) -> Client {
     }
 }
 
-/// Retrieves the block height from bitcoind.
-pub fn bitcoind_get_block_height(config: &BitcoindConfig, ctx: &Context) -> u64 {
-    let bitcoin_rpc = bitcoind_get_client(config, ctx);
-    loop {
-        match bitcoin_rpc.get_blockchain_info() {
-            Ok(result) => {
-                return result.blocks;
-            }
-            Err(e) => {
-                try_error!(
-                    ctx,
-                    "bitcoind: Unable to get block height: {}",
-                    e.to_string()
-                );
-                sleep(Duration::from_secs(1));
-            }
-        };
-    }
-}
-
 /// Retrieves the chain tip from bitcoind.
 pub fn bitcoind_get_chain_tip(config: &BitcoindConfig, ctx: &Context) -> BlockIdentifier {
     let bitcoin_rpc = bitcoind_get_client(config, ctx);
