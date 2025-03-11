@@ -51,9 +51,9 @@ export class PgStore extends BasePgStore {
     this.counts = new CountsPgStore(this);
   }
 
-  async getChainTipBlockHeight(): Promise<number> {
+  async getChainTipBlockHeight(): Promise<number | undefined> {
     const result = await this.sql<{ block_height: string }[]>`SELECT block_height FROM chain_tip`;
-    return parseInt(result[0].block_height);
+    if (result[0].block_height) return parseInt(result[0].block_height);
   }
 
   async getMaxInscriptionNumber(): Promise<number | undefined> {
