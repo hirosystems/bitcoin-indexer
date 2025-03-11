@@ -39,9 +39,8 @@ impl<'a> FromSql<'a> for PgSmallIntU8 {
 mod test {
     use test_case::test_case;
 
-    use crate::pg_test_client;
-
     use super::PgSmallIntU8;
+    use crate::pg_test_client;
 
     #[test_case(255; "u8 max")]
     #[test_case(0; "zero")]

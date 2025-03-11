@@ -35,9 +35,9 @@ password = "postgres"
 
 [bitcoind]
 network = "mainnet"
-rpc_url = "http://localhost:8332"
-rpc_username = "rafaelcr"
-rpc_password = "developer"
+rpc_url = "http://127.0.0.1:8332"
+rpc_username = "devnet"
+rpc_password = "devnet"
 zmq_url = "tcp://0.0.0.0:18543"
 
 [resources]

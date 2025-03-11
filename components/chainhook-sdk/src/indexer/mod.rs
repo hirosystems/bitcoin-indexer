@@ -9,15 +9,6 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    observer::zmq::start_zeromq_pipeline,
-    try_debug, try_info,
-    utils::{
-        bitcoind::{bitcoind_get_chain_tip, bitcoind_wait_for_chain_tip},
-        future_block_on, AbstractBlock, BlockHeights, Context,
-    },
-};
-
 use bitcoin::{
     build_http_client, download_and_parse_block_with_retry,
     pipeline::start_block_download_pipeline, standardize_bitcoin_block,
@@ -28,6 +19,14 @@ use crossbeam_channel::{Receiver, Sender, TryRecvError};
 use reqwest::Client;
 
 use self::fork_scratch_pad::ForkScratchPad;
+use crate::{
+    observer::zmq::start_zeromq_pipeline,
+    try_debug, try_info,
+    utils::{
+        bitcoind::{bitcoind_get_chain_tip, bitcoind_wait_for_chain_tip},
+        future_block_on, AbstractBlock, BlockHeights, Context,
+    },
+};
 
 pub enum BlockProcessorCommand {
     ProcessBlocks {

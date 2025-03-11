@@ -5,21 +5,19 @@ use chainhook_postgres::{
     utils,
 };
 use chainhook_types::{
-    bitcoin::TxIn, BitcoinBlockData, BlockIdentifier, OrdinalInscriptionNumber, OrdinalOperation,
+    BitcoinBlockData, BlockIdentifier, OrdinalInscriptionNumber, OrdinalOperation,
     TransactionIdentifier,
 };
 use deadpool_postgres::GenericClient;
 use refinery::embed_migrations;
 use tokio_postgres::{types::ToSql, Client};
 
-use crate::{
-    core::protocol::{satoshi_numbering::TraversalResult, satoshi_tracking::WatchedSatpoint},
-    utils::format_outpoint_to_watch,
-};
-
 use super::models::{
     DbCurrentLocation, DbInscription, DbInscriptionParent, DbInscriptionRecursion, DbLocation,
     DbSatoshi,
+};
+use crate::core::protocol::{
+    satoshi_numbering::TraversalResult, satoshi_tracking::WatchedSatpoint,
 };
 
 embed_migrations!("../../migrations/ordinals");
@@ -48,7 +46,10 @@ pub async fn get_chain_tip<T: GenericClient>(
     };
     let max: PgNumericU64 = row.get("block_height");
     let hash: String = row.get("block_hash");
-    Ok(Some(BlockIdentifier { index: max.0, hash: format!("0x{hash}") }))
+    Ok(Some(BlockIdentifier {
+        index: max.0,
+        hash: format!("0x{hash}"),
+    }))
 }
 
 pub async fn get_chain_tip_block_height<T: GenericClient>(
@@ -132,7 +133,7 @@ pub async fn get_reinscriptions_for_block<T: GenericClient>(
     client: &T,
 ) -> Result<HashMap<u64, String>, String> {
     let mut ordinal_numbers = vec![];
-    for (_, value) in inscriptions_data {
+    for value in inscriptions_data.values() {
         if value.ordinal_number != 0 {
             ordinal_numbers.push(PgNumericU64(value.ordinal_number));
         }
@@ -206,23 +207,17 @@ pub async fn get_inscriptions_at_block<T: GenericClient>(
 }
 
 pub async fn get_inscribed_satpoints_at_tx_inputs<T: GenericClient>(
-    inputs: &Vec<TxIn>,
+    inputs: &Vec<(usize, String)>,
     client: &T,
 ) -> Result<HashMap<usize, Vec<WatchedSatpoint>>, String> {
     let mut results = HashMap::new();
+    if inputs.is_empty() {
+        return Ok(results);
+    }
     for chunk in inputs.chunks(500) {
         let outpoints: Vec<(String, String)> = chunk
             .iter()
-            .enumerate()
-            .map(|(vin, input)| {
-                (
-                    vin.to_string(),
-                    format_outpoint_to_watch(
-                        &input.previous_output.txid,
-                        input.previous_output.vout as usize,
-                    ),
-                )
-            })
+            .map(|(vin, satpoint)| (vin.to_string(), satpoint.clone()))
             .collect();
         let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
         for (vin, input) in outpoints.iter() {
@@ -258,10 +253,10 @@ pub async fn get_inscribed_satpoints_at_tx_inputs<T: GenericClient>(
 }
 
 async fn insert_inscriptions<T: GenericClient>(
-    inscriptions: &Vec<DbInscription>,
+    inscriptions: &[DbInscription],
     client: &T,
 ) -> Result<(), String> {
-    if inscriptions.len() == 0 {
+    if inscriptions.is_empty() {
         return Ok(());
     }
     for chunk in inscriptions.chunks(500) {
@@ -309,10 +304,10 @@ async fn insert_inscriptions<T: GenericClient>(
 }
 
 async fn insert_inscription_recursions<T: GenericClient>(
-    inscription_recursions: &Vec<DbInscriptionRecursion>,
+    inscription_recursions: &[DbInscriptionRecursion],
     client: &T,
 ) -> Result<(), String> {
-    if inscription_recursions.len() == 0 {
+    if inscription_recursions.is_empty() {
         return Ok(());
     }
     for chunk in inscription_recursions.chunks(500) {
@@ -339,10 +334,10 @@ async fn insert_inscription_recursions<T: GenericClient>(
 }
 
 async fn insert_inscription_parents<T: GenericClient>(
-    inscription_parents: &Vec<DbInscriptionParent>,
+    inscription_parents: &[DbInscriptionParent],
     client: &T,
 ) -> Result<(), String> {
-    if inscription_parents.len() == 0 {
+    if inscription_parents.is_empty() {
         return Ok(());
     }
     for chunk in inscription_parents.chunks(500) {
@@ -369,10 +364,10 @@ async fn insert_inscription_parents<T: GenericClient>(
 }
 
 async fn insert_locations<T: GenericClient>(
-    locations: &Vec<DbLocation>,
+    locations: &[DbLocation],
     client: &T,
 ) -> Result<(), String> {
-    if locations.len() == 0 {
+    if locations.is_empty() {
         return Ok(());
     }
     for chunk in locations.chunks(500) {
@@ -459,10 +454,10 @@ async fn insert_locations<T: GenericClient>(
 }
 
 async fn insert_satoshis<T: GenericClient>(
-    satoshis: &Vec<DbSatoshi>,
+    satoshis: &[DbSatoshi],
     client: &T,
 ) -> Result<(), String> {
-    if satoshis.len() == 0 {
+    if satoshis.is_empty() {
         return Ok(());
     }
     for chunk in satoshis.chunks(500) {
@@ -579,7 +574,7 @@ async fn update_mime_type_counts<T: GenericClient>(
     counts: &HashMap<String, i32>,
     client: &T,
 ) -> Result<(), String> {
-    if counts.len() == 0 {
+    if counts.is_empty() {
         return Ok(());
     }
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
@@ -605,7 +600,7 @@ async fn update_sat_rarity_counts<T: GenericClient>(
     counts: &HashMap<String, i32>,
     client: &T,
 ) -> Result<(), String> {
-    if counts.len() == 0 {
+    if counts.is_empty() {
         return Ok(());
     }
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
@@ -631,7 +626,7 @@ async fn update_inscription_type_counts<T: GenericClient>(
     counts: &HashMap<String, i32>,
     client: &T,
 ) -> Result<(), String> {
-    if counts.len() == 0 {
+    if counts.is_empty() {
         return Ok(());
     }
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
@@ -657,7 +652,7 @@ async fn update_genesis_address_counts<T: GenericClient>(
     counts: &HashMap<String, i32>,
     client: &T,
 ) -> Result<(), String> {
-    if counts.len() == 0 {
+    if counts.is_empty() {
         return Ok(());
     }
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
@@ -683,7 +678,7 @@ async fn update_recursive_counts<T: GenericClient>(
     counts: &HashMap<bool, i32>,
     client: &T,
 ) -> Result<(), String> {
-    if counts.len() == 0 {
+    if counts.is_empty() {
         return Ok(());
     }
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
@@ -740,7 +735,10 @@ pub async fn update_chain_tip<T: GenericClient>(
     client
         .query(
             "UPDATE chain_tip SET block_height = $1, block_hash = $2",
-            &[&PgNumericU64(chain_tip.index), &chain_tip.hash[2..].to_string()],
+            &[
+                &PgNumericU64(chain_tip.index),
+                &chain_tip.hash[2..].to_string(),
+            ],
         )
         .await
         .map_err(|e| format!("update_chain_tip: {e}"))?;
@@ -794,7 +792,7 @@ pub async fn insert_block<T: GenericClient>(
                     let mime_type = inscription.mime_type.clone();
                     let genesis_address = inscription.address.clone();
                     let recursions = DbInscriptionRecursion::from_reveal(reveal)?;
-                    let is_recursive = recursions.len() > 0;
+                    let is_recursive = !recursions.is_empty();
                     if is_recursive {
                         inscription.recursive = true;
                     }

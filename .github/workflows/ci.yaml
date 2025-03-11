@@ -119,6 +119,102 @@ jobs:
         run: npm run testenv:stop
         if: always()
 
+  rustfmt:
+    name: rust-fmt
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - cli
+          - chainhook-sdk
+          - chainhook-postgres
+          - ordhook-core
+          - runes
+    defaults:
+      run:
+        working-directory: ./components/${{ matrix.suite }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Rustfmt Job Summary
+        run: |
+          # Run cargo and store the original output
+          CARGO_STATUS=0
+          CARGO_OUTPUT=$(cargo fmt --all --manifest-path=Cargo.toml -- --config group_imports=StdExternalCrate,imports_granularity=Crate --color=always --check 2>/dev/null) || CARGO_STATUS=$?
+
+          if [ ${CARGO_STATUS} -eq 0 ]; then
+              cat <<MARKDOWN_INTRO >> $GITHUB_STEP_SUMMARY
+          # Rustfmt Results
+
+          The code is formatted perfectly!
+          MARKDOWN_INTRO
+          else
+              cat <<MARKDOWN_INTRO >> $GITHUB_STEP_SUMMARY
+          # Rustfmt Results
+
+          \`cargo fmt\` reported formatting errors in the following locations.
+          You can fix them by executing the following command and committing the changes.
+          \`\`\`bash
+          cargo bitcoin-indexer-fmt
+          \`\`\`
+          MARKDOWN_INTRO
+
+              echo "${CARGO_OUTPUT}" |
+                  # Strip color codes
+                  sed 's/\x1B\[[0-9;]*[A-Za-z]\x0f\?//g' |
+                  # Strip (some) cursor movements
+                  sed 's/\x1B.[A-G]//g' |
+                  tr "\n" "\r" |
+                  # Wrap each location into a HTML details
+                  sed -E 's#Diff in ([^\r]*?)( at line |:)([[:digit:]]+):\r((:?[ +-][^\r]*\r)+)#<details>\n<summary>\1:\3</summary>\n\n```diff\n\4```\n\n</details>\n\n#g' |
+                  tr "\r" "\n" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Print the original cargo message
+          echo "${CARGO_OUTPUT}"
+          # Exit with the same status as cargo
+          exit "${CARGO_STATUS}"
+
+  clippy:
+    name: rust-clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run clippy
+        id: clippy
+        run: |
+          # Disable immediate exit on error
+          set +e
+
+          # Run clippy and capture output
+          cargo bitcoin-indexer-clippy-cli 2>&1 | tee /tmp/clippy_output.log
+          CLIPPY_EXIT_CODE=${PIPESTATUS[0]}
+
+          # Print output if clippy failed
+          if [ $CLIPPY_EXIT_CODE -ne 0 ]; then
+            echo "## ❌ Clippy Check Failed
+
+          To see and fix these issues, run:
+          \`\`\`bash
+          cargo bitcoin-indexer-clippy
+          \`\`\`
+
+          ### Clippy Errors
+          \`\`\`
+          $(cat /tmp/clippy_output.log | grep -E '(error\:)|(warning\:)')
+          \`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Enable immediate exit on error again
+          set -e
+          exit $CLIPPY_EXIT_CODE
+
   test:
     strategy:
       fail-fast: false
@@ -158,6 +254,10 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
+      - name: Run doc tests
+        run: |
+          cargo test --doc
+
       - name: Run tests
         run: |
           cargo install --force cargo-tarpaulin
@@ -178,7 +278,7 @@ jobs:
 
   semantic-release:
     runs-on: ubuntu-latest
-    needs: [api-lint, api-test, test]
+    needs: [api-lint, api-test, test, rustfmt, clippy]
     outputs:
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
       new_release_published: ${{ steps.semantic.outputs.new_release_published }}

@@ -2,15 +2,18 @@
       / --- /      Index Bitcoin meta-protocols like Ordinals, BRC-20, and Runes.
      /     /
 
-* [Features](#features)
-* [Quick Start](#quick-start)
-    * [Installing](#installing)
-    * [Running the Indexer](#running-the-indexer)
-* [Configuration](#configuration)
-* [System Requirements](#system-requirements)
-    * [Postgres](#postgres)
-* [Contribute](#contribute)
-* [Community](#community)
+- [Features](#features)
+- [Quick Start](#quick-start)
+  - [Installing](#installing)
+  - [Running the Indexer](#running-the-indexer)
+  - [Running an API](#running-an-api)
+- [Configuration](#configuration)
+- [System Requirements](#system-requirements)
+  - [Postgres](#postgres)
+- [Contribute](#contribute)
+  - [Code of Conduct](#code-of-conduct)
+  - [Contributing Guide](#contributing-guide)
+- [Community](#community)
 
 ***
 

@@ -57,9 +57,8 @@ impl Ord for PgBigIntU32 {
 mod test {
     use test_case::test_case;
 
-    use crate::pg_test_client;
-
     use super::PgBigIntU32;
+    use crate::pg_test_client;
 
     #[test_case(4294967295; "u32 max")]
     #[test_case(0; "zero")]

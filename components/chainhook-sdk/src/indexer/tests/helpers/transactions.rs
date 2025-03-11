@@ -1,7 +1,8 @@
 use base58::FromBase58;
-use bitcoincore_rpc::bitcoin::blockdata::opcodes;
-use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
-use chainhook_types::{bitcoin::TxOut, BitcoinTransactionData, BitcoinTransactionMetadata, TransactionIdentifier};
+use bitcoincore_rpc::bitcoin::blockdata::{opcodes, script::Builder as BitcoinScriptBuilder};
+use chainhook_types::{
+    bitcoin::TxOut, BitcoinTransactionData, BitcoinTransactionMetadata, TransactionIdentifier,
+};
 
 pub fn generate_test_tx_bitcoin_p2pkh_transfer(
     txid: u64,

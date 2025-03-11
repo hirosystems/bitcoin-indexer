@@ -3,7 +3,6 @@ pub mod models;
 pub mod ordinals_pg;
 
 use chainhook_postgres::pg_connect_with_retry;
-
 use chainhook_sdk::utils::Context;
 use config::Config;
 

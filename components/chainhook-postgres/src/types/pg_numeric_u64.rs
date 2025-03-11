@@ -53,9 +53,8 @@ impl Ord for PgNumericU64 {
 mod test {
     use test_case::test_case;
 
-    use crate::pg_test_client;
-
     use super::PgNumericU64;
+    use crate::pg_test_client;
 
     #[test_case(18446744073709551615; "u64 max")]
     #[test_case(800000000000; "with trailing zeros")]

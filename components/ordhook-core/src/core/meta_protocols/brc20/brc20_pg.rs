@@ -107,7 +107,7 @@ pub async fn get_unsent_token_transfers<T: GenericClient>(
             )
             .await
             .map_err(|e| format!("get_unsent_token_transfers: {e}"))?;
-        results.extend(rows.iter().map(|row| DbOperation::from_pg_row(row)));
+        results.extend(rows.iter().map(DbOperation::from_pg_row));
     }
     Ok(results)
 }
@@ -116,7 +116,7 @@ pub async fn insert_tokens<T: GenericClient>(
     tokens: &Vec<DbToken>,
     client: &T,
 ) -> Result<(), String> {
-    if tokens.len() == 0 {
+    if tokens.is_empty() {
         return Ok(());
     }
     for chunk in tokens.chunks(BATCH_QUERY_CHUNK_SIZE) {
@@ -158,7 +158,7 @@ pub async fn insert_operations<T: GenericClient>(
     operations: &Vec<DbOperation>,
     client: &T,
 ) -> Result<(), String> {
-    if operations.len() == 0 {
+    if operations.is_empty() {
         return Ok(());
     }
     for chunk in operations.chunks(BATCH_QUERY_CHUNK_SIZE) {
@@ -248,7 +248,7 @@ pub async fn update_operation_counts<T: GenericClient>(
     counts: &HashMap<String, i32>,
     client: &T,
 ) -> Result<(), String> {
-    if counts.len() == 0 {
+    if counts.is_empty() {
         return Ok(());
     }
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![];
@@ -274,7 +274,7 @@ pub async fn update_address_operation_counts<T: GenericClient>(
     counts: &HashMap<String, HashMap<String, i32>>,
     client: &T,
 ) -> Result<(), String> {
-    if counts.len() == 0 {
+    if counts.is_empty() {
         return Ok(());
     }
     for chunk in counts
@@ -312,7 +312,7 @@ pub async fn update_token_operation_counts<T: GenericClient>(
     counts: &HashMap<String, i32>,
     client: &T,
 ) -> Result<(), String> {
-    if counts.len() == 0 {
+    if counts.is_empty() {
         return Ok(());
     }
     for chunk in counts
@@ -353,7 +353,7 @@ pub async fn update_token_minted_supplies<T: GenericClient>(
     supplies: &HashMap<String, PgNumericU128>,
     client: &T,
 ) -> Result<(), String> {
-    if supplies.len() == 0 {
+    if supplies.is_empty() {
         return Ok(());
     }
     for chunk in supplies

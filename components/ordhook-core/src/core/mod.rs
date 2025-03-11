@@ -4,15 +4,13 @@ pub mod protocol;
 #[cfg(test)]
 pub mod test_builders;
 
+use std::{hash::BuildHasherDefault, ops::Div};
+
 use bitcoin::Network;
-use chainhook_sdk::indexer::bitcoin::cursor::TransactionBytesCursor;
+use chainhook_sdk::{indexer::bitcoin::cursor::TransactionBytesCursor, utils::Context};
 use config::Config;
 use dashmap::DashMap;
 use fxhash::{FxBuildHasher, FxHasher};
-use std::hash::BuildHasherDefault;
-use std::ops::Div;
-
-use chainhook_sdk::utils::Context;
 
 pub fn first_inscription_height(config: &Config) -> u64 {
     match config.bitcoind.network {
@@ -49,7 +47,7 @@ pub enum SatPosition {
     Fee(u64),
 }
 
-pub fn resolve_absolute_pointer(inputs: &Vec<u64>, absolute_pointer_value: u64) -> (usize, u64) {
+pub fn resolve_absolute_pointer(inputs: &[u64], absolute_pointer_value: u64) -> (usize, u64) {
     let mut selected_index = 0;
     let mut cumulated_input_value = 0;
     // Check for overflow
@@ -71,8 +69,8 @@ pub fn resolve_absolute_pointer(inputs: &Vec<u64>, absolute_pointer_value: u64) 
 
 pub fn compute_next_satpoint_data(
     input_index: usize,
-    inputs: &Vec<u64>,
-    outputs: &Vec<u64>,
+    inputs: &[u64],
+    outputs: &[u64],
     relative_pointer_value: u64,
     _ctx: Option<&Context>,
 ) -> SatPosition {

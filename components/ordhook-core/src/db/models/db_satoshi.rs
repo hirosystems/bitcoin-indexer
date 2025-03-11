@@ -1,8 +1,7 @@
 use chainhook_postgres::{types::PgNumericU64, FromPgRow};
 use chainhook_types::OrdinalInscriptionRevealData;
-use tokio_postgres::Row;
-
 use ord::{rarity::Rarity, sat::Sat};
+use tokio_postgres::Row;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DbSatoshi {

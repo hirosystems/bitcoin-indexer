@@ -1,5 +1,4 @@
-use std::io::Cursor;
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 
 use chainhook_types::BitcoinBlockData;
 
@@ -64,7 +63,7 @@ const SATS_LEN: usize = 8;
 const INPUT_SIZE: usize = TXID_LEN + 4 + 2 + SATS_LEN;
 const OUTPUT_SIZE: usize = 8;
 
-impl<'a> BlockBytesCursor<'a> {
+impl BlockBytesCursor<'_> {
     pub fn new(bytes: &[u8]) -> BlockBytesCursor {
         let tx_len = u16::from_be_bytes([bytes[0], bytes[1]]);
         BlockBytesCursor { bytes, tx_len }
@@ -132,7 +131,7 @@ impl<'a> BlockBytesCursor<'a> {
             let mut txin_value = [0u8; 8];
             cursor.read_exact(&mut txin_value).expect("data corrupted");
             inputs.push(TransactionInputBytesCursor {
-                txin: txin,
+                txin,
                 block_height: u32::from_be_bytes(block_height),
                 vout: u16::from_be_bytes(vout),
                 txin_value: u64::from_be_bytes(txin_value),
@@ -187,14 +186,14 @@ impl<'a> BlockBytesCursor<'a> {
     }
 
     pub fn iter_tx(&self) -> TransactionBytesCursorIterator {
-        TransactionBytesCursorIterator::new(&self)
+        TransactionBytesCursorIterator::new(self)
     }
 
-    pub fn from_full_block<'b>(block: &BitcoinBlockFullBreakdown) -> std::io::Result<Vec<u8>> {
+    pub fn from_full_block(block: &BitcoinBlockFullBreakdown) -> std::io::Result<Vec<u8>> {
         let mut buffer = vec![];
         // Number of transactions in the block (not including coinbase)
         let tx_len = block.tx.len() as u16;
-        buffer.write(&tx_len.to_be_bytes())?;
+        buffer.write_all(&tx_len.to_be_bytes())?;
         // For each transaction:
         let u16_max = u16::MAX as usize;
         for (i, tx) in block.tx.iter().enumerate() {
@@ -212,15 +211,15 @@ impl<'a> BlockBytesCursor<'a> {
                 inputs_len = 0;
             }
             // Number of inputs
-            buffer.write(&inputs_len.to_be_bytes())?;
+            buffer.write_all(&inputs_len.to_be_bytes())?;
             // Number of outputs
-            buffer.write(&outputs_len.to_be_bytes())?;
+            buffer.write_all(&outputs_len.to_be_bytes())?;
         }
         // For each transaction:
         for tx in block.tx.iter() {
             // txid - 8 first bytes
             let txid = {
-                let txid = hex::decode(tx.txid.to_string()).unwrap();
+                let txid = hex::decode(&tx.txid).unwrap();
                 [
                     txid[0], txid[1], txid[2], txid[3], txid[4], txid[5], txid[6], txid[7],
                 ]
@@ -230,12 +229,12 @@ impl<'a> BlockBytesCursor<'a> {
             let inputs_len = if tx.vin.len() > u16_max {
                 0
             } else {
-                tx.vin.len() as usize
+                tx.vin.len()
             };
             let outputs_len = if tx.vout.len() > u16_max {
                 0
             } else {
-                tx.vout.len() as usize
+                tx.vout.len()
             };
 
             // For each transaction input:
@@ -254,29 +253,29 @@ impl<'a> BlockBytesCursor<'a> {
                 buffer.write_all(&txin)?;
                 // txin's block height
                 let block_height = input.prevout.as_ref().unwrap().height as u32;
-                buffer.write(&block_height.to_be_bytes())?;
+                buffer.write_all(&block_height.to_be_bytes())?;
                 // txin's vout index
                 let vout = input.vout.unwrap() as u16;
-                buffer.write(&vout.to_be_bytes())?;
+                buffer.write_all(&vout.to_be_bytes())?;
                 // txin's sats value
                 let sats = input.prevout.as_ref().unwrap().value.to_sat();
-                buffer.write(&sats.to_be_bytes())?;
+                buffer.write_all(&sats.to_be_bytes())?;
             }
             // For each transaction output:
             for i in 0..outputs_len {
                 let output = &tx.vout[i];
                 let sats = output.value.to_sat();
-                buffer.write(&sats.to_be_bytes())?;
+                buffer.write_all(&sats.to_be_bytes())?;
             }
         }
         Ok(buffer)
     }
 
-    pub fn from_standardized_block<'b>(block: &BitcoinBlockData) -> std::io::Result<Vec<u8>> {
+    pub fn from_standardized_block(block: &BitcoinBlockData) -> std::io::Result<Vec<u8>> {
         let mut buffer = vec![];
         // Number of transactions in the block (not including coinbase)
         let tx_len = block.transactions.len() as u16;
-        buffer.write(&tx_len.to_be_bytes())?;
+        buffer.write_all(&tx_len.to_be_bytes())?;
         // For each transaction:
         for (i, tx) in block.transactions.iter().enumerate() {
             let inputs_len = if i > 0 {
@@ -286,9 +285,9 @@ impl<'a> BlockBytesCursor<'a> {
             };
             let outputs_len = tx.metadata.outputs.len() as u16;
             // Number of inputs
-            buffer.write(&inputs_len.to_be_bytes())?;
+            buffer.write_all(&inputs_len.to_be_bytes())?;
             // Number of outputs
-            buffer.write(&outputs_len.to_be_bytes())?;
+            buffer.write_all(&outputs_len.to_be_bytes())?;
         }
         // For each transaction:
         for (i, tx) in block.transactions.iter().enumerate() {
@@ -303,19 +302,19 @@ impl<'a> BlockBytesCursor<'a> {
                     buffer.write_all(&txin)?;
                     // txin's block height
                     let block_height = input.previous_output.block_height as u32;
-                    buffer.write(&block_height.to_be_bytes())?;
+                    buffer.write_all(&block_height.to_be_bytes())?;
                     // txin's vout index
                     let vout = input.previous_output.vout as u16;
-                    buffer.write(&vout.to_be_bytes())?;
+                    buffer.write_all(&vout.to_be_bytes())?;
                     // txin's sats value
                     let sats = input.previous_output.value;
-                    buffer.write(&sats.to_be_bytes())?;
+                    buffer.write_all(&sats.to_be_bytes())?;
                 }
             }
             // For each transaction output:
             for output in tx.metadata.outputs.iter() {
                 let sats = output.value;
-                buffer.write(&sats.to_be_bytes())?;
+                buffer.write_all(&sats.to_be_bytes())?;
             }
         }
         Ok(buffer)
@@ -338,7 +337,7 @@ impl<'a> TransactionBytesCursorIterator<'a> {
     }
 }
 
-impl<'a> Iterator for TransactionBytesCursorIterator<'a> {
+impl Iterator for TransactionBytesCursorIterator<'_> {
     type Item = TransactionBytesCursor;
 
     fn next(&mut self) -> Option<TransactionBytesCursor> {
@@ -367,10 +366,13 @@ impl<'a> Iterator for TransactionBytesCursorIterator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{indexer::bitcoin::{parse_downloaded_block, standardize_bitcoin_block}, utils::Context};
+    use chainhook_types::BitcoinNetwork;
 
     use super::*;
-    use chainhook_types::BitcoinNetwork;
+    use crate::{
+        indexer::bitcoin::{parse_downloaded_block, standardize_bitcoin_block},
+        utils::Context,
+    };
 
     #[test]
     fn test_block_cursor_roundtrip() {

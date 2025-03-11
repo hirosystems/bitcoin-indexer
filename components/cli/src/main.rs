@@ -1,6 +1,5 @@
 pub mod cli;
 
-#[macro_use]
 extern crate hiro_system_kit;
 
 #[cfg(feature = "tcmalloc")]

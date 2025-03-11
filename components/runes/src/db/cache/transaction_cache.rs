@@ -1,11 +1,16 @@
-use bitcoin::ScriptBuf;
-use chainhook_sdk::utils::Context;
-use ordinals::{Cenotaph, Edict, Etching, Rune, RuneId};
 use std::{
     collections::{HashMap, VecDeque},
     vec,
 };
 
+use bitcoin::ScriptBuf;
+use chainhook_sdk::utils::Context;
+use ordinals::{Cenotaph, Edict, Etching, Rune, RuneId};
+
+use super::{
+    input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation,
+    utils::move_rune_balance_to_output,
+};
 use crate::{
     db::{
         cache::utils::{is_rune_mintable, new_sequential_ledger_entry},
@@ -14,11 +19,6 @@ use crate::{
         },
     },
     try_debug, try_info, try_warn,
-};
-
-use super::{
-    input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation,
-    utils::move_rune_balance_to_output,
 };
 
 /// Holds cached data relevant to a single transaction during indexing.
@@ -209,7 +209,7 @@ impl TransactionCache {
         Some(new_sequential_ledger_entry(
             &self.location,
             Some(terms_amount.0),
-            rune_id.clone(),
+            *rune_id,
             None,
             None,
             None,
@@ -241,7 +241,7 @@ impl TransactionCache {
         Some(new_sequential_ledger_entry(
             &self.location,
             Some(terms_amount.0),
-            rune_id.clone(),
+            *rune_id,
             None,
             None,
             None,
@@ -283,7 +283,7 @@ impl TransactionCache {
             .unwrap_or(0);
         // Perform movements.
         let mut results = vec![];
-        if self.eligible_outputs.len() == 0 {
+        if self.eligible_outputs.is_empty() {
             // No eligible outputs means burn.
             try_info!(
                 ctx,
@@ -391,12 +391,12 @@ impl TransactionCache {
     }
 
     fn add_input_runes(&mut self, rune_id: &RuneId, entry: InputRuneBalance) {
-        if let Some(balance) = self.input_runes.get_mut(&rune_id) {
+        if let Some(balance) = self.input_runes.get_mut(rune_id) {
             balance.push_back(entry);
         } else {
             let mut vec = VecDeque::new();
             vec.push_back(entry);
-            self.input_runes.insert(rune_id.clone(), vec);
+            self.input_runes.insert(*rune_id, vec);
         }
     }
 }
@@ -410,6 +410,7 @@ mod test {
     use maplit::hashmap;
     use ordinals::{Edict, Etching, Rune, Terms};
 
+    use super::TransactionCache;
     use crate::db::{
         cache::{
             input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation,
@@ -417,8 +418,6 @@ mod test {
         },
         models::{db_ledger_operation::DbLedgerOperation, db_rune::DbRune},
     };
-
-    use super::TransactionCache;
 
     #[test]
     fn etches_rune() {

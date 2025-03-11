@@ -7,6 +7,7 @@ use lru::LruCache;
 use ordinals::RuneId;
 use tokio_postgres::Transaction;
 
+use super::{input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation};
 use crate::{
     db::{
         models::{
@@ -16,8 +17,6 @@ use crate::{
     },
     try_info, try_warn,
 };
-
-use super::{input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation};
 
 /// Takes all transaction inputs and transforms them into rune balances to be allocated for operations. Looks inside an output LRU
 /// cache and the DB when there are cache misses.
@@ -55,7 +54,7 @@ pub async fn input_rune_balances_from_tx_inputs(
     }
     // Look for cache misses in database. We don't need to `flush` the DB cache here because we've already looked in the current
     // block's output cache.
-    if cache_misses.len() > 0 {
+    if !cache_misses.is_empty() {
         let output_balances = pg_get_input_rune_balances(cache_misses, db_tx, ctx).await;
         indexed_input_runes.extend(output_balances);
     }
@@ -87,9 +86,9 @@ pub fn move_block_output_cache_to_output_cache(
     output_cache: &mut LruCache<(String, u32), HashMap<RuneId, Vec<InputRuneBalance>>>,
 ) {
     for (k, block_output_map) in block_output_cache.iter() {
-        if let Some(v) = output_cache.get_mut(&k) {
+        if let Some(v) = output_cache.get_mut(k) {
             for (rune_id, balances) in block_output_map.iter() {
-                if let Some(rune_balance) = v.get_mut(&rune_id) {
+                if let Some(rune_balance) = v.get_mut(rune_id) {
                     rune_balance.extend(balances.clone());
                 } else {
                     v.insert(*rune_id, balances.clone());
@@ -688,7 +687,10 @@ mod test {
         use std::num::NonZeroUsize;
 
         use chainhook_sdk::utils::Context;
-        use chainhook_types::{bitcoin::{OutPoint, TxIn}, TransactionIdentifier};
+        use chainhook_types::{
+            bitcoin::{OutPoint, TxIn},
+            TransactionIdentifier,
+        };
         use lru::LruCache;
         use maplit::hashmap;
         use ordinals::RuneId;

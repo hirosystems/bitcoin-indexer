@@ -37,9 +37,9 @@ pub fn pg_pool(config: &PgDatabaseConfig) -> Result<Pool, String> {
     if let Some(size) = config.pool_max_size {
         pool_builder = pool_builder.max_size(size);
     }
-    Ok(pool_builder
+    pool_builder
         .build()
-        .map_err(|e| format!("unable to build pg connection pool: {e}"))?)
+        .map_err(|e| format!("unable to build pg connection pool: {e}"))
 }
 
 /// Returns a new pg connection client taken from a pool.

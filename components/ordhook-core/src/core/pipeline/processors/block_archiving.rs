@@ -16,8 +16,8 @@ pub fn store_compacted_blocks(
             block_height as u32,
             &compacted_block,
             update_tip,
-            &blocks_db_rw,
-            &ctx,
+            blocks_db_rw,
+            ctx,
         );
         try_info!(ctx, "Block #{block_height} saved to disk");
     }

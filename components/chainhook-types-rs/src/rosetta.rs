@@ -1,11 +1,17 @@
-use crate::bitcoin::{TxIn, TxOut};
-use crate::ordinals::OrdinalOperation;
-use crate::Brc20Operation;
+use std::{
+    cmp::Ordering,
+    fmt::Display,
+    hash::{Hash, Hasher},
+};
+
 use bitcoin::Network;
 use schemars::JsonSchema;
-use std::cmp::Ordering;
-use std::fmt::Display;
-use std::hash::{Hash, Hasher};
+
+use crate::{
+    bitcoin::{TxIn, TxOut},
+    ordinals::OrdinalOperation,
+    Brc20Operation,
+};
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -21,7 +27,7 @@ impl BlockIdentifier {
     }
 
     pub fn get_hash_bytes(&self) -> Vec<u8> {
-        hex::decode(&self.get_hash_bytes_str()).unwrap()
+        hex::decode(self.get_hash_bytes_str()).unwrap()
     }
 }
 
@@ -140,7 +146,7 @@ impl TransactionIdentifier {
     }
 
     pub fn get_hash_bytes(&self) -> Vec<u8> {
-        hex::decode(&self.get_hash_bytes_str()).unwrap()
+        hex::decode(self.get_hash_bytes_str()).unwrap()
     }
 
     pub fn get_8_hash_bytes(&self) -> [u8; 8] {
@@ -423,22 +429,6 @@ impl std::fmt::Display for BitcoinNetwork {
     }
 }
 impl BitcoinNetwork {
-    pub fn from_str(network: &str) -> Result<BitcoinNetwork, String> {
-        let value = match network {
-            "regtest" => BitcoinNetwork::Regtest,
-            "testnet" => BitcoinNetwork::Testnet,
-            "mainnet" => BitcoinNetwork::Mainnet,
-            "signet" => BitcoinNetwork::Signet,
-            _ => {
-                return Err(format!(
-                    "network '{}' unsupported (mainnet, testnet, regtest, signet)",
-                    network
-                ))
-            }
-        };
-        Ok(value)
-    }
-
     pub fn as_str(&self) -> &str {
         match self {
             BitcoinNetwork::Regtest => "regtest",

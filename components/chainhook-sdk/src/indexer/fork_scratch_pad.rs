@@ -1,12 +1,13 @@
-use crate::{try_debug, try_error, try_info, try_warn, utils::Context};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+
 use chainhook_types::{
     BlockHeader, BlockIdentifier, BlockchainEvent, BlockchainUpdatedWithHeaders,
     BlockchainUpdatedWithReorg,
 };
 use hiro_system_kit::slog;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use super::chain_segment::{ChainSegment, ChainSegmentIncompatibility};
+use crate::{try_debug, try_error, try_info, try_warn, utils::Context};
 
 pub struct ForkScratchPad {
     canonical_fork_id: usize,
@@ -35,7 +36,11 @@ impl ForkScratchPad {
     }
 
     pub fn canonical_chain_tip(&self) -> Option<&BlockIdentifier> {
-        self.forks.get(&self.canonical_fork_id).unwrap().block_ids.front()
+        self.forks
+            .get(&self.canonical_fork_id)
+            .unwrap()
+            .block_ids
+            .front()
     }
 
     pub fn can_process_header(&self, header: &BlockHeader) -> bool {
