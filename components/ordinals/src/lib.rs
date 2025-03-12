@@ -163,14 +163,17 @@ async fn new_ordinals_indexer_runloop(
     };
     let chain_tip = match (pg_chain_tip, blocks_chain_tip) {
         // Index chain tip is the minimum of postgres DB tip vs blocks DB tip.
-        (Some(x), Some(y)) => Some(x.min(y)),
+        (Some(x), Some(y)) => Some(if x.index <= y.index { x } else { y }),
         // No blocks DB means start from zero so we can pull them.
         (Some(_), None) => None,
         // No postgres DB means we might be using an archived blocks DB, make sure we index from the first inscription chain tip.
-        (None, Some(y)) => Some(y.min(BlockIdentifier {
-            index: first_inscription_height(config) - 1,
-            hash: "0x0000000000000000000000000000000000000000000000000000000000000000".into(),
-        })),
+        (None, Some(y)) => {
+            let x = BlockIdentifier {
+                index: first_inscription_height(config) - 1,
+                hash: "0x0000000000000000000000000000000000000000000000000000000000000000".into(),
+            };
+            Some(if x.index <= y.index { x } else { y })
+        }
         // Start from zero.
         (None, None) => None,
     };

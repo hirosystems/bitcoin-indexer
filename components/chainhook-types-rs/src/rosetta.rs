@@ -51,7 +51,7 @@ impl Hash for BlockIdentifier {
 
 impl Ord for BlockIdentifier {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.index.cmp(&other.index)
+        (other.index, &other.hash).cmp(&(self.index, &self.hash))
     }
 }
 
