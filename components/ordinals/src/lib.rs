@@ -19,7 +19,7 @@ use chainhook_postgres::{pg_pool, pg_pool_client};
 use chainhook_types::BlockIdentifier;
 use config::Config;
 use db::{
-    blocks::{self, open_blocks_db_with_retry},
+    blocks::{self, find_last_block_inserted, open_blocks_db_with_retry},
     migrate_dbs,
 };
 use deadpool_postgres::Pool;
@@ -80,12 +80,7 @@ async fn new_ordinals_indexer_runloop(
                             IndexerCommand::StoreCompactedBlocks(blocks) => {
                                 let blocks_db_rw =
                                     open_blocks_db_with_retry(true, &config_moved, &ctx_moved);
-                                store_compacted_blocks(
-                                    blocks,
-                                    true,
-                                    &blocks_db_rw,
-                                    &Context::empty(),
-                                );
+                                store_compacted_blocks(blocks, true, &blocks_db_rw, &ctx_moved);
                             }
                             IndexerCommand::IndexBlocks {
                                 mut apply_blocks,
@@ -149,8 +144,36 @@ async fn new_ordinals_indexer_runloop(
         })
         .expect("unable to spawn thread");
 
-    let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
-    let chain_tip = db::ordinals_pg::get_chain_tip(&ord_client).await?;
+    let pg_chain_tip = {
+        let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
+        db::ordinals_pg::get_chain_tip(&ord_client).await?
+    };
+    let blocks_chain_tip = {
+        let blocks_db = open_blocks_db_with_retry(false, config, ctx);
+        let height = find_last_block_inserted(&blocks_db);
+        // Blocks DB does not have the hash available.
+        if height > 0 {
+            Some(BlockIdentifier {
+                index: height as u64,
+                hash: "0x0000000000000000000000000000000000000000000000000000000000000000".into(),
+            })
+        } else {
+            None
+        }
+    };
+    let chain_tip = match (pg_chain_tip, blocks_chain_tip) {
+        // Index chain tip is the minimum of postgres DB tip vs blocks DB tip.
+        (Some(x), Some(y)) => Some(x.min(y)),
+        // No blocks DB means start from zero so we can pull them.
+        (Some(_), None) => None,
+        // No postgres DB means we might be using an archived blocks DB, make sure we index from the first inscription chain tip.
+        (None, Some(y)) => Some(y.min(BlockIdentifier {
+            index: first_inscription_height(config) - 1,
+            hash: "0x0000000000000000000000000000000000000000000000000000000000000000".into(),
+        })),
+        // Start from zero.
+        (None, None) => None,
+    };
     Ok(Indexer {
         commands_tx,
         chain_tip,

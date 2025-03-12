@@ -19,7 +19,7 @@ pub fn store_compacted_blocks(
             blocks_db_rw,
             ctx,
         );
-        try_info!(ctx, "Block #{block_height} saved to disk");
+        try_info!(ctx, "Compacted block #{block_height} saved to disk");
     }
 
     if let Err(e) = blocks_db_rw.flush() {

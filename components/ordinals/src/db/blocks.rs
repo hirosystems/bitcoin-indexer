@@ -162,56 +162,6 @@ pub fn find_pinned_block_bytes_at_block_height<'a>(
     }
 }
 
-pub fn find_block_bytes_at_block_height(
-    block_height: u32,
-    retry: u8,
-    blocks_db: &DB,
-    ctx: &Context,
-) -> Option<Vec<u8>> {
-    let mut attempt = 1;
-    // let mut read_options = rocksdb::ReadOptions::default();
-    // read_options.fill_cache(true);
-    // read_options.set_verify_checksums(false);
-    let mut backoff: f64 = 1.0;
-    let mut rng = rng();
-
-    loop {
-        match blocks_db.get(block_height.to_be_bytes()) {
-            Ok(Some(res)) => return Some(res),
-            _ => {
-                attempt += 1;
-                backoff = 2.0 * backoff + (backoff * rng.random_range(0.0..1.0));
-                let duration = std::time::Duration::from_millis((backoff * 1_000.0) as u64);
-                try_warn!(
-                    ctx,
-                    "Unable to find block #{}, will retry in {:?}",
-                    block_height,
-                    duration
-                );
-                std::thread::sleep(duration);
-                if attempt > retry {
-                    return None;
-                }
-            }
-        }
-    }
-}
-
-pub fn run_compaction(blocks_db_rw: &DB, lim: u32) {
-    let gen = 0u32.to_be_bytes();
-    blocks_db_rw.compact_range(Some(&gen), Some(&lim.to_be_bytes()));
-}
-
-pub fn find_missing_blocks(blocks_db: &DB, start: u32, end: u32, ctx: &Context) -> Vec<u32> {
-    let mut missing_blocks = vec![];
-    for i in start..=end {
-        if find_pinned_block_bytes_at_block_height(i, 0, blocks_db, ctx).is_none() {
-            missing_blocks.push(i);
-        }
-    }
-    missing_blocks
-}
-
 pub fn remove_entry_from_blocks(block_height: u32, blocks_db_rw: &DB, ctx: &Context) {
     if let Err(e) = blocks_db_rw.delete(block_height.to_be_bytes()) {
         try_error!(ctx, "{}", e.to_string());

@@ -218,14 +218,23 @@ async fn initialize_block_pool(
 /// the canonical chain.
 async fn block_ingestion_runloop(
     indexer_commands_tx: &Sender<IndexerCommand>,
+    index_chain_tip: &Option<BlockIdentifier>,
     block_commands_rx: &Receiver<BlockProcessorCommand>,
     block_events_tx: &Sender<BlockProcessorEvent>,
     block_pool: &Arc<Mutex<ForkScratchPad>>,
     block_store: &Arc<Mutex<HashMap<BlockIdentifier, BitcoinBlockData>>>,
     http_client: &Client,
+    sequence_start_block_height: u64,
     config: &Config,
     ctx: &Context,
 ) -> Result<(), String> {
+    // Before starting the loop, check if the index already has progress. If so, prime the block pool with the current tip.
+    if let Some(index_chain_tip) = index_chain_tip {
+        if index_chain_tip.index >= sequence_start_block_height {
+            initialize_block_pool(block_pool, index_chain_tip, &http_client, config, ctx).await?;
+        }
+    }
+
     let mut empty_cycles = 0;
     loop {
         let (compacted_blocks, blocks) = match block_commands_rx.try_recv() {
@@ -300,17 +309,20 @@ async fn download_rpc_blocks(
     let block_store_moved = block_store.clone();
     let http_client_moved = http_client.clone();
     let indexer_commands_tx_moved = indexer.commands_tx.clone();
+    let index_chain_tip_moved = indexer.chain_tip.clone();
 
     let handle: JoinHandle<()> = hiro_system_kit::thread_named("block_download_processor")
         .spawn(move || {
             future_block_on(&ctx_moved.clone(), async move {
                 block_ingestion_runloop(
                     &indexer_commands_tx_moved,
+                    &index_chain_tip_moved,
                     &commands_rx,
                     &events_tx,
                     &block_pool_moved,
                     &block_store_moved,
                     &http_client_moved,
+                    sequence_start_block_height,
                     &config_moved,
                     &ctx_moved,
                 )
@@ -327,7 +339,8 @@ async fn download_rpc_blocks(
     let blocks = {
         let block_pool_ref = block_pool.clone();
         let pool = block_pool_ref.lock().unwrap();
-        let start_block = pool.canonical_chain_tip().unwrap().index + 1;
+        let chain_tip = pool.canonical_chain_tip().or(indexer.chain_tip.as_ref());
+        let start_block = chain_tip.map_or(0, |ct| ct.index + 1);
         BlockHeights::BlockRange(start_block, target_block_height)
             .get_sorted_entries()
             .map_err(|_e| "Block start / end block spec invalid".to_string())?
@@ -373,17 +386,20 @@ async fn stream_zmq_blocks(
     let block_store_moved = block_store.clone();
     let http_client_moved = http_client.clone();
     let indexer_commands_tx_moved = indexer.commands_tx.clone();
+    let index_chain_tip_moved = indexer.chain_tip.clone();
 
     let handle: JoinHandle<()> = hiro_system_kit::thread_named("block_stream_processor")
         .spawn(move || {
             future_block_on(&ctx_moved.clone(), async move {
                 block_ingestion_runloop(
                     &indexer_commands_tx_moved,
+                    &index_chain_tip_moved,
                     &commands_rx,
                     &events_tx,
                     &block_pool_moved,
                     &block_store_moved,
                     &http_client_moved,
+                    sequence_start_block_height,
                     &config_moved,
                     &ctx_moved,
                 )
@@ -422,28 +438,27 @@ pub async fn start_bitcoin_indexer(
     // Block pool that will track the canonical chain and detect any reorgs that may happen.
     let block_pool_arc = Arc::new(Mutex::new(ForkScratchPad::new()));
     let block_pool = block_pool_arc.clone();
-
-    if let Some(index_chain_tip) = &indexer.chain_tip {
-        try_info!(ctx, "Index chain tip is at {}", index_chain_tip);
-        // TODO: Do this only after sequence height
-        initialize_block_pool(&block_pool_arc, index_chain_tip, &http_client, config, ctx).await?;
-    } else {
-        try_info!(ctx, "Index is empty");
-    }
-
     // Block cache that will keep block data in memory while it is prepared to be sent to indexers.
     let block_store_arc = Arc::new(Mutex::new(HashMap::new()));
 
+    if let Some(index_chain_tip) = &indexer.chain_tip {
+        try_info!(ctx, "Index chain tip is at {}", index_chain_tip);
+    } else {
+        try_info!(ctx, "Index is empty");
+    }
     // Sync index until chain tip is reached.
     loop {
         {
             let pool = block_pool.lock().unwrap();
-            if bitcoind_chain_tip == *pool.canonical_chain_tip().unwrap() {
-                try_info!(
-                    ctx,
-                    "Index has reached bitcoind chain tip at {bitcoind_chain_tip}"
-                );
-                break;
+            let chain_tip = pool.canonical_chain_tip().or(indexer.chain_tip.as_ref());
+            if let Some(chain_tip) = chain_tip {
+                if bitcoind_chain_tip == *chain_tip {
+                    try_info!(
+                        ctx,
+                        "Index has reached bitcoind chain tip at {bitcoind_chain_tip}"
+                    );
+                    break;
+                }
             }
         }
         download_rpc_blocks(

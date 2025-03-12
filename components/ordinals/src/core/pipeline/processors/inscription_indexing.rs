@@ -80,6 +80,7 @@ pub async fn index_block(
     pg_pools: &PgConnectionPools,
     ctx: &Context,
 ) -> Result<(), String> {
+    // FIXME: Skip if already indexed
     let stopwatch = std::time::Instant::now();
     let block_height = block.block_identifier.index;
     try_info!(ctx, "Indexing block #{block_height}");

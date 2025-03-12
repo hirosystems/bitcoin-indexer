@@ -44,12 +44,16 @@ pub async fn get_chain_tip<T: GenericClient>(
     let Some(row) = row else {
         return Ok(None);
     };
-    let max: PgNumericU64 = row.get("block_height");
-    let hash: String = row.get("block_hash");
-    Ok(Some(BlockIdentifier {
-        index: max.0,
-        hash: format!("0x{hash}"),
-    }))
+    let height: Option<PgNumericU64> = row.get("block_height");
+    let hash: Option<String> = row.get("block_hash");
+    if let (Some(height), Some(hash)) = (height, hash) {
+        Ok(Some(BlockIdentifier {
+            index: height.0,
+            hash: format!("0x{hash}"),
+        }))
+    } else {
+        Ok(None)
+    }
 }
 
 pub async fn get_chain_tip_block_height<T: GenericClient>(
