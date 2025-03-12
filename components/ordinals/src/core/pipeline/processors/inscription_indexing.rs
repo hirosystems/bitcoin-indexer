@@ -4,7 +4,9 @@ use std::{
     sync::Arc,
 };
 
-use bitcoind::{indexer::bitcoin::cursor::TransactionBytesCursor, try_info, utils::Context};
+use bitcoind::{
+    indexer::bitcoin::cursor::TransactionBytesCursor, try_info, try_warn, utils::Context,
+};
 use chainhook_postgres::{pg_begin, pg_pool_client};
 use chainhook_types::{BitcoinBlockData, TransactionIdentifier};
 use config::Config;
@@ -28,7 +30,7 @@ use crate::{
             sequence_cursor::SequenceCursor,
         },
     },
-    db::ordinals_pg,
+    db::ordinals_pg::{self, get_chain_tip_block_height},
     utils::monitoring::PrometheusMonitoring,
     PgConnectionPools,
 };
@@ -80,7 +82,6 @@ pub async fn index_block(
     pg_pools: &PgConnectionPools,
     ctx: &Context,
 ) -> Result<(), String> {
-    // FIXME: Skip if already indexed
     let stopwatch = std::time::Instant::now();
     let block_height = block.block_identifier.index;
     try_info!(ctx, "Indexing block #{block_height}");
@@ -95,6 +96,13 @@ pub async fn index_block(
     {
         let mut ord_client = pg_pool_client(&pg_pools.ordinals).await?;
         let ord_tx = pg_begin(&mut ord_client).await?;
+
+        if let Some(chain_tip) = get_chain_tip_block_height(&ord_tx).await? {
+            if block_height <= chain_tip {
+                try_warn!(ctx, "Block #{block_height} was already indexed, skipping");
+                return Ok(());
+            }
+        }
 
         // Parsed BRC20 ops will be deposited here for this block.
         let mut brc20_operation_map = HashMap::new();

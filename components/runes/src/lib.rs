@@ -68,8 +68,8 @@ async fn new_runes_indexer_runloop(config: &Config, ctx: &Context) -> Result<Ind
     let chain_tip = db::get_chain_tip(&mut pg_client, ctx)
         .await
         .unwrap_or(BlockIdentifier {
-            index: 839999, // FIXME: Alter this for testnet, etc.
-            hash: "0x0000000000000000000172014ba58d66455762add0512355ad651207918494ab".into(),
+            index: get_rune_genesis_block_height(config.bitcoind.network) - 1,
+            hash: "0x0000000000000000000000000000000000000000000000000000000000000000".into(),
         });
     Ok(Indexer {
         commands_tx,
