@@ -1,6 +1,6 @@
 use std::thread::JoinHandle;
 
-use chainhook_sdk::{
+use bitcoind::{
     indexer::{start_bitcoin_indexer, Indexer, IndexerCommand},
     utils::{future_block_on, Context},
 };

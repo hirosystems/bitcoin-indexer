@@ -1,8 +1,8 @@
 use std::{collections::HashMap, process, str::FromStr};
 
+use bitcoind::utils::Context;
 use cache::input_rune_balance::InputRuneBalance;
 use chainhook_postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
-use chainhook_sdk::utils::Context;
 use chainhook_types::BlockIdentifier;
 use config::Config;
 use models::{

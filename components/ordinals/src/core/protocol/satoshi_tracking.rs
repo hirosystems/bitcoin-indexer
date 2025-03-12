@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use bitcoin::{Address, Network, ScriptBuf};
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use chainhook_types::{
     BitcoinBlockData, BitcoinTransactionData, BlockIdentifier, OrdinalInscriptionTransferData,
     OrdinalInscriptionTransferDestination, OrdinalOperation,
@@ -252,7 +252,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
 mod test {
     use bitcoin::Network;
     use chainhook_postgres::{pg_begin, pg_pool_client};
-    use chainhook_sdk::utils::Context;
+    use bitcoind::utils::Context;
     use chainhook_types::{
         OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,

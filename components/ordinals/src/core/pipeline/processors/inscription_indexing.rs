@@ -5,7 +5,7 @@ use std::{
 };
 
 use chainhook_postgres::{pg_begin, pg_pool_client};
-use chainhook_sdk::{indexer::bitcoin::cursor::TransactionBytesCursor, utils::Context};
+use bitcoind::{indexer::bitcoin::cursor::TransactionBytesCursor, utils::Context};
 use chainhook_types::{BitcoinBlockData, TransactionIdentifier};
 use config::Config;
 use dashmap::DashMap;

@@ -1,4 +1,4 @@
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use rocksdb::DB;
 
 use crate::{db::blocks::insert_entry_in_blocks, try_error, try_info};

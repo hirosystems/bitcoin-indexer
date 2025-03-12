@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use tokio_postgres::Transaction;
 
 use crate::{

@@ -10,11 +10,11 @@ use core::{
 };
 use std::{sync::Arc, thread::JoinHandle};
 
-use chainhook_postgres::{pg_pool, pg_pool_client};
-use chainhook_sdk::{
+use bitcoind::{
     indexer::{start_bitcoin_indexer, Indexer, IndexerCommand},
     utils::{future_block_on, Context},
 };
+use chainhook_postgres::{pg_pool, pg_pool_client};
 use chainhook_types::BlockIdentifier;
 use config::Config;
 use db::{

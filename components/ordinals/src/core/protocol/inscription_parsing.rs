@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str, str::FromStr};
 
 use bitcoin::{hash_types::Txid, Witness};
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use chainhook_types::{
     BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
     OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,
@@ -172,7 +172,7 @@ pub fn parse_inscriptions_in_standardized_block(
 mod test {
     use std::collections::HashMap;
 
-    use chainhook_sdk::utils::Context;
+    use bitcoind::utils::Context;
     use chainhook_types::OrdinalOperation;
     use config::Config;
 

@@ -1,6 +1,6 @@
 use std::{hash::BuildHasherDefault, sync::Arc};
 
-use chainhook_sdk::{
+use bitcoind::{
     indexer::bitcoin::cursor::{BlockBytesCursor, TransactionBytesCursor},
     utils::Context,
 };
@@ -302,7 +302,7 @@ pub fn compute_satoshi_number(
 mod test {
     use std::{hash::BuildHasherDefault, sync::Arc};
 
-    use chainhook_sdk::{
+    use bitcoind::{
         indexer::bitcoin::cursor::{TransactionBytesCursor, TransactionInputBytesCursor},
         utils::Context,
     };

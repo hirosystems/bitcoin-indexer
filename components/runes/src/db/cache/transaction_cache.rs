@@ -4,7 +4,7 @@ use std::{
 };
 
 use bitcoin::ScriptBuf;
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use ordinals::{Cenotaph, Edict, Etching, Rune, RuneId};
 
 use super::{
@@ -406,7 +406,7 @@ mod test {
     use std::collections::VecDeque;
 
     use bitcoin::ScriptBuf;
-    use chainhook_sdk::utils::Context;
+    use bitcoind::utils::Context;
     use maplit::hashmap;
     use ordinals::{Edict, Etching, Rune, Terms};
 

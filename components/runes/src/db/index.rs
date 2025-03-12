@@ -5,7 +5,7 @@ use bitcoin::{
     transaction::{TxOut, Version},
     Amount, Network, ScriptBuf, Transaction,
 };
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use chainhook_types::{BitcoinBlockData, BitcoinTransactionData};
 use ordinals::{Artifact, Runestone};
 use tokio_postgres::Client;

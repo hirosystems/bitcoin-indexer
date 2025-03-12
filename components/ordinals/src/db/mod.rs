@@ -3,7 +3,7 @@ pub mod models;
 pub mod ordinals_pg;
 
 use chainhook_postgres::pg_connect_with_retry;
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use config::Config;
 
 use crate::{core::meta_protocols::brc20::brc20_pg, try_info, try_warn};

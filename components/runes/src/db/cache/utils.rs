@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use bitcoin::{Address, ScriptBuf};
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use chainhook_types::bitcoin::TxIn;
 use lru::LruCache;
 use ordinals::RuneId;
@@ -316,7 +316,7 @@ mod test {
         use std::collections::{HashMap, VecDeque};
 
         use bitcoin::ScriptBuf;
-        use chainhook_sdk::utils::Context;
+        use bitcoind::utils::Context;
         use maplit::hashmap;
         use ordinals::RuneId;
 
@@ -686,7 +686,7 @@ mod test {
     mod input_balances {
         use std::num::NonZeroUsize;
 
-        use chainhook_sdk::utils::Context;
+        use bitcoind::utils::Context;
         use chainhook_types::{
             bitcoin::{OutPoint, TxIn},
             TransactionIdentifier,

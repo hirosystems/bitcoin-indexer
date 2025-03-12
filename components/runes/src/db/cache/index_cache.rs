@@ -1,7 +1,7 @@
 use std::{collections::HashMap, num::NonZeroUsize, str::FromStr};
 
 use bitcoin::{Network, ScriptBuf};
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use chainhook_types::bitcoin::TxIn;
 use config::Config;
 use lru::LruCache;

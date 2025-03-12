@@ -1,6 +1,6 @@
 use std::{path::PathBuf, process, thread::sleep, time::Duration};
 
-use chainhook_sdk::{try_error, try_info, utils::Context};
+use bitcoind::{try_error, try_info, utils::Context};
 use chainhook_types::BlockIdentifier;
 use clap::Parser;
 use commands::{Command, ConfigCommand, DatabaseCommand, IndexCommand, Protocol, ServiceCommand};
@@ -69,21 +69,21 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                     check_maintenance_mode(ctx);
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    ordhook::start_ordinals_indexer(true, &config, ctx).await?
+                    ordinals::start_ordinals_indexer(true, &config, ctx).await?
                 }
             },
             Command::Index(index_command) => match index_command {
                 IndexCommand::Sync(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    ordhook::start_ordinals_indexer(false, &config, ctx).await?
+                    ordinals::start_ordinals_indexer(false, &config, ctx).await?
                 }
                 IndexCommand::Rollback(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    let chain_tip = ordhook::get_chain_tip(&config).await?;
+                    let chain_tip = ordinals::get_chain_tip(&config).await?;
                     confirm_rollback(&chain_tip, cmd.blocks)?;
-                    ordhook::rollback_block_range(
+                    ordinals::rollback_block_range(
                         chain_tip.index - cmd.blocks as u64,
                         chain_tip.index,
                         &config,
@@ -97,7 +97,7 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                 DatabaseCommand::Migrate(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    ordhook::db::migrate_dbs(&config, ctx).await?;
+                    ordinals::db::migrate_dbs(&config, ctx).await?;
                 }
             },
         },

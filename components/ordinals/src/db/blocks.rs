@@ -1,6 +1,6 @@
 use std::{path::PathBuf, thread::sleep, time::Duration};
 
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use config::Config;
 use rand::{rng, Rng};
 use rocksdb::{DBPinnableSlice, Options, DB};
@@ -242,7 +242,7 @@ pub fn insert_standardized_block(
     ctx: &Context,
 ) {
     let block_bytes =
-        match chainhook_sdk::indexer::bitcoin::cursor::BlockBytesCursor::from_standardized_block(
+        match bitcoind::indexer::bitcoin::cursor::BlockBytesCursor::from_standardized_block(
             &block,
         ) {
             Ok(block_bytes) => block_bytes,

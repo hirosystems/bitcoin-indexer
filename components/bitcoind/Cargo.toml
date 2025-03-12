@@ -1,7 +1,7 @@
 [package]
-name = "chainhook-sdk"
+name = "bitcoind"
 version.workspace = true
-description = "Stateless Transaction Indexing Engine for Stacks and Bitcoin"
+description = "Stateless Transaction Indexing Engine for Bitcoin"
 license = "GPL-3.0"
 edition = "2021"
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chainhook_sdk::utils::Context;
+use bitcoind::utils::Context;
 use chainhook_types::{
     BitcoinBlockData, BlockIdentifier, Brc20BalanceData, Brc20Operation, Brc20TokenDeployData,
     Brc20TransferData, OrdinalInscriptionTransferData, OrdinalOperation, TransactionIdentifier,
