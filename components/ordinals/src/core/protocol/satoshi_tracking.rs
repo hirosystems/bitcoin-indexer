@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use bitcoin::{Address, Network, ScriptBuf};
-use bitcoind::utils::Context;
+use bitcoind::{try_info, utils::Context};
 use chainhook_types::{
     BitcoinBlockData, BitcoinTransactionData, BlockIdentifier, OrdinalInscriptionTransferData,
     OrdinalInscriptionTransferDestination, OrdinalOperation,
@@ -12,7 +12,6 @@ use super::inscription_sequencing::get_bitcoin_network;
 use crate::{
     core::{compute_next_satpoint_data, SatPosition},
     db::ordinals_pg,
-    try_info,
     utils::format_outpoint_to_watch,
 };
 
@@ -251,8 +250,8 @@ pub async fn augment_transaction_with_ordinal_transfers(
 #[cfg(test)]
 mod test {
     use bitcoin::Network;
-    use chainhook_postgres::{pg_begin, pg_pool_client};
     use bitcoind::utils::Context;
+    use chainhook_postgres::{pg_begin, pg_pool_client};
     use chainhook_types::{
         OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,

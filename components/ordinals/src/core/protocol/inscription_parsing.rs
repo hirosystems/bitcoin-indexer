@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str, str::FromStr};
 
 use bitcoin::{hash_types::Txid, Witness};
-use bitcoind::utils::Context;
+use bitcoind::{try_warn, utils::Context};
 use chainhook_types::{
     BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
     OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,
@@ -15,12 +15,9 @@ use ord::{
 };
 use serde_json::json;
 
-use crate::{
-    core::meta_protocols::brc20::{
-        brc20_activation_height,
-        parser::{parse_brc20_operation, ParsedBrc20Operation},
-    },
-    try_warn,
+use crate::core::meta_protocols::brc20::{
+    brc20_activation_height,
+    parser::{parse_brc20_operation, ParsedBrc20Operation},
 };
 
 pub fn parse_inscriptions_from_witness(

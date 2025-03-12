@@ -5,7 +5,10 @@ use std::{
 };
 
 use bitcoin::Network;
-use bitcoind::{indexer::bitcoin::cursor::TransactionBytesCursor, utils::Context};
+use bitcoind::{
+    indexer::bitcoin::cursor::TransactionBytesCursor, try_debug, try_error, try_info,
+    utils::Context,
+};
 use chainhook_types::{
     BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
     OrdinalInscriptionCurseType, OrdinalInscriptionTransferDestination, OrdinalOperation,
@@ -26,7 +29,6 @@ use super::{
 use crate::{
     core::{protocol::satoshi_tracking::UNBOUND_INSCRIPTION_SATPOINT, resolve_absolute_pointer},
     db::{self, ordinals_pg},
-    try_debug, try_error, try_info,
     utils::format_inscription_id,
 };
 
@@ -600,8 +602,8 @@ async fn update_tx_inscriptions_with_consensus_sequence_data(
 mod test {
     use std::collections::BTreeMap;
 
-    use chainhook_postgres::{pg_begin, pg_pool_client};
     use bitcoind::utils::Context;
+    use chainhook_postgres::{pg_begin, pg_pool_client};
     use chainhook_types::{
         bitcoin::{OutPoint, TxIn, TxOut},
         OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,

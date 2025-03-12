@@ -1,11 +1,9 @@
 use std::{path::PathBuf, thread::sleep, time::Duration};
 
-use bitcoind::utils::Context;
+use bitcoind::{try_error, try_warn, utils::Context};
 use config::Config;
 use rand::{rng, Rng};
 use rocksdb::{DBPinnableSlice, Options, DB};
-
-use crate::{try_error, try_warn};
 
 fn get_default_blocks_db_path(base_dir: &PathBuf) -> PathBuf {
     let mut destination_path = base_dir.clone();
@@ -242,9 +240,8 @@ pub fn insert_standardized_block(
     ctx: &Context,
 ) {
     let block_bytes =
-        match bitcoind::indexer::bitcoin::cursor::BlockBytesCursor::from_standardized_block(
-            &block,
-        ) {
+        match bitcoind::indexer::bitcoin::cursor::BlockBytesCursor::from_standardized_block(&block)
+        {
             Ok(block_bytes) => block_bytes,
             Err(e) => {
                 try_error!(

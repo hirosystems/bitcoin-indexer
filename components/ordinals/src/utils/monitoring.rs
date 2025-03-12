@@ -1,4 +1,4 @@
-use bitcoind::utils::Context;
+use bitcoind::{try_debug, try_info, try_warn, utils::Context};
 use hyper::{
     header::CONTENT_TYPE,
     service::{make_service_fn, service_fn},
@@ -8,8 +8,6 @@ use prometheus::{
     core::{AtomicU64, GenericGauge},
     Encoder, Registry, TextEncoder,
 };
-
-use crate::{try_debug, try_info, try_warn};
 
 type UInt64Gauge = GenericGauge<AtomicU64>;
 

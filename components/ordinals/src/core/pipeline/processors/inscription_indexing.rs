@@ -4,8 +4,8 @@ use std::{
     sync::Arc,
 };
 
+use bitcoind::{indexer::bitcoin::cursor::TransactionBytesCursor, try_info, utils::Context};
 use chainhook_postgres::{pg_begin, pg_pool_client};
-use bitcoind::{indexer::bitcoin::cursor::TransactionBytesCursor, utils::Context};
 use chainhook_types::{BitcoinBlockData, TransactionIdentifier};
 use config::Config;
 use dashmap::DashMap;
@@ -29,7 +29,6 @@ use crate::{
         },
     },
     db::ordinals_pg,
-    try_info,
     utils::monitoring::PrometheusMonitoring,
     PgConnectionPools,
 };

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, process, str::FromStr};
 
-use bitcoind::utils::Context;
+use bitcoind::{try_error, try_info, utils::Context};
 use cache::input_rune_balance::InputRuneBalance;
 use chainhook_postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
 use chainhook_types::BlockIdentifier;
@@ -12,8 +12,6 @@ use models::{
 use ordinals::RuneId;
 use refinery::embed_migrations;
 use tokio_postgres::{types::ToSql, Client, Error, GenericClient, NoTls, Transaction};
-
-use crate::{try_error, try_info};
 
 pub mod cache;
 pub mod index;

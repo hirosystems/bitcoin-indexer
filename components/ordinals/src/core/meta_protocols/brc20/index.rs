@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bitcoind::utils::Context;
+use bitcoind::{try_info, utils::Context};
 use chainhook_types::{
     BitcoinBlockData, BlockIdentifier, Brc20BalanceData, Brc20Operation, Brc20TokenDeployData,
     Brc20TransferData, OrdinalInscriptionTransferData, OrdinalOperation, TransactionIdentifier,
@@ -13,7 +13,7 @@ use super::{
     parser::ParsedBrc20Operation,
     verifier::{verify_brc20_operation, verify_brc20_transfers, VerifiedBrc20Operation},
 };
-use crate::{core::meta_protocols::brc20::u128_amount_to_decimals_str, try_info};
+use crate::core::meta_protocols::brc20::u128_amount_to_decimals_str;
 
 /// Index ordinal transfers in a single Bitcoin block looking for BRC-20 transfers.
 async fn index_unverified_brc20_transfers(

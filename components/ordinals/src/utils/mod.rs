@@ -1,4 +1,3 @@
-pub mod logger;
 pub mod monitoring;
 
 use std::{

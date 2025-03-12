@@ -1,7 +1,7 @@
-use bitcoind::utils::Context;
+use bitcoind::{try_error, try_info, utils::Context};
 use rocksdb::DB;
 
-use crate::{db::blocks::insert_entry_in_blocks, try_error, try_info};
+use crate::db::blocks::insert_entry_in_blocks;
 
 pub fn store_compacted_blocks(
     mut compacted_blocks: Vec<(u64, Vec<u8>)>,

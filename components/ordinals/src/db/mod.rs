@@ -2,11 +2,11 @@ pub mod blocks;
 pub mod models;
 pub mod ordinals_pg;
 
+use bitcoind::{try_info, try_warn, utils::Context};
 use chainhook_postgres::pg_connect_with_retry;
-use bitcoind::utils::Context;
 use config::Config;
 
-use crate::{core::meta_protocols::brc20::brc20_pg, try_info, try_warn};
+use crate::core::meta_protocols::brc20::brc20_pg;
 
 pub async fn migrate_dbs(config: &Config, ctx: &Context) -> Result<(), String> {
     let Some(ordinals) = &config.ordinals else {

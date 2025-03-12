@@ -2,6 +2,7 @@ use std::{hash::BuildHasherDefault, sync::Arc};
 
 use bitcoind::{
     indexer::bitcoin::cursor::{BlockBytesCursor, TransactionBytesCursor},
+    try_error,
     utils::Context,
 };
 use chainhook_types::{BlockIdentifier, OrdinalInscriptionNumber, TransactionIdentifier};
@@ -10,7 +11,7 @@ use dashmap::DashMap;
 use fxhash::FxHasher;
 use ord::{height::Height, sat::Sat};
 
-use crate::{db::blocks::find_pinned_block_bytes_at_block_height, try_error};
+use crate::db::blocks::find_pinned_block_bytes_at_block_height;
 
 #[derive(Clone, Debug)]
 pub struct TraversalResult {

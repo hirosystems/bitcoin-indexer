@@ -12,6 +12,7 @@ use std::{sync::Arc, thread::JoinHandle};
 
 use bitcoind::{
     indexer::{start_bitcoin_indexer, Indexer, IndexerCommand},
+    try_debug,
     utils::{future_block_on, Context},
 };
 use chainhook_postgres::{pg_pool, pg_pool_client};
@@ -23,9 +24,6 @@ use db::{
 };
 use deadpool_postgres::Pool;
 use utils::monitoring::PrometheusMonitoring;
-
-#[macro_use]
-extern crate hiro_system_kit;
 
 #[macro_use]
 extern crate serde_derive;
