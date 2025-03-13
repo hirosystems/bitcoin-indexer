@@ -1,5 +1,5 @@
 use chainhook_postgres::{types::PgNumericU64, FromPgRow};
-use chainhook_types::OrdinalInscriptionRevealData;
+use bitcoind::types::OrdinalInscriptionRevealData;
 use ord::{rarity::Rarity, sat::Sat};
 use tokio_postgres::Row;
 

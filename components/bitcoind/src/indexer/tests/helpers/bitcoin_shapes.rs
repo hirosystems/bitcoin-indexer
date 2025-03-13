@@ -1,4 +1,4 @@
-use chainhook_types::{BitcoinBlockData, BlockchainEvent};
+use crate::types::{BitcoinBlockData, BlockchainEvent};
 use hiro_system_kit::slog;
 
 use super::{super::BlockchainEventExpectation, bitcoin_blocks};

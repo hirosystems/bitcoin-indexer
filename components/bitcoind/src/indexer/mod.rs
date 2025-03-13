@@ -13,7 +13,6 @@ use bitcoin::{
     build_http_client, download_and_parse_block_with_retry,
     pipeline::start_block_download_pipeline, standardize_bitcoin_block,
 };
-use chainhook_types::{BitcoinBlockData, BitcoinNetwork, BlockIdentifier, BlockchainEvent};
 use config::Config;
 use crossbeam_channel::{Receiver, Sender, TryRecvError};
 use reqwest::Client;
@@ -22,6 +21,7 @@ use self::fork_scratch_pad::ForkScratchPad;
 use crate::{
     observer::zmq::start_zeromq_pipeline,
     try_debug, try_info,
+    types::{BitcoinBlockData, BitcoinNetwork, BlockIdentifier, BlockchainEvent},
     utils::{
         bitcoind::{bitcoind_get_chain_tip, bitcoind_wait_for_chain_tip},
         future_block_on, AbstractBlock, BlockHeights, Context,

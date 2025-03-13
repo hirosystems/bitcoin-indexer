@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use chainhook_types::BitcoinNetwork;
+use crate::types::BitcoinNetwork;
 use config::Config;
 use crossbeam_channel::bounded;
 use reqwest::Client;

@@ -2,7 +2,7 @@ use std::{collections::HashMap, str, str::FromStr};
 
 use bitcoin::{hash_types::Txid, Witness};
 use bitcoind::{try_warn, utils::Context};
-use chainhook_types::{
+use bitcoind::types::{
     BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
     OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,
     OrdinalOperation,
@@ -170,7 +170,7 @@ mod test {
     use std::collections::HashMap;
 
     use bitcoind::utils::Context;
-    use chainhook_types::OrdinalOperation;
+    use bitcoind::types::OrdinalOperation;
     use config::Config;
 
     use super::parse_inscriptions_in_standardized_block;

@@ -1,4 +1,4 @@
-use chainhook_types::OrdinalInscriptionRevealData;
+use bitcoind::types::OrdinalInscriptionRevealData;
 use regex::Regex;
 
 lazy_static! {
@@ -33,7 +33,7 @@ impl DbInscriptionRecursion {
 
 #[cfg(test)]
 mod test {
-    use chainhook_types::{OrdinalInscriptionNumber, OrdinalInscriptionRevealData};
+    use bitcoind::types::{OrdinalInscriptionNumber, OrdinalInscriptionRevealData};
 
     use super::DbInscriptionRecursion;
 

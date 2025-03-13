@@ -1,9 +1,8 @@
 use std::collections::VecDeque;
 
-use chainhook_types::BlockIdentifier;
-
 use crate::{
     try_debug, try_info, try_warn,
+    types::BlockIdentifier,
     utils::{AbstractBlock, Context},
 };
 

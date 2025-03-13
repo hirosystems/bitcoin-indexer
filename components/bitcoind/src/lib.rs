@@ -10,4 +10,5 @@ pub use bitcoincore_rpc;
 
 pub mod indexer;
 pub mod observer;
+pub mod types;
 pub mod utils;

@@ -2,7 +2,6 @@
 members = [
     "components/bitcoind",
     "components/chainhook-postgres",
-    "components/chainhook-types-rs",
     "components/cli",
     "components/config",
     "components/ordinals",

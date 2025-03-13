@@ -7,7 +7,7 @@ use std::{
     path::Path,
 };
 
-use chainhook_types::{BitcoinBlockData, BlockHeader, BlockIdentifier};
+use crate::types::{BitcoinBlockData, BlockHeader, BlockIdentifier};
 use hiro_system_kit::{slog, Logger};
 use reqwest::RequestBuilder;
 

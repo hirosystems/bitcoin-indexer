@@ -1,5 +1,5 @@
 use bitcoind::utils::Context;
-use chainhook_types::{
+use bitcoind::types::{
     OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
     OrdinalInscriptionTransferDestination,
 };

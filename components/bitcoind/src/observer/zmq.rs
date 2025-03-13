@@ -1,4 +1,4 @@
-use chainhook_types::BitcoinNetwork;
+use crate::types::BitcoinNetwork;
 use config::Config;
 use zmq::Socket;
 

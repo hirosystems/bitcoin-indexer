@@ -2,9 +2,9 @@ use std::thread::JoinHandle;
 
 use bitcoind::{
     indexer::{start_bitcoin_indexer, Indexer, IndexerCommand},
+    types::BlockIdentifier,
     utils::{future_block_on, Context},
 };
-use chainhook_types::BlockIdentifier;
 use config::Config;
 use db::{
     cache::index_cache::IndexCache,

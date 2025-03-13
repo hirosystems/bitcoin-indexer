@@ -9,7 +9,7 @@ use bitcoind::{
     indexer::bitcoin::cursor::TransactionBytesCursor, try_debug, try_error, try_info,
     utils::Context,
 };
-use chainhook_types::{
+use bitcoind::types::{
     BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
     OrdinalInscriptionCurseType, OrdinalInscriptionTransferDestination, OrdinalOperation,
     TransactionIdentifier,
@@ -604,7 +604,7 @@ mod test {
 
     use bitcoind::utils::Context;
     use chainhook_postgres::{pg_begin, pg_pool_client};
-    use chainhook_types::{
+    use bitcoind::types::{
         bitcoin::{OutPoint, TxIn, TxOut},
         OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,
         OrdinalOperation, TransactionIdentifier,

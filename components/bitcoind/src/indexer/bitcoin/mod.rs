@@ -8,7 +8,7 @@ use bitcoincore_rpc::{
     jsonrpc::error::RpcError,
 };
 use bitcoincore_rpc_json::GetRawTransactionResultVoutScriptPubKey;
-use chainhook_types::{
+use crate::types::{
     bitcoin::{OutPoint, TxIn, TxOut},
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinNetwork, BitcoinTransactionData,
     BitcoinTransactionMetadata, BlockHeader, BlockIdentifier, TransactionIdentifier,

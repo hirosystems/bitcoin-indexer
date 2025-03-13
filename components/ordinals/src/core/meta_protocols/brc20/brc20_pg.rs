@@ -502,7 +502,7 @@ mod test {
         types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8},
         FromPgRow,
     };
-    use chainhook_types::{
+    use bitcoind::types::{
         BlockIdentifier, OrdinalInscriptionTransferDestination, TransactionIdentifier,
     };
     use deadpool_postgres::GenericClient;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bitcoind::{try_info, utils::Context};
-use chainhook_types::{
+use bitcoind::types::{
     BitcoinBlockData, BlockIdentifier, Brc20BalanceData, Brc20Operation, Brc20TokenDeployData,
     Brc20TransferData, OrdinalInscriptionTransferData, OrdinalOperation, TransactionIdentifier,
 };
@@ -263,7 +263,7 @@ mod test {
     use std::collections::HashMap;
 
     use chainhook_postgres::{pg_begin, pg_pool_client};
-    use chainhook_types::{
+    use bitcoind::types::{
         Brc20BalanceData, Brc20Operation, Brc20TokenDeployData, Brc20TransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,
     };

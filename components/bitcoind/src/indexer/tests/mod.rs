@@ -1,5 +1,5 @@
 pub mod helpers;
-use chainhook_types::{BitcoinBlockData, BlockchainEvent};
+use crate::types::{BitcoinBlockData, BlockchainEvent};
 
 use super::fork_scratch_pad::ForkScratchPad;
 use crate::utils::{AbstractBlock, Context};

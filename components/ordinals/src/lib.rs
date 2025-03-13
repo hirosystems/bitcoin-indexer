@@ -13,10 +13,10 @@ use std::{sync::Arc, thread::JoinHandle};
 use bitcoind::{
     indexer::{start_bitcoin_indexer, Indexer, IndexerCommand},
     try_debug,
+    types::BlockIdentifier,
     utils::{future_block_on, Context},
 };
 use chainhook_postgres::{pg_pool, pg_pool_client};
-use chainhook_types::BlockIdentifier;
 use config::Config;
 use db::{
     blocks::{self, find_last_block_inserted, open_blocks_db_with_retry},

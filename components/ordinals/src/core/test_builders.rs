@@ -1,4 +1,4 @@
-use chainhook_types::{
+use bitcoind::types::{
     bitcoin::{OutPoint, TxIn, TxOut},
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinNetwork, BitcoinTransactionData,
     BitcoinTransactionMetadata, BlockIdentifier, Brc20Operation, OrdinalInscriptionNumber,

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use bitcoin::{Address, Network, ScriptBuf};
 use bitcoind::{try_info, utils::Context};
-use chainhook_types::{
+use bitcoind::types::{
     BitcoinBlockData, BitcoinTransactionData, BlockIdentifier, OrdinalInscriptionTransferData,
     OrdinalInscriptionTransferDestination, OrdinalOperation,
 };
@@ -252,7 +252,7 @@ mod test {
     use bitcoin::Network;
     use bitcoind::utils::Context;
     use chainhook_postgres::{pg_begin, pg_pool_client};
-    use chainhook_types::{
+    use bitcoind::types::{
         OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,
     };

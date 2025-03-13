@@ -1,6 +1,6 @@
 use std::io::{Cursor, Read, Write};
 
-use chainhook_types::BitcoinBlockData;
+use crate::types::BitcoinBlockData;
 
 use super::BitcoinBlockFullBreakdown;
 
@@ -366,7 +366,7 @@ impl Iterator for TransactionBytesCursorIterator<'_> {
 
 #[cfg(test)]
 mod tests {
-    use chainhook_types::BitcoinNetwork;
+    use crate::types::BitcoinNetwork;
 
     use super::*;
     use crate::{

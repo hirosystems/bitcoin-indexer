@@ -5,7 +5,7 @@ use bitcoind::{
     try_error,
     utils::Context,
 };
-use chainhook_types::{BlockIdentifier, OrdinalInscriptionNumber, TransactionIdentifier};
+use bitcoind::types::{BlockIdentifier, OrdinalInscriptionNumber, TransactionIdentifier};
 use config::Config;
 use dashmap::DashMap;
 use fxhash::FxHasher;
@@ -307,7 +307,7 @@ mod test {
         indexer::bitcoin::cursor::{TransactionBytesCursor, TransactionInputBytesCursor},
         utils::Context,
     };
-    use chainhook_types::{bitcoin::TxOut, BlockIdentifier, TransactionIdentifier};
+    use bitcoind::types::{bitcoin::TxOut, BlockIdentifier, TransactionIdentifier};
     use config::Config;
     use dashmap::DashMap;
     use fxhash::FxHasher;

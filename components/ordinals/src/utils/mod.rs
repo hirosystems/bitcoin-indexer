@@ -1,6 +1,6 @@
 pub mod monitoring;
 
-use chainhook_types::TransactionIdentifier;
+use bitcoind::types::TransactionIdentifier;
 
 pub fn format_inscription_id(
     transaction_identifier: &TransactionIdentifier,

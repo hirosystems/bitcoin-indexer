@@ -6,7 +6,7 @@ use bitcoin::{
     Amount, Network, ScriptBuf, Transaction,
 };
 use bitcoind::{try_info, utils::Context};
-use chainhook_types::{BitcoinBlockData, BitcoinTransactionData};
+use bitcoind::types::{BitcoinBlockData, BitcoinTransactionData};
 use ordinals::{Artifact, Runestone};
 use tokio_postgres::Client;
 

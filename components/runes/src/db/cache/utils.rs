@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 
 use bitcoin::{Address, ScriptBuf};
 use bitcoind::{try_info, try_warn, utils::Context};
-use chainhook_types::bitcoin::TxIn;
+use bitcoind::types::bitcoin::TxIn;
 use lru::LruCache;
 use ordinals::RuneId;
 use tokio_postgres::Transaction;
@@ -684,7 +684,7 @@ mod test {
         use std::num::NonZeroUsize;
 
         use bitcoind::utils::Context;
-        use chainhook_types::{
+        use bitcoind::types::{
             bitcoin::{OutPoint, TxIn},
             TransactionIdentifier,
         };

@@ -1,7 +1,7 @@
 use std::{thread::sleep, time::Duration};
 
 use bitcoincore_rpc::{Auth, Client, RpcApi};
-use chainhook_types::BlockIdentifier;
+use crate::types::BlockIdentifier;
 use config::BitcoindConfig;
 
 use crate::{try_error, try_info, utils::Context};

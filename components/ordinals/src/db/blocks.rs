@@ -185,7 +185,7 @@ pub fn delete_blocks_in_block_range(
 
 #[cfg(test)]
 pub fn insert_standardized_block(
-    block: &chainhook_types::BitcoinBlockData,
+    block: &bitcoind::types::BitcoinBlockData,
     blocks_db_rw: &DB,
     ctx: &Context,
 ) {

@@ -4,7 +4,7 @@ use chainhook_postgres::{
     types::{PgBigIntU32, PgNumericU64},
     utils,
 };
-use chainhook_types::{
+use bitcoind::types::{
     BitcoinBlockData, BlockIdentifier, OrdinalInscriptionNumber, OrdinalOperation,
     TransactionIdentifier,
 };
@@ -1058,7 +1058,7 @@ mod test {
         types::{PgBigIntU32, PgNumericU64},
         FromPgRow,
     };
-    use chainhook_types::{
+    use bitcoind::types::{
         OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,
     };
