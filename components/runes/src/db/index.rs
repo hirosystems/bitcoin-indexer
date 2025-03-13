@@ -5,8 +5,11 @@ use bitcoin::{
     transaction::{TxOut, Version},
     Amount, Network, ScriptBuf, Transaction,
 };
-use bitcoind::{try_info, utils::Context};
-use bitcoind::types::{BitcoinBlockData, BitcoinTransactionData};
+use bitcoind::{
+    try_info,
+    types::{BitcoinBlockData, BitcoinTransactionData},
+    utils::Context,
+};
 use ordinals::{Artifact, Runestone};
 use tokio_postgres::Client;
 

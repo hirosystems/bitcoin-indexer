@@ -1,10 +1,10 @@
-use postgres::{
-    types::{PgBigIntU32, PgNumericU64},
-    FromPgRow,
-};
 use bitcoind::types::{
     BlockIdentifier, OrdinalInscriptionCurseType, OrdinalInscriptionRevealData,
     TransactionIdentifier,
+};
+use postgres::{
+    types::{PgBigIntU32, PgNumericU64},
+    FromPgRow,
 };
 use tokio_postgres::Row;
 

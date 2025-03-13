@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
-use bitcoind::{try_info, utils::Context};
-use bitcoind::types::{
-    BitcoinBlockData, BlockIdentifier, Brc20BalanceData, Brc20Operation, Brc20TokenDeployData,
-    Brc20TransferData, OrdinalInscriptionTransferData, OrdinalOperation, TransactionIdentifier,
+use bitcoind::{
+    try_info,
+    types::{
+        BitcoinBlockData, BlockIdentifier, Brc20BalanceData, Brc20Operation, Brc20TokenDeployData,
+        Brc20TransferData, OrdinalInscriptionTransferData, OrdinalOperation, TransactionIdentifier,
+    },
+    utils::Context,
 };
 use deadpool_postgres::Transaction;
 
@@ -262,11 +265,11 @@ pub async fn index_block_and_insert_brc20_operations(
 mod test {
     use std::collections::HashMap;
 
-    use postgres::{pg_begin, pg_pool_client};
     use bitcoind::types::{
         Brc20BalanceData, Brc20Operation, Brc20TokenDeployData, Brc20TransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,
     };
+    use postgres::{pg_begin, pg_pool_client};
 
     use crate::{
         core::{

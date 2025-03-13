@@ -6,13 +6,14 @@ use std::{
 
 use bitcoin::Network;
 use bitcoind::{
-    indexer::bitcoin::cursor::TransactionBytesCursor, try_debug, try_error, try_info,
+    indexer::bitcoin::cursor::TransactionBytesCursor,
+    try_debug, try_error, try_info,
+    types::{
+        BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
+        OrdinalInscriptionCurseType, OrdinalInscriptionTransferDestination, OrdinalOperation,
+        TransactionIdentifier,
+    },
     utils::Context,
-};
-use bitcoind::types::{
-    BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
-    OrdinalInscriptionCurseType, OrdinalInscriptionTransferDestination, OrdinalOperation,
-    TransactionIdentifier,
 };
 use config::Config;
 use crossbeam_channel::unbounded;
@@ -602,14 +603,16 @@ async fn update_tx_inscriptions_with_consensus_sequence_data(
 mod test {
     use std::collections::BTreeMap;
 
-    use bitcoind::utils::Context;
-    use postgres::{pg_begin, pg_pool_client};
-    use bitcoind::types::{
-        bitcoin::{OutPoint, TxIn, TxOut},
-        OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,
-        OrdinalOperation, TransactionIdentifier,
+    use bitcoind::{
+        types::{
+            bitcoin::{OutPoint, TxIn, TxOut},
+            OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,
+            OrdinalOperation, TransactionIdentifier,
+        },
+        utils::Context,
     };
     use ord::charm::Charm;
+    use postgres::{pg_begin, pg_pool_client};
     use test_case::test_case;
 
     use super::update_block_inscriptions_with_consensus_sequence_data;

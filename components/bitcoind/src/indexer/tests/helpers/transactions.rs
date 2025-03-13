@@ -1,5 +1,6 @@
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::{opcodes, script::Builder as BitcoinScriptBuilder};
+
 use crate::types::{
     bitcoin::TxOut, BitcoinTransactionData, BitcoinTransactionMetadata, TransactionIdentifier,
 };

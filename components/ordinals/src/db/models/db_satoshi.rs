@@ -1,6 +1,6 @@
-use postgres::{types::PgNumericU64, FromPgRow};
 use bitcoind::types::OrdinalInscriptionRevealData;
 use ord::{rarity::Rarity, sat::Sat};
+use postgres::{types::PgNumericU64, FromPgRow};
 use tokio_postgres::Row;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

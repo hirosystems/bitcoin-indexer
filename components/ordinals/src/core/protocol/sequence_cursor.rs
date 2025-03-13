@@ -170,8 +170,8 @@ impl SequenceCursor {
 #[cfg(test)]
 mod test {
     use bitcoin::Network;
-    use postgres::{pg_begin, pg_pool_client};
     use bitcoind::types::OrdinalOperation;
+    use postgres::{pg_begin, pg_pool_client};
     use test_case::test_case;
 
     use super::SequenceCursor;

@@ -3,8 +3,8 @@ pub mod models;
 pub mod ordinals_pg;
 
 use bitcoind::{try_info, try_warn, utils::Context};
-use postgres::pg_connect_with_retry;
 use config::Config;
+use postgres::pg_connect_with_retry;
 
 use crate::core::meta_protocols::brc20::brc20_pg;
 
@@ -86,9 +86,7 @@ pub fn pg_test_connection_pool() -> deadpool_postgres::Pool {
 
 #[cfg(test)]
 pub async fn pg_test_connection() -> tokio_postgres::Client {
-    postgres::pg_connect(&pg_test_config())
-        .await
-        .unwrap()
+    postgres::pg_connect(&pg_test_config()).await.unwrap()
 }
 
 #[cfg(test)]

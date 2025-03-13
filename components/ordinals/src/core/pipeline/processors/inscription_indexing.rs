@@ -5,13 +5,15 @@ use std::{
 };
 
 use bitcoind::{
-    indexer::bitcoin::cursor::TransactionBytesCursor, try_info, try_warn, utils::Context,
+    indexer::bitcoin::cursor::TransactionBytesCursor,
+    try_info, try_warn,
+    types::{BitcoinBlockData, TransactionIdentifier},
+    utils::Context,
 };
-use postgres::{pg_begin, pg_pool_client};
-use bitcoind::types::{BitcoinBlockData, TransactionIdentifier};
 use config::Config;
 use dashmap::DashMap;
 use fxhash::FxHasher;
+use postgres::{pg_begin, pg_pool_client};
 
 use crate::{
     core::{

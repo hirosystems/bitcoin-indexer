@@ -1,8 +1,7 @@
 use std::io::{Cursor, Read, Write};
 
-use crate::types::BitcoinBlockData;
-
 use super::BitcoinBlockFullBreakdown;
+use crate::types::BitcoinBlockData;
 
 #[derive(Debug)]
 pub struct BlockBytesCursor<'a> {
@@ -366,11 +365,10 @@ impl Iterator for TransactionBytesCursorIterator<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::BitcoinNetwork;
-
     use super::*;
     use crate::{
         indexer::bitcoin::{parse_downloaded_block, standardize_bitcoin_block},
+        types::BitcoinNetwork,
         utils::Context,
     };
 

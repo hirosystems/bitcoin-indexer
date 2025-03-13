@@ -8,17 +8,20 @@ use bitcoincore_rpc::{
     jsonrpc::error::RpcError,
 };
 use bitcoincore_rpc_json::GetRawTransactionResultVoutScriptPubKey;
-use crate::types::{
-    bitcoin::{OutPoint, TxIn, TxOut},
-    BitcoinBlockData, BitcoinBlockMetadata, BitcoinNetwork, BitcoinTransactionData,
-    BitcoinTransactionMetadata, BlockHeader, BlockIdentifier, TransactionIdentifier,
-};
 use config::BitcoindConfig;
 use hiro_system_kit::slog;
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
 
-use crate::{try_debug, utils::Context};
+use crate::{
+    try_debug,
+    types::{
+        bitcoin::{OutPoint, TxIn, TxOut},
+        BitcoinBlockData, BitcoinBlockMetadata, BitcoinNetwork, BitcoinTransactionData,
+        BitcoinTransactionMetadata, BlockHeader, BlockIdentifier, TransactionIdentifier,
+    },
+    utils::Context,
+};
 
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

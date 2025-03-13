@@ -1,5 +1,5 @@
-use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
 use ordinals::RuneId;
+use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
 use tokio_postgres::Row;
 
 use super::db_ledger_operation::DbLedgerOperation;

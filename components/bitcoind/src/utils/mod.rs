@@ -7,11 +7,13 @@ use std::{
     path::Path,
 };
 
-use crate::types::{BitcoinBlockData, BlockHeader, BlockIdentifier};
 use hiro_system_kit::{slog, Logger};
 use reqwest::RequestBuilder;
 
-use crate::try_crit;
+use crate::{
+    try_crit,
+    types::{BitcoinBlockData, BlockHeader, BlockIdentifier},
+};
 
 #[derive(Clone)]
 pub struct Context {

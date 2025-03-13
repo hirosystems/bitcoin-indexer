@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
+use deadpool_postgres::GenericClient;
 use postgres::{
     types::{PgNumericU128, PgNumericU64},
     utils, FromPgRow, BATCH_QUERY_CHUNK_SIZE,
 };
-use deadpool_postgres::GenericClient;
 use refinery::embed_migrations;
 use tokio_postgres::{types::ToSql, Client};
 
@@ -497,15 +497,15 @@ pub async fn rollback_block_operations<T: GenericClient>(
 mod test {
     use std::collections::HashMap;
 
+    use bitcoind::types::{
+        BlockIdentifier, OrdinalInscriptionTransferDestination, TransactionIdentifier,
+    };
+    use deadpool_postgres::GenericClient;
     use postgres::{
         pg_begin, pg_pool_client,
         types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8},
         FromPgRow,
     };
-    use bitcoind::types::{
-        BlockIdentifier, OrdinalInscriptionTransferDestination, TransactionIdentifier,
-    };
-    use deadpool_postgres::GenericClient;
 
     use crate::{
         core::meta_protocols::brc20::{

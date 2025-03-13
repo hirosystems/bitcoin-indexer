@@ -1,8 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use bitcoin::{Address, ScriptBuf};
-use bitcoind::{try_info, try_warn, utils::Context};
-use bitcoind::types::bitcoin::TxIn;
+use bitcoind::{try_info, try_warn, types::bitcoin::TxIn, utils::Context};
 use lru::LruCache;
 use ordinals::RuneId;
 use tokio_postgres::Transaction;
@@ -683,10 +682,12 @@ mod test {
     mod input_balances {
         use std::num::NonZeroUsize;
 
-        use bitcoind::utils::Context;
-        use bitcoind::types::{
-            bitcoin::{OutPoint, TxIn},
-            TransactionIdentifier,
+        use bitcoind::{
+            types::{
+                bitcoin::{OutPoint, TxIn},
+                TransactionIdentifier,
+            },
+            utils::Context,
         };
         use lru::LruCache;
         use maplit::hashmap;

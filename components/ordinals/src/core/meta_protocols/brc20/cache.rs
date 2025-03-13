@@ -3,7 +3,6 @@ use std::{
     num::NonZeroUsize,
 };
 
-use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8};
 use bitcoind::types::{
     BlockIdentifier, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
     TransactionIdentifier,
@@ -12,6 +11,7 @@ use config::Config;
 use deadpool_postgres::GenericClient;
 use lru::LruCache;
 use maplit::hashmap;
+use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8};
 
 use super::{
     brc20_pg,
@@ -486,8 +486,8 @@ impl Brc20MemoryCache {
 
 #[cfg(test)]
 mod test {
-    use postgres::{pg_begin, pg_pool_client};
     use bitcoind::types::{BitcoinNetwork, BlockIdentifier, TransactionIdentifier};
+    use postgres::{pg_begin, pg_pool_client};
     use test_case::test_case;
 
     use super::Brc20MemoryCache;

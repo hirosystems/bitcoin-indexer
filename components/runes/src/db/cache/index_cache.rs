@@ -1,8 +1,7 @@
 use std::{collections::HashMap, num::NonZeroUsize, str::FromStr};
 
 use bitcoin::{Network, ScriptBuf};
-use bitcoind::{try_debug, try_info, try_warn, utils::Context};
-use bitcoind::types::bitcoin::TxIn;
+use bitcoind::{try_debug, try_info, try_warn, types::bitcoin::TxIn, utils::Context};
 use config::Config;
 use lru::LruCache;
 use ordinals::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
