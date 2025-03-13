@@ -170,7 +170,7 @@ impl SequenceCursor {
 #[cfg(test)]
 mod test {
     use bitcoin::Network;
-    use chainhook_postgres::{pg_begin, pg_pool_client};
+    use postgres::{pg_begin, pg_pool_client};
     use bitcoind::types::OrdinalOperation;
     use test_case::test_case;
 

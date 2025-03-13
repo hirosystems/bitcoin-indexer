@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chainhook_postgres::{
+use postgres::{
     types::{PgNumericU128, PgNumericU64},
     utils, FromPgRow, BATCH_QUERY_CHUNK_SIZE,
 };
@@ -497,7 +497,7 @@ pub async fn rollback_block_operations<T: GenericClient>(
 mod test {
     use std::collections::HashMap;
 
-    use chainhook_postgres::{
+    use postgres::{
         pg_begin, pg_pool_client,
         types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8},
         FromPgRow,

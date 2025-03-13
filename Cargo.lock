@@ -576,20 +576,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
-name = "chainhook-postgres"
-version = "2.2.5"
-dependencies = [
- "bytes",
- "config",
- "deadpool-postgres",
- "num-traits",
- "slog",
- "test-case",
- "tokio",
- "tokio-postgres",
-]
-
-[[package]]
 name = "chrono"
 version = "0.4.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2407,7 +2393,6 @@ dependencies = [
  "atty",
  "bitcoin 0.32.5",
  "bitcoind",
- "chainhook-postgres",
  "config",
  "crossbeam-channel",
  "dashmap",
@@ -2425,6 +2410,7 @@ dependencies = [
  "maplit",
  "num_cpus",
  "ord",
+ "postgres",
  "pprof",
  "progressing",
  "prometheus",
@@ -2548,6 +2534,20 @@ name = "pkg-config"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
+
+[[package]]
+name = "postgres"
+version = "2.2.5"
+dependencies = [
+ "bytes",
+ "config",
+ "deadpool-postgres",
+ "num-traits",
+ "slog",
+ "test-case",
+ "tokio",
+ "tokio-postgres",
+]
 
 [[package]]
 name = "postgres-protocol"
@@ -3189,7 +3189,6 @@ dependencies = [
  "bitcoin 0.32.5",
  "bitcoind",
  "bytes",
- "chainhook-postgres",
  "clap 4.5.32",
  "clap_generate",
  "config",
@@ -3202,6 +3201,7 @@ dependencies = [
  "maplit",
  "num-traits",
  "ordinals 0.0.15",
+ "postgres",
  "rand 0.8.5",
  "refinery",
  "serde",

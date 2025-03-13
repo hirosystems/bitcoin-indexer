@@ -262,7 +262,7 @@ pub async fn index_block_and_insert_brc20_operations(
 mod test {
     use std::collections::HashMap;
 
-    use chainhook_postgres::{pg_begin, pg_pool_client};
+    use postgres::{pg_begin, pg_pool_client};
     use bitcoind::types::{
         Brc20BalanceData, Brc20Operation, Brc20TokenDeployData, Brc20TransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,

@@ -1,4 +1,4 @@
-use chainhook_postgres::types::{PgNumericU128, PgNumericU64};
+use postgres::types::{PgNumericU128, PgNumericU64};
 
 /// An update to a rune that affects its total counts.
 #[derive(Debug, Clone)]

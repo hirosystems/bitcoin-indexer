@@ -42,7 +42,7 @@ hyper = { version = "=0.14.27" }
 lazy_static = { version = "1.4.0" }
 regex = "1.10.3"
 prometheus = "0.13.3"
-chainhook-postgres = { path = "../chainhook-postgres" }
+postgres = { path = "../postgres" }
 tokio-postgres = { workspace = true }
 deadpool-postgres = { workspace = true }
 refinery = { workspace = true }

@@ -1,14 +1,14 @@
 use std::collections::{BTreeMap, HashMap};
 
-use chainhook_postgres::{
-    types::{PgBigIntU32, PgNumericU64},
-    utils,
-};
 use bitcoind::types::{
     BitcoinBlockData, BlockIdentifier, OrdinalInscriptionNumber, OrdinalOperation,
     TransactionIdentifier,
 };
 use deadpool_postgres::GenericClient;
+use postgres::{
+    types::{PgBigIntU32, PgNumericU64},
+    utils,
+};
 use refinery::embed_migrations;
 use tokio_postgres::{types::ToSql, Client};
 
@@ -1053,16 +1053,16 @@ pub async fn rollback_block<T: GenericClient>(block_height: u64, client: &T) -> 
 
 #[cfg(test)]
 mod test {
-    use chainhook_postgres::{
-        pg_begin, pg_pool_client,
-        types::{PgBigIntU32, PgNumericU64},
-        FromPgRow,
-    };
     use bitcoind::types::{
         OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,
     };
     use deadpool_postgres::GenericClient;
+    use postgres::{
+        pg_begin, pg_pool_client,
+        types::{PgBigIntU32, PgNumericU64},
+        FromPgRow,
+    };
 
     use crate::{
         core::test_builders::{TestBlockBuilder, TestTransactionBuilder},

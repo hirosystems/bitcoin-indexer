@@ -3,7 +3,7 @@ use std::{
     num::NonZeroUsize,
 };
 
-use chainhook_postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8};
+use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8};
 use bitcoind::types::{
     BlockIdentifier, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
     TransactionIdentifier,
@@ -486,7 +486,7 @@ impl Brc20MemoryCache {
 
 #[cfg(test)]
 mod test {
-    use chainhook_postgres::{pg_begin, pg_pool_client};
+    use postgres::{pg_begin, pg_pool_client};
     use bitcoind::types::{BitcoinNetwork, BlockIdentifier, TransactionIdentifier};
     use test_case::test_case;
 

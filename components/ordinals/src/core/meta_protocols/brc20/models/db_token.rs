@@ -1,4 +1,4 @@
-use chainhook_postgres::{
+use postgres::{
     types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8},
     FromPgRow,
 };

@@ -603,7 +603,7 @@ mod test {
     use std::collections::BTreeMap;
 
     use bitcoind::utils::Context;
-    use chainhook_postgres::{pg_begin, pg_pool_client};
+    use postgres::{pg_begin, pg_pool_client};
     use bitcoind::types::{
         bitcoin::{OutPoint, TxIn, TxOut},
         OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,

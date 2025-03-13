@@ -7,7 +7,7 @@ use std::{
 use bitcoind::{
     indexer::bitcoin::cursor::TransactionBytesCursor, try_info, try_warn, utils::Context,
 };
-use chainhook_postgres::{pg_begin, pg_pool_client};
+use postgres::{pg_begin, pg_pool_client};
 use bitcoind::types::{BitcoinBlockData, TransactionIdentifier};
 use config::Config;
 use dashmap::DashMap;

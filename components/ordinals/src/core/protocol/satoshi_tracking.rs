@@ -251,7 +251,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
 mod test {
     use bitcoin::Network;
     use bitcoind::utils::Context;
-    use chainhook_postgres::{pg_begin, pg_pool_client};
+    use postgres::{pg_begin, pg_pool_client};
     use bitcoind::types::{
         OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,

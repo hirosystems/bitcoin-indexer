@@ -1,4 +1,4 @@
-use chainhook_postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
+use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
 use ordinals::RuneId;
 use tokio_postgres::Row;
 

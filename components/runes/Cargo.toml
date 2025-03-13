@@ -19,7 +19,7 @@ ctrlc = { version = "3.2.2", optional = true }
 crossbeam-channel = "0.5.8"
 clap = { version = "4.3.2", features = ["derive"] }
 clap_generate = { version = "3.0.3" }
-chainhook-postgres = { path = "../chainhook-postgres" }
+postgres = { path = "../postgres" }
 tokio = { workspace = true }
 tokio-postgres = { workspace = true }
 deadpool-postgres = { workspace = true }

@@ -298,7 +298,7 @@ pub async fn verify_brc20_transfers(
 
 #[cfg(test)]
 mod test {
-    use chainhook_postgres::{pg_begin, pg_pool_client};
+    use postgres::{pg_begin, pg_pool_client};
     use bitcoind::types::{
         BitcoinNetwork, BlockIdentifier, OrdinalInscriptionRevealData,
         OrdinalInscriptionTransferData, OrdinalInscriptionTransferDestination,

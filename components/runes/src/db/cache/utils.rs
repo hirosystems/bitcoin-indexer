@@ -584,7 +584,7 @@ mod test {
     }
 
     mod mint_validation {
-        use chainhook_postgres::types::{PgNumericU128, PgNumericU64};
+        use postgres::types::{PgNumericU128, PgNumericU64};
         use test_case::test_case;
 
         use crate::db::{
