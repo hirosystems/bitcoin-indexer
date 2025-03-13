@@ -1,7 +1,7 @@
 use std::{collections::HashMap, num::NonZeroUsize, str::FromStr};
 
 use bitcoin::{Network, ScriptBuf};
-use chainhook_sdk::utils::Context;
+use bitcoind::{try_debug, try_info, try_warn, utils::Context};
 use chainhook_types::bitcoin::TxIn;
 use config::Config;
 use lru::LruCache;
@@ -12,17 +12,13 @@ use super::{
     db_cache::DbCache, input_rune_balance::InputRuneBalance, transaction_cache::TransactionCache,
     transaction_location::TransactionLocation, utils::move_block_output_cache_to_output_cache,
 };
-use crate::{
-    db::{
-        cache::utils::input_rune_balances_from_tx_inputs,
-        models::{
-            db_balance_change::DbBalanceChange, db_ledger_entry::DbLedgerEntry,
-            db_ledger_operation::DbLedgerOperation, db_rune::DbRune,
-            db_supply_change::DbSupplyChange,
-        },
-        pg_get_max_rune_number, pg_get_rune_by_id, pg_get_rune_total_mints,
+use crate::db::{
+    cache::utils::input_rune_balances_from_tx_inputs,
+    models::{
+        db_balance_change::DbBalanceChange, db_ledger_entry::DbLedgerEntry,
+        db_ledger_operation::DbLedgerOperation, db_rune::DbRune, db_supply_change::DbSupplyChange,
     },
-    try_debug, try_info, try_warn,
+    pg_get_max_rune_number, pg_get_rune_by_id, pg_get_rune_total_mints,
 };
 
 /// Holds rune data across multiple blocks for faster computations. Processes rune events as they happen during transactions and
@@ -301,7 +297,7 @@ impl IndexCache {
         self.db_cache.flush(db_tx, ctx).await;
         let db_rune = pg_get_rune_by_id(rune_id, db_tx, ctx).await?;
         self.rune_cache.put(*rune_id, db_rune.clone());
-        return Some(db_rune);
+        Some(db_rune)
     }
 
     async fn get_cached_rune_total_mints(
@@ -323,7 +319,7 @@ impl IndexCache {
         self.db_cache.flush(db_tx, ctx).await;
         let total = pg_get_rune_total_mints(rune_id, db_tx, ctx).await?;
         self.rune_total_mints_cache.put(*rune_id, total);
-        return Some(total);
+        Some(total)
     }
 
     /// Take ledger entries returned by the `TransactionCache` and add them to the `DbCache`. Update global balances and counters

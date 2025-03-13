@@ -5,16 +5,13 @@ use bitcoin::{
     transaction::{TxOut, Version},
     Amount, Network, ScriptBuf, Transaction,
 };
-use chainhook_sdk::utils::Context;
+use bitcoind::{try_info, utils::Context};
 use chainhook_types::{BitcoinBlockData, BitcoinTransactionData};
 use ordinals::{Artifact, Runestone};
 use tokio_postgres::Client;
 
 use super::cache::index_cache::IndexCache;
-use crate::{
-    db::{cache::transaction_location::TransactionLocation, pg_roll_back_block},
-    try_info,
-};
+use crate::db::{cache::transaction_location::TransactionLocation, pg_roll_back_block};
 
 pub fn get_rune_genesis_block_height(network: Network) -> u64 {
     match network {

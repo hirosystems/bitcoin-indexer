@@ -1,11 +1,11 @@
 [workspace]
 members = [
-    "components/chainhook-sdk",
+    "components/bitcoind",
     "components/chainhook-postgres",
     "components/chainhook-types-rs",
     "components/cli",
     "components/config",
-    "components/ordhook-core",
+    "components/ordinals",
     "components/ord",
     "components/runes",
 ]

@@ -4,7 +4,7 @@ version.workspace = true
 edition = "2021"
 
 [dependencies]
-chainhook-sdk = { path = "../chainhook-sdk" }
+bitcoind = { path = "../bitcoind" }
 chainhook-types = { path = "../chainhook-types-rs" }
 bitcoin = { workspace = true }
 lru = "0.12.3"

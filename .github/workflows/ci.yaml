@@ -126,10 +126,10 @@ jobs:
       fail-fast: false
       matrix:
         suite:
-          - cli
-          - chainhook-sdk
+          - bitcoind
           - chainhook-postgres
-          - ordhook-core
+          - cli
+          - ordinals
           - runes
     defaults:
       run:
@@ -220,10 +220,10 @@ jobs:
       fail-fast: false
       matrix:
         suite:
-          - cli
-          - chainhook-sdk
+          - bitcoind
           - chainhook-postgres
-          - ordhook-core
+          - cli
+          - ordinals
           - runes
     runs-on: ubuntu-latest
     defaults:
