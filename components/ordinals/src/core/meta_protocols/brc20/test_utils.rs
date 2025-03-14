@@ -1,7 +1,9 @@
-use bitcoind::utils::Context;
-use chainhook_types::{
-    OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
-    OrdinalInscriptionTransferDestination,
+use bitcoind::{
+    types::{
+        OrdinalInscriptionNumber, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
+        OrdinalInscriptionTransferDestination,
+    },
+    utils::Context,
 };
 
 pub fn get_test_ctx() -> Context {

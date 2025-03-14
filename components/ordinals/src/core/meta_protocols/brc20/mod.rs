@@ -1,4 +1,4 @@
-use chainhook_types::BitcoinNetwork;
+use bitcoind::types::BitcoinNetwork;
 
 pub mod brc20_pg;
 pub mod cache;

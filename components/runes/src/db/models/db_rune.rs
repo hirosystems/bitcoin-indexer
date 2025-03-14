@@ -1,5 +1,5 @@
-use chainhook_postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8};
 use ordinals::{Etching, Rune, RuneId, SpacedRune};
+use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8};
 use tokio_postgres::Row;
 
 use crate::db::cache::transaction_location::TransactionLocation;

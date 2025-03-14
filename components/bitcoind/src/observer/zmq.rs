@@ -1,4 +1,3 @@
-use chainhook_types::BitcoinNetwork;
 use config::Config;
 use zmq::Socket;
 
@@ -11,6 +10,7 @@ use crate::{
         BlockProcessor, BlockProcessorCommand,
     },
     try_info, try_warn,
+    types::BitcoinNetwork,
     utils::Context,
 };
 

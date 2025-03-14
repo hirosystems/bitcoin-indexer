@@ -4,7 +4,6 @@ use std::{
     time::Duration,
 };
 
-use chainhook_types::BitcoinNetwork;
 use config::Config;
 use crossbeam_channel::bounded;
 use reqwest::Client;
@@ -19,6 +18,7 @@ use crate::{
         BlockProcessor, BlockProcessorCommand, BlockProcessorEvent,
     },
     try_debug, try_info,
+    types::BitcoinNetwork,
     utils::Context,
 };
 

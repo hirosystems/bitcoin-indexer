@@ -127,7 +127,7 @@ jobs:
       matrix:
         suite:
           - bitcoind
-          - chainhook-postgres
+          - postgres
           - cli
           - ordinals
           - runes
@@ -221,7 +221,7 @@ jobs:
       matrix:
         suite:
           - bitcoind
-          - chainhook-postgres
+          - postgres
           - cli
           - ordinals
           - runes

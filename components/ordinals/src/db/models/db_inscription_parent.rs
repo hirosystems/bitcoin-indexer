@@ -1,4 +1,4 @@
-use chainhook_types::OrdinalInscriptionRevealData;
+use bitcoind::types::OrdinalInscriptionRevealData;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DbInscriptionParent {

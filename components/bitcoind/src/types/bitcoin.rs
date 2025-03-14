@@ -1,4 +1,4 @@
-use crate::TransactionIdentifier;
+use super::TransactionIdentifier;
 
 /// A transaction input, which defines old coins to be consumed
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Serialize, Deserialize)]

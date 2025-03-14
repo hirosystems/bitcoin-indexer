@@ -1,8 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use bitcoin::{Address, ScriptBuf};
-use bitcoind::{try_info, try_warn, utils::Context};
-use chainhook_types::bitcoin::TxIn;
+use bitcoind::{try_info, try_warn, types::bitcoin::TxIn, utils::Context};
 use lru::LruCache;
 use ordinals::RuneId;
 use tokio_postgres::Transaction;
@@ -584,7 +583,7 @@ mod test {
     }
 
     mod mint_validation {
-        use chainhook_postgres::types::{PgNumericU128, PgNumericU64};
+        use postgres::types::{PgNumericU128, PgNumericU64};
         use test_case::test_case;
 
         use crate::db::{
@@ -683,10 +682,12 @@ mod test {
     mod input_balances {
         use std::num::NonZeroUsize;
 
-        use bitcoind::utils::Context;
-        use chainhook_types::{
-            bitcoin::{OutPoint, TxIn},
-            TransactionIdentifier,
+        use bitcoind::{
+            types::{
+                bitcoin::{OutPoint, TxIn},
+                TransactionIdentifier,
+            },
+            utils::Context,
         };
         use lru::LruCache;
         use maplit::hashmap;

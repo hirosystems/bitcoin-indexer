@@ -1,5 +1,5 @@
 use bitcoin::Network;
-use chainhook_types::OrdinalInscriptionNumber;
+use bitcoind::types::OrdinalInscriptionNumber;
 use deadpool_postgres::GenericClient;
 
 use super::inscription_sequencing;
@@ -170,8 +170,8 @@ impl SequenceCursor {
 #[cfg(test)]
 mod test {
     use bitcoin::Network;
-    use chainhook_postgres::{pg_begin, pg_pool_client};
-    use chainhook_types::OrdinalOperation;
+    use bitcoind::types::OrdinalOperation;
+    use postgres::{pg_begin, pg_pool_client};
     use test_case::test_case;
 
     use super::SequenceCursor;

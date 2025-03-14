@@ -15,7 +15,6 @@ path = "src/lib.rs"
 config = { path = "../config" }
 ordinals = { path = "../ordinals" }
 runes = { path = "../runes" }
-chainhook-types = { path = "../chainhook-types-rs" }
 bitcoind = { path = "../bitcoind" }
 hex = "0.4.3"
 num_cpus = "1.16.0"

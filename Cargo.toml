@@ -1,8 +1,7 @@
 [workspace]
 members = [
     "components/bitcoind",
-    "components/chainhook-postgres",
-    "components/chainhook-types-rs",
+    "components/postgres",
     "components/cli",
     "components/config",
     "components/ordinals",

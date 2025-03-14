@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
-use bitcoind::utils::Context;
-use chainhook_types::{
-    BitcoinNetwork, BlockIdentifier, OrdinalInscriptionRevealData, OrdinalInscriptionTransferData,
-    OrdinalInscriptionTransferDestination, TransactionIdentifier,
+use bitcoind::{
+    types::{
+        BitcoinNetwork, BlockIdentifier, OrdinalInscriptionRevealData,
+        OrdinalInscriptionTransferData, OrdinalInscriptionTransferDestination,
+        TransactionIdentifier,
+    },
+    utils::Context,
 };
 use deadpool_postgres::Transaction;
 
@@ -298,12 +301,12 @@ pub async fn verify_brc20_transfers(
 
 #[cfg(test)]
 mod test {
-    use chainhook_postgres::{pg_begin, pg_pool_client};
-    use chainhook_types::{
+    use bitcoind::types::{
         BitcoinNetwork, BlockIdentifier, OrdinalInscriptionRevealData,
         OrdinalInscriptionTransferData, OrdinalInscriptionTransferDestination,
         TransactionIdentifier,
     };
+    use postgres::{pg_begin, pg_pool_client};
     use test_case::test_case;
 
     use super::{verify_brc20_operation, verify_brc20_transfers, VerifiedBrc20TransferData};

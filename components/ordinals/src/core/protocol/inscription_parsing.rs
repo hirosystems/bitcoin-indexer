@@ -1,11 +1,14 @@
 use std::{collections::HashMap, str, str::FromStr};
 
 use bitcoin::{hash_types::Txid, Witness};
-use bitcoind::{try_warn, utils::Context};
-use chainhook_types::{
-    BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
-    OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,
-    OrdinalOperation,
+use bitcoind::{
+    try_warn,
+    types::{
+        BitcoinBlockData, BitcoinNetwork, BitcoinTransactionData, BlockIdentifier,
+        OrdinalInscriptionCurseType, OrdinalInscriptionNumber, OrdinalInscriptionRevealData,
+        OrdinalOperation,
+    },
+    utils::Context,
 };
 use config::Config;
 use ord::{
@@ -169,8 +172,7 @@ pub fn parse_inscriptions_in_standardized_block(
 mod test {
     use std::collections::HashMap;
 
-    use bitcoind::utils::Context;
-    use chainhook_types::OrdinalOperation;
+    use bitcoind::{types::OrdinalOperation, utils::Context};
     use config::Config;
 
     use super::parse_inscriptions_in_standardized_block;

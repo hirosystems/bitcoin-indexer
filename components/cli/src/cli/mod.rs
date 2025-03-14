@@ -1,7 +1,6 @@
 use std::{path::PathBuf, process, thread::sleep, time::Duration};
 
-use bitcoind::{try_error, try_info, utils::Context};
-use chainhook_types::BlockIdentifier;
+use bitcoind::{try_error, try_info, types::BlockIdentifier, utils::Context};
 use clap::Parser;
 use commands::{Command, ConfigCommand, DatabaseCommand, IndexCommand, Protocol, ServiceCommand};
 use config::{generator::generate_toml_config, Config};

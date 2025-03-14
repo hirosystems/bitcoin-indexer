@@ -1,6 +1,6 @@
-use chainhook_postgres::{types::PgNumericU64, FromPgRow};
-use chainhook_types::OrdinalInscriptionRevealData;
+use bitcoind::types::OrdinalInscriptionRevealData;
 use ord::{rarity::Rarity, sat::Sat};
+use postgres::{types::PgNumericU64, FromPgRow};
 use tokio_postgres::Row;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -7,10 +7,9 @@ use std::{
 use bitcoin::Network;
 use schemars::JsonSchema;
 
-use crate::{
+use super::{
     bitcoin::{TxIn, TxOut},
-    ordinals::OrdinalOperation,
-    Brc20Operation,
+    Brc20Operation, OrdinalOperation,
 };
 
 /// BlockIdentifier uniquely identifies a block in a particular network.

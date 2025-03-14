@@ -1,8 +1,10 @@
-use chainhook_types::{BitcoinBlockData, BlockchainEvent};
 use hiro_system_kit::slog;
 
 use super::{super::BlockchainEventExpectation, bitcoin_blocks};
-use crate::utils::Context;
+use crate::{
+    types::{BitcoinBlockData, BlockchainEvent},
+    utils::Context,
+};
 
 pub fn expect_no_chain_update() -> BlockchainEventExpectation {
     Box::new(move |chain_event_to_check: Option<BlockchainEvent>| {

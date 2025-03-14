@@ -1,5 +1,5 @@
 [package]
-name = "chainhook-postgres"
+name = "postgres"
 version.workspace = true
 edition = "2021"
 
