@@ -26,6 +26,9 @@ pub async fn get_token<T: GenericClient>(
     ticker: &String,
     client: &T,
 ) -> Result<Option<DbToken>, String> {
+    if ticker.as_bytes().contains(&0) {
+        return Ok(None);
+    }
     let row = client
         .query_opt("SELECT * FROM tokens WHERE ticker = $1", &[&ticker])
         .await
@@ -40,6 +43,9 @@ pub async fn get_token_minted_supply<T: GenericClient>(
     ticker: &String,
     client: &T,
 ) -> Result<Option<u128>, String> {
+    if ticker.as_bytes().contains(&0) {
+        return Ok(None);
+    }
     let row = client
         .query_opt(
             "SELECT minted_supply FROM tokens WHERE ticker = $1",
@@ -59,6 +65,9 @@ pub async fn get_token_available_balance_for_address<T: GenericClient>(
     address: &String,
     client: &T,
 ) -> Result<Option<u128>, String> {
+    if ticker.as_bytes().contains(&0) {
+        return Ok(None);
+    }
     let row = client
         .query_opt(
             "SELECT avail_balance FROM balances WHERE ticker = $1 AND address = $2",
