@@ -99,6 +99,9 @@ pub fn parse_brc20_operation(
     let Some(inscription_body) = inscription.body() else {
         return Ok(None);
     };
+    if inscription_body.contains(&0) {
+        return Ok(None);
+    }
     match serde_json::from_slice::<Brc20DeployJson>(inscription_body) {
         Ok(json) => {
             if json.p != "brc-20" || json.op != "deploy" {
@@ -525,6 +528,10 @@ mod test {
         => Ok(None); "with mint JSON5"
     )]
     #[test_case(
+        InscriptionBuilder::new().body("{\"p\":\"brc-20\", \"op\": \"m\0int\", \"tick\": \"a  b\", \"amt\": \"1000\",}").build()
+        => Ok(None); "with mint null bytes"
+    )]
+    #[test_case(
         InscriptionBuilder::new().body(r#"{"P":"brc-20", "OP": "mint", "TICK": "a  b", "AMT": "1000"}"#).build()
         => Ok(None); "with mint uppercase fields"
     )]
@@ -570,6 +577,10 @@ mod test {
             tick: "pepe".to_string(),
             amt: "1000".to_string()
         }))); "with transfer"
+    )]
+    #[test_case(
+        InscriptionBuilder::new().body("{\"p\":\"brc-20\", \"op\": \"transfer\", \"tick\": \"a\0\0b\", \"amt\": \"1000\",}").build()
+        => Ok(None); "with transfer null bytes"
     )]
     #[test_case(
         InscriptionBuilder::new().body(r#"{"p":"brc-20", "op": "transfer", "tick": "PEPE", "amt": "1000"}"#).build()
