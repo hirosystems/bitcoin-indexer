@@ -170,6 +170,9 @@ pub fn parse_brc20_operation(
                 if json.p != "brc-20" || json.tick.len() < 4 || json.tick.len() > 5 {
                     return Ok(None);
                 }
+                if json.tick.as_bytes().contains(&0) {
+                    return Ok(None);
+                }
                 let op_str = json.op.as_str();
                 match op_str {
                     "mint" | "transfer" => {
