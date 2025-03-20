@@ -107,6 +107,9 @@ pub fn parse_brc20_operation(
             if json.p != "brc-20" || json.op != "deploy" {
                 return Ok(None);
             }
+            if json.tick.as_bytes().contains(&0) {
+                return Ok(None);
+            }
             let mut self_mint = false;
             if json.self_mint == Some("true".to_string()) {
                 if json.tick.len() != 5 {
@@ -270,6 +273,10 @@ mod test {
     #[test_case(
         InscriptionBuilder::new().body(&String::from("{\"p\":\"brc-20\",\"op\":\"deploy\",\"tick\":\"X\0\0Z\",\"max\":\"21000000\",\"lim\":\"1000\",\"dec\":\"6\"}")).build()
         => Ok(None); "with deploy null bytes"
+    )]
+    #[test_case(
+        InscriptionBuilder::new().body(&String::from(r#"{"p":"brc-20","op":"deploy","tick":"\u0000\u0000\u0000\u0000","max":"21000000","lim":"1000"}"#)).build()
+        => Ok(None); "with deploy null bytes utf8 encoded"
     )]
     #[test_case(
         InscriptionBuilder::new().body(r#"{"p":"brc-20", "op": "deploy", "tick": "PEPE", "max": "21000000", "lim": "1000", "dec": "6"}"#).build()
