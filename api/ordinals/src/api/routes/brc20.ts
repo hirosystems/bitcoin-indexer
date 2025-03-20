@@ -252,7 +252,6 @@ export const Brc20Routes: FastifyPluginCallback<
         }),
         querystring: Type.Object({
           ticker: Type.Optional(Brc20TickersParam),
-          block_height: Type.Optional(BlockHeightParam),
           // Pagination
           offset: Type.Optional(OffsetParam),
           limit: Type.Optional(LimitParam),

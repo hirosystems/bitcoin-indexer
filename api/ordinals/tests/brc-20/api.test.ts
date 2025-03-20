@@ -1656,10 +1656,13 @@ describe('BRC-20 API', () => {
       // 7. Verify that A no longer has any transferable inscriptions
       // 8. A creates transfer inscriptions for 500 'pepe' and 2000 'meme'
       // 9. Verify that A has both transferable inscriptions
-      // 10. A sends the 500 'pepe' transfer to B
-      // 11. Verify that A only has the 'meme' transferable inscription left
-      // 12. A sends the 2000 'meme' transfer to B
-      // 13. Verify that A has no transferable inscriptions left
+      // 11. Verify that A only has the 'meme' transferable inscription if querying for 'meme' ticker
+      // 12. Verify that A only has the 'pepe' transferable inscription if querying for 'pepe' ticker
+      // 13. Verify that A only has no transferable inscription if querying for 'rere' ticker
+      // 14. A sends the 500 'pepe' transfer to B
+      // 15. Verify that A only has the 'meme' transferable inscription left
+      // 16. A sends the 2000 'meme' transfer to B
+      // 17. Verify that A has no transferable inscriptions left
 
       // Setup
       const blockHeights = incrementing(767430);
@@ -1949,6 +1952,52 @@ describe('BRC-20 API', () => {
           } as Brc20TransferableInscriptionsResponse),
         ])
       );
+
+      // Verify that A only has the 'meme' transferable inscription if querying for 'meme' ticker
+      response = await fastify.inject({
+        method: 'GET',
+        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}?ticker=meme`,
+      });
+      expect(response.statusCode).toBe(200);
+      json = response.json();
+      expect(json.total).toBe(1);
+      expect(json.results).toEqual([
+        expect.objectContaining({
+          inscription_id: `${transferHashMocked3}i0`,
+          ticker: 'meme',
+          inscription_number: parseInt(inscriptionNumberMocked3),
+          block_height: parseInt(blockHeightMocked3),
+          amount: '2000000000000000000000',
+        } as Brc20TransferableInscriptionsResponse),
+      ]);
+
+      // Verify that A only has the 'pepe' transferable inscription if querying for 'pepe' ticker
+      response = await fastify.inject({
+        method: 'GET',
+        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}?ticker=pepe`,
+      });
+      expect(response.statusCode).toBe(200);
+      json = response.json();
+      expect(json.total).toBe(1);
+      expect(json.results).toEqual([
+        expect.objectContaining({
+          inscription_id: `${transferHashMocked2}i0`,
+          ticker: 'pepe',
+          inscription_number: parseInt(inscriptionNumberMocked2),
+          block_height: parseInt(blockHeightMocked2),
+          amount: '500000000000000000000',
+        } as Brc20TransferableInscriptionsResponse),
+      ]);
+
+      // Verify that A only has no transferable inscription if querying for 'rere' ticker
+      response = await fastify.inject({
+        method: 'GET',
+        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}?ticker=rere`,
+      });
+      expect(response.statusCode).toBe(200);
+      json = response.json();
+      expect(json.total).toBe(0);
+      expect(json.results).toEqual([]);
 
       // A sends transfer inscription to B (aka transfer/sale) of pepe
       transferHash = randomHash();

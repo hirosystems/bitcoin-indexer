@@ -134,6 +134,7 @@ export class Brc20PgStore extends BasePgStore {
       FROM operations AS o1
       WHERE o1.operation = 'transfer'
       AND o1.address = ${args.address}
+      ${args.ticker ? this.sql`AND o1.ticker IN ${this.sql(args.ticker)}` : this.sql``}
       AND NOT EXISTS (
           SELECT 1 
           FROM operations o2
