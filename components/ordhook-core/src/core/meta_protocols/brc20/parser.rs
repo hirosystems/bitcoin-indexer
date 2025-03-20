@@ -99,9 +99,15 @@ pub fn parse_brc20_operation(
     let Some(inscription_body) = inscription.body() else {
         return Ok(None);
     };
+    if inscription_body.contains(&0) {
+        return Ok(None);
+    }
     match serde_json::from_slice::<Brc20DeployJson>(inscription_body) {
         Ok(json) => {
             if json.p != "brc-20" || json.op != "deploy" {
+                return Ok(None);
+            }
+            if json.tick.as_bytes().contains(&0) {
                 return Ok(None);
             }
             let mut self_mint = false;
@@ -162,6 +168,9 @@ pub fn parse_brc20_operation(
         Err(_) => match serde_json::from_slice::<Brc20MintOrTransferJson>(inscription_body) {
             Ok(json) => {
                 if json.p != "brc-20" || json.tick.len() < 4 || json.tick.len() > 5 {
+                    return Ok(None);
+                }
+                if json.tick.as_bytes().contains(&0) {
                     return Ok(None);
                 }
                 let op_str = json.op.as_str();
@@ -267,6 +276,10 @@ mod test {
     #[test_case(
         InscriptionBuilder::new().body(&String::from("{\"p\":\"brc-20\",\"op\":\"deploy\",\"tick\":\"X\0\0Z\",\"max\":\"21000000\",\"lim\":\"1000\",\"dec\":\"6\"}")).build()
         => Ok(None); "with deploy null bytes"
+    )]
+    #[test_case(
+        InscriptionBuilder::new().body(&String::from(r#"{"p":"brc-20","op":"deploy","tick":"\u0000\u0000\u0000\u0000","max":"21000000","lim":"1000"}"#)).build()
+        => Ok(None); "with deploy null bytes utf8 encoded"
     )]
     #[test_case(
         InscriptionBuilder::new().body(r#"{"p":"brc-20", "op": "deploy", "tick": "PEPE", "max": "21000000", "lim": "1000", "dec": "6"}"#).build()
@@ -525,6 +538,10 @@ mod test {
         => Ok(None); "with mint JSON5"
     )]
     #[test_case(
+        InscriptionBuilder::new().body(r#"{"p":"brc-20","op":"mint","tick":"\u0000\u0000\u0000\u0000","amt":"1000"}"#).build()
+        => Ok(None); "with mint null bytes utf8 encoded"
+    )]
+    #[test_case(
         InscriptionBuilder::new().body(r#"{"P":"brc-20", "OP": "mint", "TICK": "a  b", "AMT": "1000"}"#).build()
         => Ok(None); "with mint uppercase fields"
     )]
@@ -570,6 +587,10 @@ mod test {
             tick: "pepe".to_string(),
             amt: "1000".to_string()
         }))); "with transfer"
+    )]
+    #[test_case(
+        InscriptionBuilder::new().body("{\"p\":\"brc-20\", \"op\": \"transfer\", \"tick\": \"a\0\0b\", \"amt\": \"1000\",}").build()
+        => Ok(None); "with transfer null bytes"
     )]
     #[test_case(
         InscriptionBuilder::new().body(r#"{"p":"brc-20", "op": "transfer", "tick": "PEPE", "amt": "1000"}"#).build()
