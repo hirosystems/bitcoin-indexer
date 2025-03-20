@@ -6,6 +6,7 @@ import {
   DbBrc20Holder,
   DbBrc20Token,
   DbBrc20TokenWithSupply,
+  DbBrc20TransferableInscription,
 } from '../../pg/brc20/types';
 import {
   DbFullyLocatedInscriptionResult,
@@ -21,6 +22,7 @@ import {
   Brc20HolderResponse,
   Brc20Supply,
   Brc20TokenResponse,
+  Brc20TransferableInscriptionsResponse,
   InscriptionLocationResponse,
   InscriptionResponseType,
 } from '../schemas';
@@ -179,6 +181,18 @@ export function parseBrc20Balances(items: DbBrc20Balance[]): Brc20BalanceRespons
     available_balance: decimals(i.avail_balance, i.decimals),
     transferrable_balance: decimals(i.trans_balance, i.decimals),
     overall_balance: decimals(i.total_balance, i.decimals),
+  }));
+}
+
+export function parseBrc20TransferableInscriptions(
+  items: DbBrc20TransferableInscription[]
+): Brc20TransferableInscriptionsResponse[] {
+  return items.map(i => ({
+    inscription_number: parseInt(i.inscription_number),
+    inscription_id: i.inscription_id,
+    block_height: parseInt(i.block_height),
+    amount: i.amount,
+    ticker: i.ticker,
   }));
 }
 

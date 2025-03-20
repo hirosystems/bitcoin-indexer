@@ -1,5 +1,9 @@
 import { buildApiServer } from '../../src/api/init';
-import { Brc20TokenResponse, Brc20ActivityResponse } from '../../src/api/schemas';
+import {
+  Brc20TokenResponse,
+  Brc20ActivityResponse,
+  Brc20TransferableInscriptionsResponse,
+} from '../../src/api/schemas';
 import { Brc20PgStore } from '../../src/pg/brc20/brc20-pg-store';
 import { PgStore } from '../../src/pg/pg-store';
 import {
@@ -1625,6 +1629,434 @@ describe('BRC-20 API', () => {
           },
         ])
       );
+    });
+  });
+
+  describe('/brc-20/transferable-inscriptions/:address', () => {
+    test('returns 202 if address has no transferable inscriptions', async () => {
+      const response = await fastify.inject({
+        method: 'GET',
+        url: `/ordinals/brc-20/transferable-inscriptions/bc1p3cyx5e2hgh53w7kpxcvm8s4kkega9gv5wfw7c4qxsvxl0u8x834qf0u2td`,
+      });
+      expect(response.statusCode).toBe(200);
+      const json = response.json();
+      expect(json.total).toBe(0);
+      expect(json.results).toEqual([]);
+    });
+
+    test('transferable inscriptions are accurate', async () => {
+      // This test verifies that the transferable inscriptions API correctly tracks BRC-20 tokens
+      // that are available for transfer by an address. The test follows this flow:
+      // 1. Address A deploys two tokens: 'pepe' and 'meme'
+      // 2. Address A mints 10000 'pepe' and 20000 'meme'
+      // 3. Address B mints 10000 'pepe'
+      // 4. Address A creates a transfer inscription for 9000 'pepe'
+      // 5. Verify that A's transferable inscriptions include this 'pepe' transfer
+      // 6. A sends the 'pepe' transfer inscription to B
+      // 7. Verify that A no longer has any transferable inscriptions
+      // 8. A creates transfer inscriptions for 500 'pepe' and 2000 'meme'
+      // 9. Verify that A has both transferable inscriptions
+      // 10. A sends the 500 'pepe' transfer to B
+      // 11. Verify that A only has the 'meme' transferable inscription left
+      // 12. A sends the 2000 'meme' transfer to B
+      // 13. Verify that A has no transferable inscriptions left
+
+      // Setup
+      const blockHeights = incrementing(767430);
+      const numbers = incrementing(0);
+      const addressA = 'bc1q6uwuet65rm6xvlz7ztw2gvdmmay5uaycu03mqz';
+      const addressB = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4';
+
+      // A deploys pepe
+      let transferHash = randomHash();
+      let blockHash = randomHash();
+      await brc20TokenDeploy(brc20Db.sql, {
+        ticker: 'pepe',
+        display_ticker: 'pepe',
+        inscription_id: `${transferHash}i0`,
+        inscription_number: numbers.next().value.toString(),
+        block_height: blockHeights.next().value.toString(),
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        address: addressA,
+        max: '21000000000000000000000000',
+        limit: '21000000000000000000000000',
+        decimals: 18,
+        self_mint: false,
+        minted_supply: '0',
+        tx_count: 1,
+        timestamp: 1677803510,
+        operation: 'deploy',
+        ordinal_number: '20000',
+        output: `${transferHash}:0`,
+        offset: '0',
+        to_address: null,
+        amount: '0',
+      });
+
+      // A deploys meme
+      transferHash = randomHash();
+      blockHash = randomHash();
+      await brc20TokenDeploy(brc20Db.sql, {
+        ticker: 'meme',
+        display_ticker: 'meme',
+        inscription_id: `${transferHash}i0`,
+        inscription_number: numbers.next().value.toString(),
+        block_height: blockHeights.next().value.toString(),
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        address: addressA,
+        max: '21000000000000000000000000',
+        limit: '21000000000000000000000000',
+        decimals: 18,
+        self_mint: false,
+        minted_supply: '0',
+        tx_count: 1,
+        timestamp: 1677803510,
+        operation: 'deploy',
+        ordinal_number: '30000',
+        output: `${transferHash}:0`,
+        offset: '0',
+        to_address: null,
+        amount: '0',
+      });
+
+      // A mints 10000 pepe
+      transferHash = randomHash();
+      blockHash = randomHash();
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'pepe',
+        operation: 'mint',
+        inscription_id: `${transferHash}i0`,
+        inscription_number: numbers.next().value.toString(),
+        ordinal_number: '200000',
+        block_height: blockHeights.next().value.toString(),
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        output: `${transferHash}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressA,
+        to_address: null,
+        amount: '10000000000000000000000',
+      });
+
+      // A mints 20000 meme
+      transferHash = randomHash();
+      blockHash = randomHash();
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'meme',
+        operation: 'mint',
+        inscription_id: `${transferHash}i0`,
+        inscription_number: numbers.next().value.toString(),
+        ordinal_number: '300000',
+        block_height: blockHeights.next().value.toString(),
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        output: `${transferHash}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressA,
+        to_address: null,
+        amount: '20000000000000000000000',
+      });
+
+      // B mints 10000 pepe
+      transferHash = randomHash();
+      blockHash = randomHash();
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'pepe',
+        operation: 'mint',
+        inscription_id: `${transferHash}i0`,
+        inscription_number: numbers.next().value.toString(),
+        ordinal_number: '200000',
+        block_height: blockHeights.next().value.toString(),
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        output: `${transferHash}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressB,
+        to_address: null,
+        amount: '10000000000000000000000',
+      });
+
+      // A creates transfer of 9000 pepe
+      blockHash = randomHash();
+      const inscriptionNumberMocked = numbers.next().value.toString();
+      const blockHeightMocked = blockHeights.next().value.toString();
+      const transferHashMocked = randomHash();
+      transferHash = transferHashMocked;
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'pepe',
+        operation: 'transfer',
+        inscription_id: `${transferHashMocked}i0`,
+        inscription_number: inscriptionNumberMocked,
+        ordinal_number: '200000',
+        block_height: blockHeightMocked,
+        block_hash: blockHash,
+        tx_id: transferHashMocked,
+        tx_index: 0,
+        output: `${transferHashMocked}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressA,
+        to_address: null,
+        amount: '9000000000000000000000',
+      });
+
+      let response = await fastify.inject({
+        method: 'GET',
+        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      let json = response.json();
+      expect(json.total).toBe(1);
+      expect(json.results).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            inscription_id: `${transferHash}i0`,
+            ticker: 'pepe',
+            inscription_number: parseInt(inscriptionNumberMocked),
+            block_height: parseInt(blockHeightMocked),
+            amount: '9000000000000000000000',
+          } as Brc20TransferableInscriptionsResponse),
+        ])
+      );
+
+      // A sends transfer inscription to B (aka transfer/sale)
+      transferHash = randomHash();
+      blockHash = randomHash();
+      const blockHeightMockedSend = blockHeights.next().value.toString();
+      const inscriptionNumberMockedSend = numbers.next().value.toString();
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'pepe',
+        operation: 'transfer_send',
+        inscription_id: `${transferHashMocked}i0`,
+        inscription_number: inscriptionNumberMockedSend,
+        ordinal_number: '200000',
+        block_height: blockHeightMockedSend,
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        output: `${transferHash}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressA,
+        to_address: addressB,
+        amount: '9000000000000000000000',
+      });
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'pepe',
+        operation: 'transfer_receive',
+        inscription_id: `${transferHashMocked}i0`,
+        inscription_number: inscriptionNumberMockedSend,
+        ordinal_number: '200000',
+        block_height: blockHeightMockedSend,
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        output: `${transferHash}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressB,
+        to_address: null,
+        amount: '9000000000000000000000',
+      });
+
+      response = await fastify.inject({
+        method: 'GET',
+        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}`,
+      });
+      expect(response.statusCode).toBe(200);
+      json = response.json();
+      expect(json.total).toBe(0);
+      expect(json.results).toEqual([]);
+
+      // A creates transfer of 500 pepe and 2000 meme
+      blockHash = randomHash();
+      const inscriptionNumberMocked2 = numbers.next().value.toString();
+      const blockHeightMocked2 = blockHeights.next().value.toString();
+      const transferHashMocked2 = randomHash();
+      const inscriptionNumberMocked3 = numbers.next().value.toString();
+      const blockHeightMocked3 = blockHeights.next().value.toString();
+      const transferHashMocked3 = randomHash();
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'pepe',
+        operation: 'transfer',
+        inscription_id: `${transferHashMocked2}i0`,
+        inscription_number: inscriptionNumberMocked2,
+        ordinal_number: '200000',
+        block_height: blockHeightMocked2,
+        block_hash: blockHash,
+        tx_id: transferHashMocked2,
+        tx_index: 0,
+        output: `${transferHashMocked2}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressA,
+        to_address: null,
+        amount: '500000000000000000000',
+      });
+
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'meme',
+        operation: 'transfer',
+        inscription_id: `${transferHashMocked3}i0`,
+        inscription_number: inscriptionNumberMocked3,
+        ordinal_number: '300000',
+        block_height: blockHeightMocked3,
+        block_hash: blockHash,
+        tx_id: transferHashMocked3,
+        tx_index: 0,
+        output: `${transferHashMocked3}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressA,
+        to_address: null,
+        amount: '2000000000000000000000',
+      });
+
+      response = await fastify.inject({
+        method: 'GET',
+        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      json = response.json();
+      expect(json.total).toBe(2);
+      expect(json.results).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            inscription_id: `${transferHashMocked2}i0`,
+            ticker: 'pepe',
+            inscription_number: parseInt(inscriptionNumberMocked2),
+            block_height: parseInt(blockHeightMocked2),
+            amount: '500000000000000000000',
+          } as Brc20TransferableInscriptionsResponse),
+          expect.objectContaining({
+            inscription_id: `${transferHashMocked3}i0`,
+            ticker: 'meme',
+            inscription_number: parseInt(inscriptionNumberMocked3),
+            block_height: parseInt(blockHeightMocked3),
+            amount: '2000000000000000000000',
+          } as Brc20TransferableInscriptionsResponse),
+        ])
+      );
+
+      // A sends transfer inscription to B (aka transfer/sale) of pepe
+      transferHash = randomHash();
+      blockHash = randomHash();
+      const blockHeightMockedSend4 = blockHeights.next().value.toString();
+      const inscriptionNumberMockedSend4 = numbers.next().value.toString();
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'pepe',
+        operation: 'transfer_send',
+        inscription_id: `${transferHashMocked2}i0`,
+        inscription_number: inscriptionNumberMockedSend4,
+        ordinal_number: '200000',
+        block_height: blockHeightMockedSend4,
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        output: `${transferHash}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressA,
+        to_address: addressB,
+        amount: '500000000000000000000',
+      });
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'pepe',
+        operation: 'transfer_receive',
+        inscription_id: `${transferHashMocked2}i0`,
+        inscription_number: inscriptionNumberMockedSend4,
+        ordinal_number: '200000',
+        block_height: blockHeightMockedSend4,
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        output: `${transferHash}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressB,
+        to_address: null,
+        amount: '500000000000000000000',
+      });
+
+      response = await fastify.inject({
+        method: 'GET',
+        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}`,
+      });
+      expect(response.statusCode).toBe(200);
+      json = response.json();
+      expect(json.total).toBe(1);
+      expect(json.results).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            inscription_id: `${transferHashMocked3}i0`,
+            ticker: 'meme',
+            inscription_number: parseInt(inscriptionNumberMocked3),
+            block_height: parseInt(blockHeightMocked3),
+            amount: '2000000000000000000000',
+          } as Brc20TransferableInscriptionsResponse),
+        ])
+      );
+
+      // A sends transfer inscription to B (aka transfer/sale) of meme
+      transferHash = randomHash();
+      blockHash = randomHash();
+      const blockHeightMockedSend5 = blockHeights.next().value.toString();
+      const inscriptionNumberMockedSend5 = numbers.next().value.toString();
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'pepe',
+        operation: 'transfer_send',
+        inscription_id: `${transferHashMocked3}i0`,
+        inscription_number: inscriptionNumberMockedSend5,
+        ordinal_number: '300000',
+        block_height: blockHeightMockedSend5,
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        output: `${transferHash}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressA,
+        to_address: addressB,
+        amount: '2000000000000000000000',
+      });
+      await brc20Operation(brc20Db.sql, {
+        ticker: 'meme',
+        operation: 'transfer_receive',
+        inscription_id: `${transferHashMocked3}i0`,
+        inscription_number: inscriptionNumberMockedSend5,
+        ordinal_number: '300000',
+        block_height: blockHeightMockedSend5,
+        block_hash: blockHash,
+        tx_id: transferHash,
+        tx_index: 0,
+        output: `${transferHash}:0`,
+        offset: '0',
+        timestamp: 1677803510,
+        address: addressB,
+        to_address: null,
+        amount: '2000000000000000000000',
+      });
+
+      response = await fastify.inject({
+        method: 'GET',
+        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}`,
+      });
+      expect(response.statusCode).toBe(200);
+      json = response.json();
+      expect(json.total).toBe(0);
+      expect(json.results).toEqual([]);
     });
   });
 });

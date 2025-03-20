@@ -36,6 +36,14 @@ export type DbBrc20Balance = {
   total_balance: string;
 };
 
+export type DbBrc20TransferableInscription = {
+  inscription_number: string;
+  inscription_id: string;
+  block_height: string;
+  amount: string;
+  ticker: string;
+};
+
 export enum DbBrc20EventOperation {
   deploy = 'deploy',
   mint = 'mint',
