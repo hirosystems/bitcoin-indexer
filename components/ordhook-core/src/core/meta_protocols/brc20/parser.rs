@@ -538,8 +538,8 @@ mod test {
         => Ok(None); "with mint JSON5"
     )]
     #[test_case(
-        InscriptionBuilder::new().body("{\"p\":\"brc-20\", \"op\": \"m\0int\", \"tick\": \"a  b\", \"amt\": \"1000\",}").build()
-        => Ok(None); "with mint null bytes"
+        InscriptionBuilder::new().body(r#"{"p":"brc-20","op":"mint","tick":"\u0000\u0000\u0000\u0000","amt":"1000"}"#).build()
+        => Ok(None); "with mint null bytes utf8 encoded"
     )]
     #[test_case(
         InscriptionBuilder::new().body(r#"{"P":"brc-20", "OP": "mint", "TICK": "a  b", "AMT": "1000"}"#).build()
