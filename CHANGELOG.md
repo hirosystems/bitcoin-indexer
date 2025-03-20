@@ -1,3 +1,10 @@
+## [3.0.1](https://github.com/hirosystems/bitcoin-indexer/compare/v3.0.0...v3.0.1) (2025-03-20)
+
+
+### Bug Fixes
+
+* **brc20:** ignore utf8 encoded null bytes ([#507](https://github.com/hirosystems/bitcoin-indexer/issues/507)) ([9d7eb84](https://github.com/hirosystems/bitcoin-indexer/commit/9d7eb84855e4f7e425078cea6206300c6d27d574))
+
 ## [3.0.0](https://github.com/hirosystems/bitcoin-indexer/compare/v2.2.5...v3.0.0) (2025-03-06)
 
 
