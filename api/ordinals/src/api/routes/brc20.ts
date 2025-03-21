@@ -19,6 +19,7 @@ import {
   NotFoundResponse,
   OffsetParam,
   PaginatedResponse,
+  Brc20TransferableInscriptionsResponseSchema,
 } from '../schemas';
 import { handleInscriptionTransfersCache } from '../util/cache';
 import {
@@ -28,6 +29,7 @@ import {
   parseBrc20Holders,
   parseBrc20Supply,
   parseBrc20Tokens,
+  parseBrc20TransferableInscriptions,
 } from '../util/helpers';
 
 export const Brc20Routes: FastifyPluginCallback<
@@ -233,6 +235,50 @@ export const Brc20Routes: FastifyPluginCallback<
         offset,
         total: balances.total,
         results: parseBrc20Activities(balances.results),
+      });
+    }
+  );
+
+  fastify.get(
+    '/brc-20/balances/:address/transferable',
+    {
+      schema: {
+        operationId: 'getBrc20TransferableInscriptions',
+        summary: 'BRC-20 Transferable Inscriptions',
+        description: 'Retrieves BRC-20 transferable inscriptions for a Bitcoin address',
+        tags: ['BRC-20'],
+        params: Type.Object({
+          address: AddressParam,
+        }),
+        querystring: Type.Object({
+          ticker: Type.Optional(Brc20TickersParam),
+          // Pagination
+          offset: Type.Optional(OffsetParam),
+          limit: Type.Optional(LimitParam),
+        }),
+        response: {
+          200: PaginatedResponse(
+            Brc20TransferableInscriptionsResponseSchema,
+            'Paginated BRC-20 Transferable Inscriptions Response'
+          ),
+        },
+      },
+    },
+    async (request, reply) => {
+      const limit = request.query.limit ?? DEFAULT_API_LIMIT;
+      const offset = request.query.offset ?? 0;
+      const balances = await fastify.brc20Db.getTransferableInscriptions({
+        limit,
+        offset,
+        address: request.params.address,
+        ticker: request.query.ticker,
+      });
+
+      await reply.send({
+        limit,
+        offset,
+        total: balances.total,
+        results: parseBrc20TransferableInscriptions(balances.results),
       });
     }
   );

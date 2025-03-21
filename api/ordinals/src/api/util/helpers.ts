@@ -6,6 +6,7 @@ import {
   DbBrc20Holder,
   DbBrc20Token,
   DbBrc20TokenWithSupply,
+  DbBrc20TransferableInscription,
 } from '../../pg/brc20/types';
 import {
   DbFullyLocatedInscriptionResult,
@@ -21,6 +22,7 @@ import {
   Brc20HolderResponse,
   Brc20Supply,
   Brc20TokenResponse,
+  Brc20TransferableInscriptionsResponse,
   InscriptionLocationResponse,
   InscriptionResponseType,
 } from '../schemas';
@@ -241,6 +243,18 @@ export function parseBrc20Holders(items: DbBrc20Holder[]): Brc20HolderResponse[]
   return items.map(i => ({
     address: i.address,
     overall_balance: decimals(i.total_balance, i.decimals),
+  }));
+}
+
+export function parseBrc20TransferableInscriptions(
+  items: DbBrc20TransferableInscription[]
+): Brc20TransferableInscriptionsResponse[] {
+  return items.map(i => ({
+    inscription_number: parseInt(i.inscription_number),
+    inscription_id: i.inscription_id,
+    amount: i.amount,
+    ticker: i.ticker,
+    ordinal_number: i.ordinal_number,
   }));
 }
 
