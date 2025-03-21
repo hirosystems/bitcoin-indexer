@@ -30,7 +30,7 @@ export const StatusRoutes: FastifyPluginCallback<
         const max_inscription_number = await fastify.db.getMaxInscriptionNumber();
         const max_cursed_inscription_number = await fastify.db.getMaxCursedInscriptionNumber();
         return {
-          server_version: `ordinals-api ${SERVER_VERSION.tag} (${SERVER_VERSION.branch}:${SERVER_VERSION.commit})`,
+          server_version: `bitcoin-indexer-ordinals-api ${SERVER_VERSION.tag} (${SERVER_VERSION.branch}:${SERVER_VERSION.commit})`,
           status: 'ready',
           block_height,
           max_inscription_number,
