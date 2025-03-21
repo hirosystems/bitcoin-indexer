@@ -184,18 +184,6 @@ export function parseBrc20Balances(items: DbBrc20Balance[]): Brc20BalanceRespons
   }));
 }
 
-export function parseBrc20TransferableInscriptions(
-  items: DbBrc20TransferableInscription[]
-): Brc20TransferableInscriptionsResponse[] {
-  return items.map(i => ({
-    inscription_number: parseInt(i.inscription_number),
-    inscription_id: i.inscription_id,
-    block_height: parseInt(i.block_height),
-    amount: i.amount,
-    ticker: i.ticker,
-  }));
-}
-
 export function parseBrc20Activities(items: DbBrc20Activity[]): Brc20ActivityResponse[] {
   return items.map(i => {
     const activity = {
@@ -255,6 +243,18 @@ export function parseBrc20Holders(items: DbBrc20Holder[]): Brc20HolderResponse[]
   return items.map(i => ({
     address: i.address,
     overall_balance: decimals(i.total_balance, i.decimals),
+  }));
+}
+
+export function parseBrc20TransferableInscriptions(
+  items: DbBrc20TransferableInscription[]
+): Brc20TransferableInscriptionsResponse[] {
+  return items.map(i => ({
+    inscription_number: parseInt(i.inscription_number),
+    inscription_id: i.inscription_id,
+    amount: i.amount,
+    ticker: i.ticker,
+    ordinal_number: i.ordinal_number,
   }));
 }
 

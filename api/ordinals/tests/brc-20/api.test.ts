@@ -1632,11 +1632,11 @@ describe('BRC-20 API', () => {
     });
   });
 
-  describe('/brc-20/transferable-inscriptions/:address', () => {
+  describe('/brc-20/balances/:address/transferable', () => {
     test('returns 202 if address has no transferable inscriptions', async () => {
       const response = await fastify.inject({
         method: 'GET',
-        url: `/ordinals/brc-20/transferable-inscriptions/bc1p3cyx5e2hgh53w7kpxcvm8s4kkega9gv5wfw7c4qxsvxl0u8x834qf0u2td`,
+        url: `/ordinals/brc-20/balances/bc1p3cyx5e2hgh53w7kpxcvm8s4kkega9gv5wfw7c4qxsvxl0u8x834qf0u2td/transferable`,
       });
       expect(response.statusCode).toBe(200);
       const json = response.json();
@@ -1815,23 +1815,21 @@ describe('BRC-20 API', () => {
 
       let response = await fastify.inject({
         method: 'GET',
-        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}`,
+        url: `/ordinals/brc-20/balances/${addressA}/transferable`,
       });
 
       expect(response.statusCode).toBe(200);
       let json = response.json();
       expect(json.total).toBe(1);
-      expect(json.results).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            inscription_id: `${transferHash}i0`,
-            ticker: 'pepe',
-            inscription_number: parseInt(inscriptionNumberMocked),
-            block_height: parseInt(blockHeightMocked),
-            amount: '9000000000000000000000',
-          } as Brc20TransferableInscriptionsResponse),
-        ])
-      );
+      expect(json.results).toEqual([
+        {
+          inscription_id: `${transferHash}i0`,
+          ticker: 'pepe',
+          inscription_number: parseInt(inscriptionNumberMocked),
+          ordinal_number: '200000',
+          amount: '9000000000000000000000',
+        } as Brc20TransferableInscriptionsResponse,
+      ]);
 
       // A sends transfer inscription to B (aka transfer/sale)
       transferHash = randomHash();
@@ -1875,7 +1873,7 @@ describe('BRC-20 API', () => {
 
       response = await fastify.inject({
         method: 'GET',
-        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}`,
+        url: `/ordinals/brc-20/balances/${addressA}/transferable`,
       });
       expect(response.statusCode).toBe(200);
       json = response.json();
@@ -1928,7 +1926,7 @@ describe('BRC-20 API', () => {
 
       response = await fastify.inject({
         method: 'GET',
-        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}`,
+        url: `/ordinals/brc-20/balances/${addressA}/transferable`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -1940,14 +1938,14 @@ describe('BRC-20 API', () => {
             inscription_id: `${transferHashMocked2}i0`,
             ticker: 'pepe',
             inscription_number: parseInt(inscriptionNumberMocked2),
-            block_height: parseInt(blockHeightMocked2),
+            ordinal_number: '200000',
             amount: '500000000000000000000',
           } as Brc20TransferableInscriptionsResponse),
           expect.objectContaining({
             inscription_id: `${transferHashMocked3}i0`,
             ticker: 'meme',
             inscription_number: parseInt(inscriptionNumberMocked3),
-            block_height: parseInt(blockHeightMocked3),
+            ordinal_number: '300000',
             amount: '2000000000000000000000',
           } as Brc20TransferableInscriptionsResponse),
         ])
@@ -1956,7 +1954,7 @@ describe('BRC-20 API', () => {
       // Verify that A only has the 'meme' transferable inscription if querying for 'meme' ticker
       response = await fastify.inject({
         method: 'GET',
-        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}?ticker=meme`,
+        url: `/ordinals/brc-20/balances/${addressA}/transferable?ticker=meme`,
       });
       expect(response.statusCode).toBe(200);
       json = response.json();
@@ -1966,7 +1964,7 @@ describe('BRC-20 API', () => {
           inscription_id: `${transferHashMocked3}i0`,
           ticker: 'meme',
           inscription_number: parseInt(inscriptionNumberMocked3),
-          block_height: parseInt(blockHeightMocked3),
+          ordinal_number: '300000',
           amount: '2000000000000000000000',
         } as Brc20TransferableInscriptionsResponse),
       ]);
@@ -1974,7 +1972,7 @@ describe('BRC-20 API', () => {
       // Verify that A only has the 'pepe' transferable inscription if querying for 'pepe' ticker
       response = await fastify.inject({
         method: 'GET',
-        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}?ticker=pepe`,
+        url: `/ordinals/brc-20/balances/${addressA}/transferable?ticker=pepe`,
       });
       expect(response.statusCode).toBe(200);
       json = response.json();
@@ -1984,7 +1982,7 @@ describe('BRC-20 API', () => {
           inscription_id: `${transferHashMocked2}i0`,
           ticker: 'pepe',
           inscription_number: parseInt(inscriptionNumberMocked2),
-          block_height: parseInt(blockHeightMocked2),
+          ordinal_number: '200000',
           amount: '500000000000000000000',
         } as Brc20TransferableInscriptionsResponse),
       ]);
@@ -1992,7 +1990,7 @@ describe('BRC-20 API', () => {
       // Verify that A only has no transferable inscription if querying for 'rere' ticker
       response = await fastify.inject({
         method: 'GET',
-        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}?ticker=rere`,
+        url: `/ordinals/brc-20/balances/${addressA}/transferable?ticker=rere`,
       });
       expect(response.statusCode).toBe(200);
       json = response.json();
@@ -2041,7 +2039,7 @@ describe('BRC-20 API', () => {
 
       response = await fastify.inject({
         method: 'GET',
-        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}`,
+        url: `/ordinals/brc-20/balances/${addressA}/transferable`,
       });
       expect(response.statusCode).toBe(200);
       json = response.json();
@@ -2052,7 +2050,7 @@ describe('BRC-20 API', () => {
             inscription_id: `${transferHashMocked3}i0`,
             ticker: 'meme',
             inscription_number: parseInt(inscriptionNumberMocked3),
-            block_height: parseInt(blockHeightMocked3),
+            ordinal_number: '300000',
             amount: '2000000000000000000000',
           } as Brc20TransferableInscriptionsResponse),
         ])
@@ -2100,7 +2098,7 @@ describe('BRC-20 API', () => {
 
       response = await fastify.inject({
         method: 'GET',
-        url: `/ordinals/brc-20/transferable-inscriptions/${addressA}`,
+        url: `/ordinals/brc-20/balances/${addressA}/transferable`,
       });
       expect(response.statusCode).toBe(200);
       json = response.json();

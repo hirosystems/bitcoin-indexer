@@ -130,11 +130,15 @@ export class Brc20PgStore extends BasePgStore {
   ): Promise<DbPaginatedResult<DbBrc20TransferableInscription>> {
     const results = await this.sql<(DbBrc20TransferableInscription & { total: number })[]>`
       SELECT
-        o1.inscription_number, o1.inscription_id, o1.block_height, o1.amount, o1.ticker, COUNT(*) OVER() AS total
+        o1.inscription_number, o1.inscription_id, o1.ordinal_number, o1.amount, o1.ticker, COUNT(*) OVER() AS total
       FROM operations AS o1
       WHERE o1.operation = 'transfer'
       AND o1.address = ${args.address}
-      ${args.ticker ? this.sql`AND o1.ticker IN ${this.sql(args.ticker)}` : this.sql``}
+      ${
+        args.ticker
+          ? this.sql`AND LOWER(o1.ticker) IN (${args.ticker.map(t => t.toLowerCase())})`
+          : this.sql``
+      }
       AND NOT EXISTS (
           SELECT 1 
           FROM operations o2

@@ -428,19 +428,6 @@ export const Brc20BalanceResponseSchema = Type.Object({
 });
 export type Brc20BalanceResponse = Static<typeof Brc20BalanceResponseSchema>;
 
-export const Brc20TransferableInscriptionsResponseSchema = Type.Object({
-  inscription_number: Type.Integer({ examples: [1095397] }),
-  inscription_id: Type.String({
-    examples: ['ffb9df4532e05fe514765bcbeebb75c38d8f1774a291f9d6f123d68820cc39cdi0'],
-  }),
-  block_height: Type.Integer({ examples: [785143] }),
-  amount: Type.String({ examples: ['30000000000000000000'] }),
-  ticker: Type.String({ examples: ['meme'] }),
-});
-export type Brc20TransferableInscriptionsResponse = Static<
-  typeof Brc20TransferableInscriptionsResponseSchema
->;
-
 export const Brc20ActivityResponseSchema = Type.Object({
   operation: Type.Union([
     Type.Literal('deploy'),
@@ -499,6 +486,19 @@ export const Brc20ActivityResponseSchema = Type.Object({
   ),
 });
 export type Brc20ActivityResponse = Static<typeof Brc20ActivityResponseSchema>;
+
+export const Brc20TransferableInscriptionsResponseSchema = Type.Object({
+  inscription_number: Type.Integer({ examples: [1095397] }),
+  inscription_id: Type.String({
+    examples: ['ffb9df4532e05fe514765bcbeebb75c38d8f1774a291f9d6f123d68820cc39cdi0'],
+  }),
+  ordinal_number: Type.String({ examples: ['300000'] }),
+  amount: Type.String({ examples: ['30000000000000000000'] }),
+  ticker: Type.String({ examples: ['meme'] }),
+});
+export type Brc20TransferableInscriptionsResponse = Static<
+  typeof Brc20TransferableInscriptionsResponseSchema
+>;
 
 export const Brc20TokenResponseSchema = Type.Object(
   {

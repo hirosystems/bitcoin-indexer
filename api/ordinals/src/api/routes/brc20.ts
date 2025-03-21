@@ -240,7 +240,7 @@ export const Brc20Routes: FastifyPluginCallback<
   );
 
   fastify.get(
-    '/brc-20/transferable-inscriptions/:address',
+    '/brc-20/balances/:address/transferable',
     {
       schema: {
         operationId: 'getBrc20TransferableInscriptions',
