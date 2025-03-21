@@ -5,7 +5,7 @@ use std::{
 
 use bitcoin::ScriptBuf;
 use bitcoind::{try_debug, try_info, try_warn, utils::Context};
-use ordinals::{Cenotaph, Edict, Etching, Rune, RuneId};
+use ordinals_parser::{Cenotaph, Edict, Etching, Rune, RuneId};
 
 use super::{
     input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation,
@@ -405,7 +405,7 @@ mod test {
     use bitcoin::ScriptBuf;
     use bitcoind::utils::Context;
     use maplit::hashmap;
-    use ordinals::{Edict, Etching, Rune, Terms};
+    use ordinals_parser::{Edict, Etching, Rune, Terms};
 
     use super::TransactionCache;
     use crate::db::{

@@ -10,7 +10,7 @@ use bitcoind::{
     types::{BitcoinBlockData, BitcoinTransactionData},
     utils::Context,
 };
-use ordinals::{Artifact, Runestone};
+use ordinals_parser::{Artifact, Runestone};
 use tokio_postgres::Client;
 
 use super::cache::index_cache::IndexCache;

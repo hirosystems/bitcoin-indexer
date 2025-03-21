@@ -7,7 +7,7 @@ use models::{
     db_balance_change::DbBalanceChange, db_ledger_entry::DbLedgerEntry, db_rune::DbRune,
     db_supply_change::DbSupplyChange,
 };
-use ordinals::RuneId;
+use ordinals_parser::RuneId;
 use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
 use refinery::embed_migrations;
 use tokio_postgres::{types::ToSql, Client, Error, GenericClient, NoTls, Transaction};
