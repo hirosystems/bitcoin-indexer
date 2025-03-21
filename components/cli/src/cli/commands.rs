@@ -1,16 +1,16 @@
 use clap::{Parser, Subcommand};
 
-/// Protocol command enum
+/// Index Bitcoin meta-protocols like Ordinals, BRC-20, and Runes
 #[derive(Parser, Debug)]
 #[clap(name = "bitcoin-indexer", author, version, about, long_about = None)]
 pub enum Protocol {
-    /// Ordinals commands
+    /// Ordinals index commands
     #[clap(subcommand)]
     Ordinals(Command),
-    /// Runes commands
+    /// Runes index commands
     #[clap(subcommand)]
     Runes(Command),
-    /// Generate a new configuration file
+    /// Configuration file commands
     #[clap(subcommand)]
     Config(ConfigCommand),
 }

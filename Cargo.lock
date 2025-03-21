@@ -453,7 +453,7 @@ dependencies = [
 
 [[package]]
 name = "bitcoind"
-version = "2.2.5"
+version = "1.0.0"
 dependencies = [
  "assert-json-diff",
  "base58",
@@ -726,7 +726,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "cli"
-version = "2.2.5"
+version = "3.0.0"
 dependencies = [
  "bitcoind",
  "clap 3.2.25",
@@ -736,7 +736,7 @@ dependencies = [
  "hex",
  "hiro-system-kit",
  "num_cpus",
- "ordinals 2.2.5",
+ "ordinals 1.0.0",
  "reqwest 0.11.27",
  "runes",
  "serde",
@@ -754,7 +754,7 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
 name = "config"
-version = "2.2.5"
+version = "1.0.0"
 dependencies = [
  "bitcoin 0.32.5",
  "hiro-system-kit",
@@ -2388,7 +2388,7 @@ dependencies = [
 
 [[package]]
 name = "ordinals"
-version = "2.2.5"
+version = "1.0.0"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -2539,7 +2539,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "postgres"
-version = "2.2.5"
+version = "1.0.0"
 dependencies = [
  "bytes",
  "config",
@@ -3194,7 +3194,7 @@ dependencies = [
 
 [[package]]
 name = "runes"
-version = "2.2.5"
+version = "1.0.0"
 dependencies = [
  "bitcoin 0.32.5",
  "bitcoind",
