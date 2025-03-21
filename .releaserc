@@ -23,7 +23,7 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "sed -i -e '1h;2,$H;$!d;g' -e 's@[workspace.package]\\nversion = \"[^\"]*\"@[workspace.package]\\nversion = \"${nextRelease.version}\"@g' Cargo.toml && sed -i -e '1h;2,$H;$!d;g' -e 's@name = \"cli\"\\nversion = \"[^\"]*\"@name = \"cli\"\\nversion = \"${nextRelease.version}\"@g' Cargo.lock"
+        "prepareCmd": "sed -i -e '1h;2,$H;$!d;g' -e 's@\\[workspace\\.package\\]\\nversion = \"[^\"]*\"@\\[workspace\\.package\\]\\nversion = \"${nextRelease.version}\"@g' Cargo.toml && sed -i -e '1h;2,$H;$!d;g' -e 's@name = \"cli\"\\nversion = \"[^\"]*\"@name = \"cli\"\\nversion = \"${nextRelease.version}\"@g' Cargo.lock"
       }
     ],
     [
