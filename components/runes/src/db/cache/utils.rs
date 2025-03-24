@@ -3,7 +3,7 @@ use std::collections::{HashMap, VecDeque};
 use bitcoin::{Address, ScriptBuf};
 use bitcoind::{try_info, try_warn, types::bitcoin::TxIn, utils::Context};
 use lru::LruCache;
-use ordinals::RuneId;
+use ordinals_parser::RuneId;
 use tokio_postgres::Transaction;
 
 use super::{input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation};
@@ -314,7 +314,7 @@ mod test {
         use bitcoin::ScriptBuf;
         use bitcoind::utils::Context;
         use maplit::hashmap;
-        use ordinals::RuneId;
+        use ordinals_parser::RuneId;
 
         use crate::db::{
             cache::{
@@ -630,7 +630,7 @@ mod test {
     }
 
     mod sequential_ledger_entry {
-        use ordinals::RuneId;
+        use ordinals_parser::RuneId;
 
         use crate::db::{
             cache::{
@@ -691,7 +691,7 @@ mod test {
         };
         use lru::LruCache;
         use maplit::hashmap;
-        use ordinals::RuneId;
+        use ordinals_parser::RuneId;
 
         use crate::db::{
             cache::{
@@ -900,7 +900,7 @@ mod test {
 
         use lru::LruCache;
         use maplit::hashmap;
-        use ordinals::RuneId;
+        use ordinals_parser::RuneId;
 
         use crate::db::cache::{
             input_rune_balance::InputRuneBalance, utils::move_block_output_cache_to_output_cache,

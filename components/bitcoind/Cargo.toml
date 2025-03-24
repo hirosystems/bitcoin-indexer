@@ -1,6 +1,6 @@
 [package]
 name = "bitcoind"
-version.workspace = true
+version = "1.0.0"
 description = "Stateless Transaction Indexing Engine for Bitcoin"
 license = "GPL-3.0"
 edition = "2021"

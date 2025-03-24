@@ -1,4 +1,4 @@
-use ordinals::RuneId;
+use ordinals_parser::RuneId;
 use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
 use tokio_postgres::Row;
 

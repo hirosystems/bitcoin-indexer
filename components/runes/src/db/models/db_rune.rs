@@ -1,4 +1,4 @@
-use ordinals::{Etching, Rune, RuneId, SpacedRune};
+use ordinals_parser::{Etching, Rune, RuneId, SpacedRune};
 use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8};
 use tokio_postgres::Row;
 
@@ -204,7 +204,7 @@ impl DbRune {
 mod test {
     use std::str::FromStr;
 
-    use ordinals::{Etching, SpacedRune, Terms};
+    use ordinals_parser::{Etching, SpacedRune, Terms};
 
     use super::DbRune;
     use crate::db::cache::transaction_location::TransactionLocation;

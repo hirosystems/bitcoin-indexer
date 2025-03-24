@@ -4,7 +4,7 @@ use bitcoin::{Network, ScriptBuf};
 use bitcoind::{try_debug, try_info, try_warn, types::bitcoin::TxIn, utils::Context};
 use config::Config;
 use lru::LruCache;
-use ordinals::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
+use ordinals_parser::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
 use tokio_postgres::{Client, Transaction};
 
 use super::{

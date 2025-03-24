@@ -1,13 +1,13 @@
 [package]
 name = "runes"
-version.workspace = true
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
 bitcoind = { path = "../bitcoind" }
 bitcoin = { workspace = true }
 lru = "0.12.3"
-ordinals = "0.0.15"
+ordinals-parser = { package = "ordinals", version = "0.0.15" }
 bytes = "1.3"
 config = { path = "../config" }
 serde = "1"
