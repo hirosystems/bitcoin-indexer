@@ -279,6 +279,9 @@ jobs:
   semantic-release:
     runs-on: ubuntu-latest
     needs: [api-lint, api-test, test, rustfmt, clippy]
+    permissions:
+      contents: write
+      issues: write
     outputs:
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
       new_release_published: ${{ steps.semantic.outputs.new_release_published }}
@@ -368,7 +371,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -409,125 +412,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # Only push if (there's a new release on main branch, or if building a non-main branch) and (Only run on non-PR events or only PRs that aren't from forks)
           push: ${{ (github.ref != 'refs/heads/master' || needs.semantic-release.outputs.new_release_version != '') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-
-  deploy-dev:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        network: [mainnet]
-        subenv: [blue]
-    needs: build-publish
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    env:
-      DEPLOY_ENV: dev
-    environment:
-      name: Development-${{ matrix.network }}-${{ matrix.subenv }}
-      url: https://platform.dev.hiro.so/
-    steps:
-      - name: Checkout actions repo
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          token: ${{ secrets.GH_TOKEN }}
-          repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
-
-      - name: Deploy Ordhook build to Dev ${{ matrix.network }} ${{ matrix.subenv }}
-        uses: ./actions/deploy
-        with:
-          docker_image: ${{ env.DOCKER_IMAGE }}
-          docker_image_tag_or_digest: ${{ needs.build-publish.outputs.docker_image_digest }}
-          file_pattern: manifests/bitcoin/${{ matrix.network }}/ordhook/${{ env.DEPLOY_ENV }}/*/kustomization.yaml
-          subenv: ${{ matrix.subenv }}
-          gh_token: ${{ secrets.GH_TOKEN }}
-
-  auto-approve-dev:
-    runs-on: ubuntu-latest
-    if: needs.build-publish.outputs.new_release_published == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-    needs: build-publish
-    steps:
-      - name: Approve pending deployments
-        run: |
-          sleep 5
-          ENV_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/ordhook/actions/runs/${{ github.run_id }}/pending_deployments" | jq -r '.[0].environment.id // empty')
-          if [[ "${ENV_IDS}" != "[]" ]]; then
-            curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/ordhook/actions/runs/${{ github.run_id }}/pending_deployments" -d "{\"environment_ids\":[${ENV_ID}],\"state\":\"approved\",\"comment\":\"auto approve\"}"
-          fi
-
-  deploy-staging:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        network: [mainnet]
-        subenv: [blue]
-    needs:
-      - build-publish
-      - deploy-dev
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    env:
-      DEPLOY_ENV: stg
-    environment:
-      name: Staging-${{ matrix.network }}-${{ matrix.subenv }}
-      url: https://platform.stg.hiro.so/
-    steps:
-      - name: Checkout actions repo
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          token: ${{ secrets.GH_TOKEN }}
-          repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
-
-      - name: Deploy Ordhook build to Stg ${{ matrix.network }} ${{ matrix.subenv }}
-        uses: ./actions/deploy
-        with:
-          docker_image: ${{ env.DOCKER_IMAGE }}
-          docker_image_tag_or_digest: ${{ needs.build-publish.outputs.docker_image_digest }}
-          file_pattern: manifests/bitcoin/${{ matrix.network }}/ordhook/${{ env.DEPLOY_ENV }}/*/kustomization.yaml
-          subenv: ${{ matrix.subenv }}
-          gh_token: ${{ secrets.GH_TOKEN }}
-
-  auto-approve-stg:
-    runs-on: ubuntu-latest
-    if: needs.build-publish.outputs.new_release_published == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-    needs:
-      - build-publish
-      - deploy-dev
-    steps:
-      - name: Approve pending deployments
-        run: |
-          sleep 5
-          ENV_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/ordhook/actions/runs/${{ github.run_id }}/pending_deployments" | jq -r '.[0].environment.id // empty')
-          if [[ "${ENV_IDS}" != "[]" ]]; then
-            curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/ordhook/actions/runs/${{ github.run_id }}/pending_deployments" -d "{\"environment_ids\":[${ENV_ID}],\"state\":\"approved\",\"comment\":\"auto approve\"}"
-          fi
-
-  deploy-prod:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        network: [mainnet]
-        subenv: [blue, green]
-    needs:
-      - build-publish
-      - deploy-staging
-    if: needs.build-publish.outputs.new_release_published == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-    env:
-      DEPLOY_ENV: prd
-    environment:
-      name: Production-${{ matrix.network }}-${{ matrix.subenv }}
-      url: https://platform.hiro.so/
-    steps:
-      - name: Checkout actions repo
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          token: ${{ secrets.GH_TOKEN }}
-          repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
-
-      - name: Deploy Ordhook build to Prd ${{ matrix.network }} ${{ matrix.subenv }}
-        uses: ./actions/deploy
-        with:
-          docker_image: ${{ env.DOCKER_IMAGE }}
-          docker_image_tag_or_digest: ${{ needs.build-publish.outputs.docker_image_digest }}
-          file_pattern: manifests/bitcoin/${{ matrix.network }}/ordhook/${{ env.DEPLOY_ENV }}/*/kustomization.yaml
-          subenv: ${{ matrix.subenv }}
-          gh_token: ${{ secrets.GH_TOKEN }}
