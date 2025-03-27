@@ -284,7 +284,7 @@ jobs:
       issues: write
     outputs:
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
-      new_release_published: ${{ steps.semantic.outputs.new_release_published == 'true' }}
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
       latest: ${{ steps.semantic.outputs.new_release_published == 'true' && github.ref_name == 'main' }}
     steps:
       - uses: actions/checkout@v4
@@ -313,26 +313,12 @@ jobs:
     outputs:
       docker_image_digest: ${{ steps.docker_push.outputs.digest }}
     steps:
-      - name: Debug output
-        run: |
-          VALUE="${{ needs.semantic-release.outputs.new_release_published }}"
-          echo "new_release_published is: '$VALUE'"
-          if [ "$VALUE" = "false" ]; then
-            echo "Value is the string 'false'"
-          elif [ "$VALUE" = "true" ]; then
-            echo "Value is the string 'true'"
-          elif [ -z "$VALUE" ]; then
-            echo "Value is empty or unset"
-          else
-            echo "Value is something else: '$VALUE'"
-          fi
-
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
       - name: Checkout tag
-        if: needs.semantic-release.outputs.new_release_published
+        if: needs.semantic-release.outputs.new_release_published == 'true'
         uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -371,7 +357,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           # Only push if (there's a new release on main branch, or if building a non-main branch) and (Only run on non-PR events or only PRs that aren't from forks)
-          push: ${{ (github.ref != 'refs/heads/main' || needs.semantic-release.outputs.new_release_published) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+          push: ${{ (github.ref != 'refs/heads/main' || needs.semantic-release.outputs.new_release_published == 'true') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
 
   api-build-publish:
     strategy:
@@ -388,7 +374,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout tag
-        if: needs.semantic-release.outputs.new_release_published
+        if: needs.semantic-release.outputs.new_release_published == 'true'
         uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -424,4 +410,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Only push if (there's a new release on main branch, or if building a non-main branch) and (Only run on non-PR events or only PRs that aren't from forks)
-          push: ${{ (github.ref != 'refs/heads/main' || needs.semantic-release.outputs.new_release_published) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+          push: ${{ (github.ref != 'refs/heads/main' || needs.semantic-release.outputs.new_release_published == 'true') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
