@@ -284,7 +284,8 @@ jobs:
       issues: write
     outputs:
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
-      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_published: ${{ steps.semantic.outputs.new_release_published == 'true' }}
+      latest: ${{ steps.semantic.outputs.new_release_published == 'true' && github.ref_name == 'main' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -298,7 +299,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SEMANTIC_RELEASE_PACKAGE: ${{ github.event.repository.name }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_CRATES_IO_API_KEY }}
         with:
           semantic_version: 19
           extra_plugins: |
@@ -318,7 +318,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout tag
-        if: needs.semantic-release.outputs.new_release_version != ''
+        if: needs.semantic-release.outputs.new_release_published
         uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -336,9 +336,9 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}},value=${{ needs.semantic-release.outputs.new_release_version }},enable=${{ needs.semantic-release.outputs.new_release_version != '' }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ needs.semantic-release.outputs.new_release_version }},enable=${{ needs.semantic-release.outputs.new_release_version != '' }}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}},value=${{ needs.semantic-release.outputs.new_release_version }},enable=${{ needs.semantic-release.outputs.new_release_published }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.semantic-release.outputs.new_release_version }},enable=${{ needs.semantic-release.outputs.new_release_published }}
+            type=raw,value=latest,enable=${{ needs.semantic-release.outputs.latest }}
 
       - name: Log in to DockerHub
         uses: docker/login-action@v3
@@ -354,8 +354,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           file: ./dockerfiles/components/bitcoin-indexer.dockerfile
-          build-args: |
-            GIT_COMMIT=${{ env.GITHUB_SHA_SHORT }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           # Only push if (there's a new release on main branch, or if building a non-main branch) and (Only run on non-PR events or only PRs that aren't from forks)
@@ -394,8 +392,9 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}},value=${{ needs.semantic-release.outputs.new_release_version }},enable=${{ needs.semantic-release.outputs.new_release_version != '' }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ needs.semantic-release.outputs.new_release_version }},enable=${{ needs.semantic-release.outputs.new_release_version != '' }}
+            type=semver,pattern={{version}},value=${{ needs.semantic-release.outputs.new_release_version }},enable=${{ needs.semantic-release.outputs.new_release_published }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.semantic-release.outputs.new_release_version }},enable=${{ needs.semantic-release.outputs.new_release_published }}
+            type=raw,value=latest,enable=${{ needs.semantic-release.outputs.latest }}
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
