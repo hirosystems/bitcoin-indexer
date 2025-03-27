@@ -284,8 +284,8 @@ jobs:
       issues: write
     outputs:
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
-      new_release_published: ${{ steps.semantic.outputs.new_release_version != '' }}
-      latest: ${{ steps.semantic.outputs.new_release_version != '' && github.ref_name == 'main' }}
+      new_release_published: ${{ steps.semantic.outputs.new_release_published == 'true' }}
+      latest: ${{ steps.semantic.outputs.new_release_published == 'true' && github.ref_name == 'main' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -313,8 +313,19 @@ jobs:
     outputs:
       docker_image_digest: ${{ steps.docker_push.outputs.digest }}
     steps:
-      - name: Debug the output
-        run: echo "The output is ${{ needs.semantic-release.outputs.new_release_published }} ${{ needs.semantic-release.outputs.latest }}"
+      - name: Debug output
+        run: |
+          VALUE="${{ needs.semantic-release.outputs.new_release_published }}"
+          echo "new_release_published is: '$VALUE'"
+          if [ "$VALUE" = "false" ]; then
+            echo "Value is the string 'false'"
+          elif [ "$VALUE" = "true" ]; then
+            echo "Value is the string 'true'"
+          elif [ -z "$VALUE" ]; then
+            echo "Value is empty or unset"
+          else
+            echo "Value is something else: '$VALUE'"
+          fi
 
       - uses: actions/checkout@v4
         with:
