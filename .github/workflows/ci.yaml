@@ -284,7 +284,7 @@ jobs:
       issues: write
     outputs:
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
-      new_release_published: ${{ steps.semantic.outputs.new_release_published == 'true' }}
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
       latest: ${{ steps.semantic.outputs.new_release_published == 'true' && github.ref_name == 'main' }}
     steps:
       - uses: actions/checkout@v4
@@ -374,7 +374,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout tag
-        if: needs.semantic-release.outputs.new_release_version != ''
+        if: needs.semantic-release.outputs.new_release_published
         uses: actions/checkout@v4
         with:
           persist-credentials: false

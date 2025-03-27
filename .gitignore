@@ -226,3 +226,4 @@ Cargo.lock
 # Mutation Testing
 mutants.out/
 mutants.out.old/
+.vercel
