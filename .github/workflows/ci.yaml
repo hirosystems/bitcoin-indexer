@@ -313,6 +313,9 @@ jobs:
     outputs:
       docker_image_digest: ${{ steps.docker_push.outputs.digest }}
     steps:
+      - name: Debug the output
+        run: echo "The output is ${{ needs.semantic-release.outputs.new_release_published }} ${{ needs.semantic-release.outputs.latest }}"
+
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
