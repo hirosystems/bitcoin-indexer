@@ -1,9 +1,5 @@
 FROM rust:bullseye AS build
 
-ARG GIT_COMMIT='0000000'
-
-ENV GIT_COMMIT=${GIT_COMMIT}
-
 WORKDIR /src
 
 RUN apt-get update && apt-get install -y ca-certificates pkg-config libssl-dev libclang-11-dev libunwind-dev libunwind8 curl gnupg

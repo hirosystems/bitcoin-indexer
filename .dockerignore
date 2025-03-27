@@ -2,3 +2,6 @@
 /dockerfiles/
 node_modules/
 tmp/
+.vercel
+.github
+.vscode
