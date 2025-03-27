@@ -278,7 +278,7 @@ jobs:
 
   semantic-release:
     runs-on: ubuntu-latest
-    # needs: [api-lint, api-test, test, rustfmt, clippy]
+    needs: [api-lint, api-test, test, rustfmt, clippy]
     permissions:
       contents: write
       issues: write
