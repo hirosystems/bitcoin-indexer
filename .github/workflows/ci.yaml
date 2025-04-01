@@ -282,14 +282,29 @@ jobs:
     permissions:
       contents: write
       issues: write
+      pull-requests: write
     outputs:
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
       new_release_published: ${{ steps.semantic.outputs.new_release_published }}
       latest: ${{ steps.semantic.outputs.new_release_published == 'true' && github.ref_name == 'main' }}
     steps:
+      - name: Generate release bot app token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HIROSYSTEMS_RELEASE_BOT_ID }}
+          private-key: ${{ secrets.HIROSYSTEMS_RELEASE_BOT_PEM }}
+
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Get bot user ID
+        id: bot-user-id
+        run: |
+          echo "user-id=$(gh api "/users/${{ steps.generate_token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v4
@@ -297,8 +312,10 @@ jobs:
         # Only run on non-PR events or only PRs that aren't from forks
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
           SEMANTIC_RELEASE_PACKAGE: ${{ github.event.repository.name }}
+          GIT_AUTHOR_EMAIL: "${{ steps.bot-user-id.outputs.user-id }}+${{ steps.generate_token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          GIT_COMMITTER_EMAIL: "${{ steps.bot-user-id.outputs.user-id }}+${{ steps.generate_token.outputs.app-slug }}[bot]@users.noreply.github.com"
         with:
           semantic_version: 19
           extra_plugins: |
