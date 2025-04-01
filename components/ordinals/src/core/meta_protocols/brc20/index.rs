@@ -16,7 +16,10 @@ use super::{
     parser::ParsedBrc20Operation,
     verifier::{verify_brc20_operation, verify_brc20_transfers, VerifiedBrc20Operation},
 };
-use crate::core::meta_protocols::brc20::u128_amount_to_decimals_str;
+use crate::{
+    core::meta_protocols::brc20::u128_amount_to_decimals_str,
+    utils::monitoring::PrometheusMonitoring,
+};
 
 /// Index ordinal transfers in a single Bitcoin block looking for BRC-20 transfers.
 async fn index_unverified_brc20_transfers(
@@ -26,6 +29,7 @@ async fn index_unverified_brc20_transfers(
     brc20_cache: &mut Brc20MemoryCache,
     brc20_db_tx: &Transaction<'_>,
     ctx: &Context,
+    monitoring: &PrometheusMonitoring,
 ) -> Result<Vec<(usize, Brc20Operation)>, String> {
     if transfers.is_empty() {
         return Ok(vec![]);
@@ -61,6 +65,7 @@ async fn index_unverified_brc20_transfers(
                 brc20_db_tx,
             )
             .await?;
+        monitoring.metrics_record_brc20_transfer_send();
         try_info!(
             ctx,
             "BRC-20 transfer_send {} {} ({} -> {}) at block {}",
@@ -81,6 +86,7 @@ pub async fn index_block_and_insert_brc20_operations(
     brc20_cache: &mut Brc20MemoryCache,
     brc20_db_tx: &Transaction<'_>,
     ctx: &Context,
+    monitoring: &PrometheusMonitoring,
 ) -> Result<(), String> {
     if block.block_identifier.index < brc20_activation_height(&block.metadata.network) {
         return Ok(());
@@ -110,6 +116,7 @@ pub async fn index_block_and_insert_brc20_operations(
                             brc20_cache,
                             brc20_db_tx,
                             ctx,
+                            monitoring,
                         )
                         .await?,
                     );
@@ -149,6 +156,7 @@ pub async fn index_block_and_insert_brc20_operations(
                                 &tx.transaction_identifier,
                                 tx_index as u64,
                             )?;
+                            monitoring.metrics_record_brc20_deploy();
                             try_info!(
                                 ctx,
                                 "BRC-20 deploy {} ({}) at block {}",
@@ -181,6 +189,7 @@ pub async fn index_block_and_insert_brc20_operations(
                                     brc20_db_tx,
                                 )
                                 .await?;
+                            monitoring.metrics_record_brc20_mint();
                             try_info!(
                                 ctx,
                                 "BRC-20 mint {} {} ({}) at block {}",
@@ -214,6 +223,7 @@ pub async fn index_block_and_insert_brc20_operations(
                                     brc20_db_tx,
                                 )
                                 .await?;
+                            monitoring.metrics_record_brc20_transfer();
                             try_info!(
                                 ctx,
                                 "BRC-20 transfer {} {} ({}) at block {}",
@@ -245,6 +255,7 @@ pub async fn index_block_and_insert_brc20_operations(
             brc20_cache,
             brc20_db_tx,
             ctx,
+            monitoring,
         )
         .await?,
     );
@@ -285,6 +296,7 @@ mod test {
             test_builders::{TestBlockBuilder, TestTransactionBuilder},
         },
         db::{pg_reset_db, pg_test_connection, pg_test_connection_pool},
+        utils::monitoring::PrometheusMonitoring,
     };
 
     #[tokio::test]
@@ -380,6 +392,7 @@ mod test {
                 )
                 .build();
             let mut cache = Brc20MemoryCache::new(10);
+            let monitoring = PrometheusMonitoring::new();
 
             let result = index_block_and_insert_brc20_operations(
                 &mut block,
@@ -387,6 +400,7 @@ mod test {
                 &mut cache,
                 &client,
                 &ctx,
+                &monitoring,
             )
             .await;
 
