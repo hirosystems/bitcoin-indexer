@@ -15,29 +15,26 @@ type U64Counter = GenericCounter<AtomicU64>;
 
 #[derive(Debug, Clone)]
 pub struct PrometheusMonitoring {
-    // Existing metrics
-    pub last_indexed_block_height: UInt64Gauge,
-    pub last_indexed_inscription_number: UInt64Gauge,
-
     // Performance metrics
     pub block_processing_time: Histogram,
-    pub inscription_parsing_time: Histogram,
-    pub ordinal_computation_time: Histogram,
+    pub rune_parsing_time: Histogram,
+    pub rune_computation_time: Histogram,
     pub db_write_time: Histogram,
 
     // Volumetric metrics
-    pub inscriptions_per_block: Histogram,
-    pub brc20_operations_per_block: Histogram,
+    pub runes_per_block: U64Counter,
 
     // Health metrics
     pub chain_tip_distance: UInt64Gauge,
     pub processing_errors: U64Counter,
 
-    // BRC-20 specific metrics
-    pub brc20_deploy_operations: U64Counter,
-    pub brc20_mint_operations: U64Counter,
-    pub brc20_transfer_operations: U64Counter,
-    pub brc20_transfer_send_operations: U64Counter,
+    // Runes specific metrics
+    pub runes_etching_operations: U64Counter,
+    pub runes_mint_operations: U64Counter,
+    pub runes_burn_operations: U64Counter,
+    pub runes_transfer_operations: U64Counter,
+    pub last_indexed_block_height: UInt64Gauge,
+    pub last_indexed_rune_number: UInt64Gauge,
 
     // Resource metrics
     pub cache_size: UInt64Gauge,
@@ -57,64 +54,45 @@ impl PrometheusMonitoring {
     pub fn new() -> PrometheusMonitoring {
         let registry = Registry::new();
 
-        // Existing metrics
-        let last_indexed_block_height = Self::create_and_register_uint64_gauge(
-            &registry,
-            "last_indexed_block_height",
-            "The latest Bitcoin block indexed for ordinals.",
-        );
-        let last_indexed_inscription_number = Self::create_and_register_uint64_gauge(
-            &registry,
-            "last_indexed_inscription_number",
-            "The latest indexed inscription number.",
-        );
-
         // Performance metrics
         let block_processing_time = Self::create_and_register_histogram(
             &registry,
-            "block_processing_time",
+            "runes_block_processing_time",
             "Time taken to process a block in milliseconds",
             vec![
                 10.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0,
             ],
         );
-        let inscription_parsing_time = Self::create_and_register_histogram(
+        let rune_parsing_time = Self::create_and_register_histogram(
             &registry,
-            "inscription_parsing_time",
-            "Time taken to parse inscriptions in a block in milliseconds",
+            "rune_parsing_time",
+            "Time taken to parse Runes operations in milliseconds",
             vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
         );
-        let ordinal_computation_time = Self::create_and_register_histogram(
+        let rune_computation_time = Self::create_and_register_histogram(
             &registry,
-            "ordinal_computation_time",
-            "Time taken to compute ordinals in milliseconds",
+            "rune_computation_time",
+            "Time taken to compute Runes data in milliseconds",
             vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
         );
         let db_write_time = Self::create_and_register_histogram(
             &registry,
             "db_write_time",
-            "Time taken to write to the database in milliseconds",
+            "Time taken to write Runes data to database in milliseconds",
             vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
         );
 
         // Volumetric metrics
-        let inscriptions_per_block = Self::create_and_register_histogram(
+        let runes_per_block = Self::create_and_register_counter(
             &registry,
-            "inscriptions_per_block",
-            "Number of inscriptions per block",
-            vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
-        );
-        let brc20_operations_per_block = Self::create_and_register_histogram(
-            &registry,
-            "brc20_operations_per_block",
-            "Number of BRC-20 operations per block",
-            vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0],
+            "runes_per_block",
+            "Number of Runes per block",
         );
 
         // Health metrics
         let chain_tip_distance = Self::create_and_register_uint64_gauge(
             &registry,
-            "chain_tip_distance",
+            "runes_chain_tip_distance",
             "Distance in blocks from the Bitcoin chain tip",
         );
         let processing_errors = Self::create_and_register_counter(
@@ -123,55 +101,64 @@ impl PrometheusMonitoring {
             "Count of processing errors encountered",
         );
 
-        // BRC-20 specific metrics
-        let brc20_deploy_operations = Self::create_and_register_counter(
+        // Runes specific metrics
+        let runes_etching_operations = Self::create_and_register_counter(
             &registry,
-            "brc20_deploy_operations",
-            "Count of BRC-20 deploy operations processed",
+            "runes_etching_operations",
+            "Number of Runes etchings processed",
         );
-        let brc20_mint_operations = Self::create_and_register_counter(
+        let runes_mint_operations = Self::create_and_register_counter(
             &registry,
-            "brc20_mint_operations",
-            "Count of BRC-20 mint operations processed",
+            "runes_mint_operations",
+            "Number of Runes mints processed",
         );
-        let brc20_transfer_operations = Self::create_and_register_counter(
+        let runes_burn_operations = Self::create_and_register_counter(
             &registry,
-            "brc20_transfer_operations",
-            "Count of BRC-20 transfer operations processed",
+            "runes_burn_operations",
+            "Number of Runes burns processed",
         );
-        let brc20_transfer_send_operations = Self::create_and_register_counter(
+        let runes_transfer_operations = Self::create_and_register_counter(
             &registry,
-            "brc20_transfer_send_operations",
-            "Count of BRC-20 transfer send operations processed",
+            "runes_transfer_operations",
+            "Number of Runes transfers processed",
+        );
+        let last_indexed_block_height = Self::create_and_register_uint64_gauge(
+            &registry,
+            "last_indexed_block_height",
+            "Height of the last indexed block",
+        );
+        let last_indexed_rune_number = Self::create_and_register_uint64_gauge(
+            &registry,
+            "last_indexed_rune_number",
+            "Number of the last indexed Rune",
         );
 
         // Resource metrics
         let cache_size = Self::create_and_register_uint64_gauge(
             &registry,
-            "cache_size",
-            "Current size of the cache in entries",
+            "runes_cache_size",
+            "Current size of the Runes cache in entries",
         );
         let memory_usage = Self::create_and_register_f64_gauge(
             &registry,
-            "memory_usage_mb",
-            "Estimated memory usage in MB",
+            "runes_memory_usage_mb",
+            "Estimated memory usage in MB for Runes processing",
         );
 
         PrometheusMonitoring {
-            last_indexed_block_height,
-            last_indexed_inscription_number,
             block_processing_time,
-            inscription_parsing_time,
-            ordinal_computation_time,
+            rune_parsing_time,
+            rune_computation_time,
             db_write_time,
-            inscriptions_per_block,
-            brc20_operations_per_block,
+            runes_per_block,
             chain_tip_distance,
             processing_errors,
-            brc20_deploy_operations,
-            brc20_mint_operations,
-            brc20_transfer_operations,
-            brc20_transfer_send_operations,
+            runes_etching_operations,
+            runes_mint_operations,
+            runes_burn_operations,
+            runes_transfer_operations,
+            last_indexed_block_height,
+            last_indexed_rune_number,
             cache_size,
             memory_usage,
             registry,
@@ -211,17 +198,58 @@ impl PrometheusMonitoring {
         h
     }
 
-    pub fn initialize(&self, max_inscription_number: u64, block_height: u64) {
+    pub fn initialize(&self, max_rune_number: u64, block_height: u64) {
         self.metrics_block_indexed(block_height);
-        self.metrics_inscription_indexed(max_inscription_number);
+        self.metrics_rune_indexed(max_rune_number);
         // TODO: add inital values for metrics here
     }
 
-    pub fn metrics_inscription_indexed(&self, inscription_number: u64) {
-        let highest_appended = self.last_indexed_inscription_number.get();
-        if inscription_number > highest_appended {
-            self.last_indexed_inscription_number.set(inscription_number);
-        }
+    // Performance metrics methods
+    pub fn metrics_record_block_processing_time(&self, process_time: f64) {
+        self.block_processing_time.observe(process_time);
+    }
+
+    pub fn metrics_record_rune_parsing_time(&self, ms: f64) {
+        self.rune_parsing_time.observe(ms);
+    }
+
+    pub fn metrics_record_rune_computation_time(&self, ms: f64) {
+        self.rune_computation_time.observe(ms);
+    }
+
+    pub fn metrics_record_db_write_time(&self, ms: f64) {
+        self.db_write_time.observe(ms);
+    }
+
+    // Volumetric metrics methods
+    pub fn metrics_record_runes_in_block(&self, count: u64) {
+        self.runes_per_block.inc_by(count);
+    }
+
+    // Health metrics methods
+    pub fn metrics_update_chain_tip_distance(&self, distance: u64) {
+        self.chain_tip_distance.set(distance);
+    }
+
+    pub fn metrics_record_processing_errors(&self) {
+        self.processing_errors.inc();
+    }
+
+    // Runes specific metrics methods
+    pub fn metrics_record_runes_etching(&self) {
+        self.runes_etching_operations.inc();
+    }
+
+    pub fn metrics_record_runes_mint(&self) {
+        self.runes_mint_operations.inc();
+    }
+
+    pub fn metrics_record_runes_burn(&self) {
+        self.runes_burn_operations.inc();
+    }
+
+    pub fn metrics_record_runes_transfer(&self) {
+        self.runes_transfer_operations.inc();
     }
 
     pub fn metrics_block_indexed(&self, block_height: u64) {
@@ -231,56 +259,11 @@ impl PrometheusMonitoring {
         }
     }
 
-    // Health metrics methods
-    pub fn metrics_update_chain_tip_distance(&self, distance: u64) {
-        self.chain_tip_distance.set(distance);
-    }
-
-    pub fn metrics_record_processing_error(&self) {
-        self.processing_errors.inc();
-    }
-
-    // Performance metrics methods
-    pub fn metrics_record_block_processing_time(&self, process_time: f64) {
-        self.block_processing_time.observe(process_time);
-    }
-
-    pub fn metrics_record_inscription_parsing_time(&self, elapsed_ms: f64) {
-        self.inscription_parsing_time.observe(elapsed_ms);
-    }
-
-    pub fn metrics_record_ordinal_computation_time(&self, elapsed_ms: f64) {
-        self.ordinal_computation_time.observe(elapsed_ms);
-    }
-
-    pub fn metrics_record_db_write_time(&self, elapsed_ms: f64) {
-        self.db_write_time.observe(elapsed_ms);
-    }
-
-    // Volumetric metrics methods
-    pub fn metrics_record_inscriptions_in_block(&self, count: u64) {
-        self.inscriptions_per_block.observe(count as f64);
-    }
-
-    pub fn metrics_record_brc20_operations_in_block(&self, count: u64) {
-        self.brc20_operations_per_block.observe(count as f64);
-    }
-
-    // BRC-20 specific metrics methods
-    pub fn metrics_record_brc20_deploy(&self) {
-        self.brc20_deploy_operations.inc();
-    }
-
-    pub fn metrics_record_brc20_mint(&self) {
-        self.brc20_mint_operations.inc();
-    }
-
-    pub fn metrics_record_brc20_transfer(&self) {
-        self.brc20_transfer_operations.inc();
-    }
-
-    pub fn metrics_record_brc20_transfer_send(&self) {
-        self.brc20_transfer_send_operations.inc();
+    pub fn metrics_rune_indexed(&self, rune_number: u64) {
+        let highest_appended = self.last_indexed_rune_number.get();
+        if rune_number > highest_appended {
+            self.last_indexed_rune_number.set(rune_number);
+        }
     }
 
     // Resource metrics methods
@@ -330,7 +313,6 @@ async fn serve_req(
                 req.uri().path()
             );
             let response = Response::builder().status(404).body(Body::empty()).unwrap();
-
             Ok(response)
         }
     }
@@ -372,7 +354,7 @@ mod tests {
         let monitoring = PrometheusMonitoring::new();
         let start_time = Instant::now();
 
-        // Simulate some processing time with a more reliable method
+        // Simulate some processing time
         std::thread::sleep(std::time::Duration::from_millis(100));
 
         monitoring.metrics_record_block_processing_time(start_time.elapsed().as_millis() as f64);
@@ -401,15 +383,15 @@ mod tests {
     }
 
     #[test]
-    fn test_inscription_parsing_time() {
+    fn test_rune_parsing_time() {
         let monitoring = PrometheusMonitoring::new();
 
         // Test with different parsing times
-        monitoring.metrics_record_inscription_parsing_time(50.0);
-        monitoring.metrics_record_inscription_parsing_time(150.0);
+        monitoring.metrics_record_rune_parsing_time(50.0);
+        monitoring.metrics_record_rune_parsing_time(150.0);
 
         // Get the histogram values directly
-        let mut mfs = monitoring.inscription_parsing_time.collect();
+        let mut mfs = monitoring.rune_parsing_time.collect();
         assert_eq!(mfs.len(), 1);
 
         let mf = mfs.pop().unwrap();
@@ -432,15 +414,15 @@ mod tests {
     }
 
     #[test]
-    fn test_ordinal_computation_time() {
+    fn test_runes_computation_time() {
         let monitoring = PrometheusMonitoring::new();
 
         // Test with different computation times
-        monitoring.metrics_record_ordinal_computation_time(75.0);
-        monitoring.metrics_record_ordinal_computation_time(200.0);
+        monitoring.metrics_record_rune_computation_time(75.0);
+        monitoring.metrics_record_rune_computation_time(200.0);
 
         // Get the histogram values directly
-        let mut mfs = monitoring.ordinal_computation_time.collect();
+        let mut mfs = monitoring.rune_computation_time.collect();
         assert_eq!(mfs.len(), 1);
 
         let mf = mfs.pop().unwrap();
@@ -494,111 +476,27 @@ mod tests {
     }
 
     #[test]
-    fn test_inscriptions_in_block() {
+    fn test_runes_in_block() {
         let monitoring = PrometheusMonitoring::new();
 
-        // Test with different inscription counts
-        monitoring.metrics_record_inscriptions_in_block(5);
-        monitoring.metrics_record_inscriptions_in_block(10);
+        // Test with different operation counts
+        monitoring.metrics_record_runes_in_block(5);
+        monitoring.metrics_record_runes_in_block(10);
 
-        // Get the histogram values directly
-        let mut mfs = monitoring.inscriptions_per_block.collect();
+        // Get the counter value
+        let mut mfs = monitoring.runes_per_block.collect();
         assert_eq!(mfs.len(), 1);
 
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
-        let proto_histogram = m.get_histogram();
+        let counter = m.get_counter();
 
-        // Verify we recorded exactly 2 observations
+        // Verify the total count (5 + 10 = 15)
         assert_eq!(
-            proto_histogram.get_sample_count(),
-            2,
-            "Should have recorded 2 observations"
-        );
-
-        // Verify the sum of our observations (5 + 10 = 15)
-        assert_eq!(
-            proto_histogram.get_sample_sum(),
+            counter.get_value(),
             15.0,
-            "Sum of observations should be 15.0"
+            "Total operations count should be 15"
         );
-
-        // Verify the values were properly bucketed
-        let buckets = proto_histogram.get_bucket();
-        assert!(!buckets.is_empty(), "Should have bucket data");
-
-        // The value 5 should be in the 5-10 bucket
-        let bucket_5 = buckets
-            .iter()
-            .find(|b| b.get_upper_bound() == 5.0)
-            .expect("Should have 5 bucket");
-        assert_eq!(
-            bucket_5.get_cumulative_count(),
-            1,
-            "First value (5) should be in 5-10 bucket"
-        );
-
-        // The value 10 should be in the 10-25 bucket
-        let bucket_10 = buckets
-            .iter()
-            .find(|b| b.get_upper_bound() == 10.0)
-            .expect("Should have 10 bucket");
-        assert_eq!(
-            bucket_10.get_cumulative_count(),
-            2,
-            "Second value (10) should be in 10-25 bucket"
-        );
-    }
-
-    #[test]
-    fn test_brc20_operations_per_block() {
-        let monitoring = PrometheusMonitoring::new();
-
-        // Test with different BRC-20 operation counts
-        monitoring.metrics_record_brc20_operations_in_block(3);
-        monitoring.metrics_record_brc20_operations_in_block(7);
-
-        // Get the histogram values directly
-        let mut mfs = monitoring.brc20_operations_per_block.collect();
-        assert_eq!(mfs.len(), 1);
-
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let proto_histogram = m.get_histogram();
-
-        // Verify we recorded exactly 2 observations
-        assert_eq!(
-            proto_histogram.get_sample_count(),
-            2,
-            "Should have recorded 2 observations"
-        );
-
-        // Verify the sum of our observations (3 + 7 = 10)
-        assert_eq!(
-            proto_histogram.get_sample_sum(),
-            10.0,
-            "Sum of observations should be 10.0"
-        );
-    }
-
-    #[test]
-    fn test_metric_buckets() {
-        let monitoring = PrometheusMonitoring::new();
-
-        // Test that metrics are properly bucketed
-        let test_values = vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0];
-
-        for value in test_values {
-            monitoring.metrics_record_inscription_parsing_time(value);
-            monitoring.metrics_record_ordinal_computation_time(value);
-            monitoring.metrics_record_db_write_time(value);
-        }
-
-        // Verify metrics were recorded
-        let metrics = monitoring.registry.gather();
-        assert!(verify_metric_exists(&metrics, "inscription_parsing_time"));
-        assert!(verify_metric_exists(&metrics, "ordinal_computation_time"));
-        assert!(verify_metric_exists(&metrics, "db_write_time"));
     }
 
     #[test]
@@ -606,27 +504,27 @@ mod tests {
         let monitoring = PrometheusMonitoring::new();
 
         // Record some test metrics
-        monitoring.metrics_record_inscription_parsing_time(50.0);
-        monitoring.metrics_record_ordinal_computation_time(75.0);
+        monitoring.metrics_record_rune_parsing_time(50.0);
+        monitoring.metrics_record_rune_computation_time(75.0);
         monitoring.metrics_record_db_write_time(25.0);
 
         // Verify registry contains the metrics
         let metrics = monitoring.registry.gather();
 
         // Verify all expected metrics exist
-        assert!(verify_metric_exists(&metrics, "inscription_parsing_time"));
-        assert!(verify_metric_exists(&metrics, "ordinal_computation_time"));
+        assert!(verify_metric_exists(&metrics, "rune_parsing_time"));
+        assert!(verify_metric_exists(&metrics, "rune_computation_time"));
         assert!(verify_metric_exists(&metrics, "db_write_time"));
     }
 
     #[test]
-    fn test_processing_errors() {
+    fn test_runes_processing_error() {
         let monitoring = PrometheusMonitoring::new();
 
         // Record some processing errors
-        monitoring.metrics_record_processing_error();
-        monitoring.metrics_record_processing_error();
-        monitoring.metrics_record_processing_error();
+        monitoring.metrics_record_processing_errors();
+        monitoring.metrics_record_processing_errors();
+        monitoring.metrics_record_processing_errors();
 
         // Get the counter value
         let mut mfs = monitoring.processing_errors.collect();
@@ -665,6 +563,65 @@ mod tests {
     }
 
     #[test]
+    fn test_runes_operations() {
+        let monitoring = PrometheusMonitoring::new();
+
+        // Record different types of Runes operations
+        monitoring.metrics_record_runes_etching();
+        monitoring.metrics_record_runes_etching();
+        monitoring.metrics_record_runes_mint();
+        monitoring.metrics_record_runes_mint();
+        monitoring.metrics_record_runes_mint();
+        monitoring.metrics_record_runes_burn();
+        monitoring.metrics_record_runes_transfer();
+
+        // Get the counter values
+        let mut mfs = monitoring.runes_etching_operations.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let counter = m.get_counter();
+        assert_eq!(
+            counter.get_value(),
+            2.0,
+            "Should have recorded 2 etching operations"
+        );
+
+        mfs = monitoring.runes_mint_operations.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let counter = m.get_counter();
+        assert_eq!(
+            counter.get_value(),
+            3.0,
+            "Should have recorded 3 mint operations"
+        );
+
+        mfs = monitoring.runes_burn_operations.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let counter = m.get_counter();
+        assert_eq!(
+            counter.get_value(),
+            1.0,
+            "Should have recorded 1 burn operation"
+        );
+
+        mfs = monitoring.runes_transfer_operations.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let counter = m.get_counter();
+        assert_eq!(
+            counter.get_value(),
+            1.0,
+            "Should have recorded 1 transfer operation"
+        );
+    }
+
+    #[test]
     fn test_block_indexed() {
         let monitoring = PrometheusMonitoring::new();
 
@@ -689,15 +646,15 @@ mod tests {
     }
 
     #[test]
-    fn test_inscription_indexed() {
+    fn test_rune_indexed() {
         let monitoring = PrometheusMonitoring::new();
 
         // Record rune indexing
-        monitoring.metrics_inscription_indexed(50);
-        monitoring.metrics_inscription_indexed(100);
+        monitoring.metrics_rune_indexed(50);
+        monitoring.metrics_rune_indexed(100);
 
         // Get the counter value
-        let mut mfs = monitoring.last_indexed_inscription_number.collect();
+        let mut mfs = monitoring.last_indexed_rune_number.collect();
         assert_eq!(mfs.len(), 1);
 
         let mf = mfs.pop().unwrap();
@@ -708,7 +665,7 @@ mod tests {
         assert_eq!(
             gauge.get_value(),
             100.0,
-            "Highest inscription number indexed should be 100"
+            "Highest rune number indexed should be 100"
         );
     }
 
@@ -753,65 +710,6 @@ mod tests {
             gauge.get_value(),
             200.75,
             "Memory usage should be 200.75 MB"
-        );
-    }
-
-    #[test]
-    fn test_brc20_operations() {
-        let monitoring = PrometheusMonitoring::new();
-
-        // Record different types of BRC-20 operations
-        monitoring.metrics_record_brc20_deploy();
-        monitoring.metrics_record_brc20_deploy();
-        monitoring.metrics_record_brc20_mint();
-        monitoring.metrics_record_brc20_mint();
-        monitoring.metrics_record_brc20_mint();
-        monitoring.metrics_record_brc20_transfer();
-        monitoring.metrics_record_brc20_transfer_send();
-
-        // Get the counter values
-        let mut mfs = monitoring.brc20_deploy_operations.collect();
-        assert_eq!(mfs.len(), 1);
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
-        assert_eq!(
-            counter.get_value(),
-            2.0,
-            "Should have recorded 2 deploy operations"
-        );
-
-        mfs = monitoring.brc20_mint_operations.collect();
-        assert_eq!(mfs.len(), 1);
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
-        assert_eq!(
-            counter.get_value(),
-            3.0,
-            "Should have recorded 3 mint operations"
-        );
-
-        mfs = monitoring.brc20_transfer_operations.collect();
-        assert_eq!(mfs.len(), 1);
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
-        assert_eq!(
-            counter.get_value(),
-            1.0,
-            "Should have recorded 1 transfer operation"
-        );
-
-        mfs = monitoring.brc20_transfer_send_operations.collect();
-        assert_eq!(mfs.len(), 1);
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
-        assert_eq!(
-            counter.get_value(),
-            1.0,
-            "Should have recorded 1 transfer send operation"
         );
     }
 }

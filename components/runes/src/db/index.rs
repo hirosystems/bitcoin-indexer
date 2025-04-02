@@ -7,14 +7,18 @@ use bitcoin::{
 };
 use bitcoind::{
     try_info,
-    types::{BitcoinBlockData, BitcoinTransactionData},
+    types::{BitcoinBlockData, BitcoinTransactionData, BlockIdentifier},
     utils::Context,
 };
 use ordinals_parser::{Artifact, Runestone};
 use tokio_postgres::Client;
 
-use super::cache::index_cache::IndexCache;
-use crate::db::{cache::transaction_location::TransactionLocation, pg_roll_back_block};
+use super::{
+    cache::index_cache::IndexCache, get_chain_tip, pg_get_max_rune_number, pg_roll_back_block,
+};
+use crate::{
+    db::cache::transaction_location::TransactionLocation, utils::monitoring::PrometheusMonitoring,
+};
 
 pub fn get_rune_genesis_block_height(network: Network) -> u64 {
     match network {
@@ -67,18 +71,32 @@ pub async fn index_block(
     pg_client: &mut Client,
     index_cache: &mut IndexCache,
     block: &mut BitcoinBlockData,
+    prometheus: &PrometheusMonitoring,
     ctx: &Context,
 ) {
+    // TODO: is there no way to have processing errors as we have on ordinals?
+    // if so, delete the processing errors metrics
     let stopwatch = std::time::Instant::now();
     let block_hash = &block.block_identifier.hash;
     let block_height = block.block_identifier.index;
     try_info!(ctx, "Indexing block {}...", block_height);
+
+    // Update chain tip distance
+    if let Some(chain_tip) = get_chain_tip(pg_client, ctx).await {
+        let distance = chain_tip.index - block_height;
+        prometheus.metrics_update_chain_tip_distance(distance);
+    }
 
     let mut db_tx = pg_client
         .transaction()
         .await
         .expect("Unable to begin block processing pg transaction");
     index_cache.reset_max_rune_number(&mut db_tx, ctx).await;
+
+    // Measure parsing time
+    let parsing_start = std::time::Instant::now();
+    let mut operations_count = 0;
+
     for tx in block.transactions.iter() {
         let (transaction, eligible_outputs, first_eligible_output, total_outputs) =
             bitcoin_tx_from_chainhook_tx(block, tx);
@@ -106,27 +124,38 @@ pub async fn index_block(
         if let Some(artifact) = Runestone::decipher(&transaction) {
             match artifact {
                 Artifact::Runestone(runestone) => {
+                    operations_count += 1;
                     index_cache
                         .apply_runestone(&runestone, &mut db_tx, ctx)
                         .await;
                     if let Some(etching) = runestone.etching {
+                        prometheus.metrics_record_runes_etching();
                         index_cache.apply_etching(&etching, &mut db_tx, ctx).await;
                     }
                     if let Some(mint_rune_id) = runestone.mint {
+                        prometheus.metrics_record_runes_mint();
                         index_cache.apply_mint(&mint_rune_id, &mut db_tx, ctx).await;
                     }
                     for edict in runestone.edicts.iter() {
+                        if edict.amount == 0 {
+                            prometheus.metrics_record_runes_burn();
+                        } else {
+                            prometheus.metrics_record_runes_transfer();
+                        }
                         index_cache.apply_edict(edict, &mut db_tx, ctx).await;
                     }
                 }
                 Artifact::Cenotaph(cenotaph) => {
+                    operations_count += 1;
                     index_cache.apply_cenotaph(&cenotaph, &mut db_tx, ctx).await;
                     if let Some(etching) = cenotaph.etching {
+                        prometheus.metrics_record_runes_etching();
                         index_cache
                             .apply_cenotaph_etching(&etching, &mut db_tx, ctx)
                             .await;
                     }
                     if let Some(mint_rune_id) = cenotaph.mint {
+                        prometheus.metrics_record_runes_mint();
                         index_cache
                             .apply_cenotaph_mint(&mint_rune_id, &mut db_tx, ctx)
                             .await;
@@ -136,12 +165,32 @@ pub async fn index_block(
         }
         index_cache.end_transaction(&mut db_tx, ctx);
     }
+    prometheus.metrics_record_rune_parsing_time(parsing_start.elapsed().as_millis() as f64);
+
+    // Measure computation time
+    let computation_start = std::time::Instant::now();
     index_cache.end_block();
+    prometheus.metrics_record_rune_computation_time(computation_start.elapsed().as_millis() as f64);
+
+    // Measure database write time
+    let db_write_start = std::time::Instant::now();
     index_cache.db_cache.flush(&mut db_tx, ctx).await;
     db_tx
         .commit()
         .await
         .expect("Unable to commit pg transaction");
+    prometheus.metrics_record_db_write_time(db_write_start.elapsed().as_millis() as f64);
+
+    // Record metrics
+    prometheus.metrics_record_runes_in_block(operations_count);
+    prometheus.metrics_block_indexed(block_height);
+    let current_rune_number = pg_get_max_rune_number(pg_client, ctx).await;
+    prometheus.metrics_rune_indexed(current_rune_number as u64);
+
+    // Update cache size and memory usage metrics
+    prometheus.metrics_update_cache_size(index_cache.get_total_cache_size());
+    prometheus.metrics_update_memory_usage(index_cache.estimate_memory_usage());
+
     try_info!(
         ctx,
         "Block {} indexed in {}s",

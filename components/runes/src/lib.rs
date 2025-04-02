@@ -11,16 +11,23 @@ use db::{
     index::{get_rune_genesis_block_height, index_block, roll_back_block},
     pg_connect,
 };
+use utils::monitoring::PrometheusMonitoring;
 
 extern crate serde;
 
 pub mod db;
+pub mod utils;
 
-async fn new_runes_indexer_runloop(config: &Config, ctx: &Context) -> Result<Indexer, String> {
+async fn new_runes_indexer_runloop(
+    prometheus: &PrometheusMonitoring,
+    config: &Config,
+    ctx: &Context,
+) -> Result<Indexer, String> {
     let (commands_tx, commands_rx) = crossbeam_channel::unbounded::<IndexerCommand>();
 
     let config_moved = config.clone();
     let ctx_moved = ctx.clone();
+    let prometheus_moved = prometheus.clone();
     let handle: JoinHandle<()> = hiro_system_kit::thread_named("runes_indexer")
         .spawn(move || {
             future_block_on(&ctx_moved.clone(), async move {
@@ -51,6 +58,7 @@ async fn new_runes_indexer_runloop(config: &Config, ctx: &Context) -> Result<Ind
                                         &mut pg_client,
                                         &mut index_cache,
                                         block,
+                                        &prometheus_moved,
                                         &ctx_moved,
                                     )
                                     .await;
@@ -105,7 +113,7 @@ pub async fn start_runes_indexer(
 ) -> Result<(), String> {
     pg_connect(config, true, ctx).await;
 
-    let indexer = new_runes_indexer_runloop(config, ctx).await?;
+    let indexer = new_runes_indexer_runloop(&PrometheusMonitoring::new(), config, ctx).await?;
     start_bitcoin_indexer(
         &indexer,
         get_rune_genesis_block_height(config.bitcoind.network),
