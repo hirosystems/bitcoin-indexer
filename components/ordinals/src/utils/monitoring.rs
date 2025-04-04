@@ -22,8 +22,8 @@ pub struct PrometheusMonitoring {
     // Performance metrics
     pub block_processing_time: Histogram,
     pub inscription_parsing_time: Histogram,
-    pub ordinal_computation_time: Histogram,
-    pub db_write_time: Histogram,
+    pub inscription_computation_time: Histogram,
+    pub inscription_db_write_time: Histogram,
 
     // Volumetric metrics
     pub inscriptions_per_block: Histogram,
@@ -84,15 +84,15 @@ impl PrometheusMonitoring {
             "Time taken to parse inscriptions in a block in milliseconds",
             vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
         );
-        let ordinal_computation_time = Self::create_and_register_histogram(
+        let inscription_computation_time = Self::create_and_register_histogram(
             &registry,
-            "ordinal_computation_time",
-            "Time taken to compute ordinals in milliseconds",
+            "inscription_computation_time",
+            "Time taken to compute inscription in milliseconds",
             vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
         );
-        let db_write_time = Self::create_and_register_histogram(
+        let inscription_db_write_time = Self::create_and_register_histogram(
             &registry,
-            "db_write_time",
+            "inscription_db_write_time",
             "Time taken to write to the database in milliseconds",
             vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
         );
@@ -162,8 +162,8 @@ impl PrometheusMonitoring {
             last_indexed_inscription_number,
             block_processing_time,
             inscription_parsing_time,
-            ordinal_computation_time,
-            db_write_time,
+            inscription_computation_time,
+            inscription_db_write_time,
             inscriptions_per_block,
             brc20_operations_per_block,
             chain_tip_distance,
@@ -249,12 +249,12 @@ impl PrometheusMonitoring {
         self.inscription_parsing_time.observe(elapsed_ms);
     }
 
-    pub fn metrics_record_ordinal_computation_time(&self, elapsed_ms: f64) {
-        self.ordinal_computation_time.observe(elapsed_ms);
+    pub fn metrics_record_inscription_computation_time(&self, elapsed_ms: f64) {
+        self.inscription_computation_time.observe(elapsed_ms);
     }
 
-    pub fn metrics_record_db_write_time(&self, elapsed_ms: f64) {
-        self.db_write_time.observe(elapsed_ms);
+    pub fn metrics_record_inscription_db_write_time(&self, elapsed_ms: f64) {
+        self.inscription_db_write_time.observe(elapsed_ms);
     }
 
     // Volumetric metrics methods
@@ -432,15 +432,15 @@ mod tests {
     }
 
     #[test]
-    fn test_ordinal_computation_time() {
+    fn test_inscription_computation_time() {
         let monitoring = PrometheusMonitoring::new();
 
         // Test with different computation times
-        monitoring.metrics_record_ordinal_computation_time(75.0);
-        monitoring.metrics_record_ordinal_computation_time(200.0);
+        monitoring.metrics_record_inscription_computation_time(75.0);
+        monitoring.metrics_record_inscription_computation_time(200.0);
 
         // Get the histogram values directly
-        let mut mfs = monitoring.ordinal_computation_time.collect();
+        let mut mfs = monitoring.inscription_computation_time.collect();
         assert_eq!(mfs.len(), 1);
 
         let mf = mfs.pop().unwrap();
@@ -463,15 +463,15 @@ mod tests {
     }
 
     #[test]
-    fn test_db_write_time() {
+    fn test_inscription_db_write_time() {
         let monitoring = PrometheusMonitoring::new();
 
         // Test with different write times
-        monitoring.metrics_record_db_write_time(25.0);
-        monitoring.metrics_record_db_write_time(100.0);
+        monitoring.metrics_record_inscription_db_write_time(25.0);
+        monitoring.metrics_record_inscription_db_write_time(100.0);
 
         // Get the histogram values directly
-        let mut mfs = monitoring.db_write_time.collect();
+        let mut mfs = monitoring.inscription_db_write_time.collect();
         assert_eq!(mfs.len(), 1);
 
         let mf = mfs.pop().unwrap();
@@ -590,15 +590,18 @@ mod tests {
 
         for value in test_values {
             monitoring.metrics_record_inscription_parsing_time(value);
-            monitoring.metrics_record_ordinal_computation_time(value);
-            monitoring.metrics_record_db_write_time(value);
+            monitoring.metrics_record_inscription_computation_time(value);
+            monitoring.metrics_record_inscription_db_write_time(value);
         }
 
         // Verify metrics were recorded
         let metrics = monitoring.registry.gather();
         assert!(verify_metric_exists(&metrics, "inscription_parsing_time"));
-        assert!(verify_metric_exists(&metrics, "ordinal_computation_time"));
-        assert!(verify_metric_exists(&metrics, "db_write_time"));
+        assert!(verify_metric_exists(
+            &metrics,
+            "inscription_computation_time"
+        ));
+        assert!(verify_metric_exists(&metrics, "inscription_db_write_time"));
     }
 
     #[test]
@@ -607,16 +610,19 @@ mod tests {
 
         // Record some test metrics
         monitoring.metrics_record_inscription_parsing_time(50.0);
-        monitoring.metrics_record_ordinal_computation_time(75.0);
-        monitoring.metrics_record_db_write_time(25.0);
+        monitoring.metrics_record_inscription_computation_time(75.0);
+        monitoring.metrics_record_inscription_db_write_time(25.0);
 
         // Verify registry contains the metrics
         let metrics = monitoring.registry.gather();
 
         // Verify all expected metrics exist
         assert!(verify_metric_exists(&metrics, "inscription_parsing_time"));
-        assert!(verify_metric_exists(&metrics, "ordinal_computation_time"));
-        assert!(verify_metric_exists(&metrics, "db_write_time"));
+        assert!(verify_metric_exists(
+            &metrics,
+            "inscription_computation_time"
+        ));
+        assert!(verify_metric_exists(&metrics, "inscription_db_write_time"));
     }
 
     #[test]

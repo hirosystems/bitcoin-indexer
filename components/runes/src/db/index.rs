@@ -7,7 +7,7 @@ use bitcoin::{
 };
 use bitcoind::{
     try_info,
-    types::{BitcoinBlockData, BitcoinTransactionData, BlockIdentifier},
+    types::{BitcoinBlockData, BitcoinTransactionData},
     utils::Context,
 };
 use ordinals_parser::{Artifact, Runestone};

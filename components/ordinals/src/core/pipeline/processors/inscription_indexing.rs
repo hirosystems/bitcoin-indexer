@@ -179,7 +179,9 @@ pub async fn index_block(
                 return Err(format!("Failed to update block inscriptions: {}", e));
             }
         }
-        prometheus.metrics_record_ordinal_computation_time(computation_start.elapsed().as_millis() as f64);
+        prometheus.metrics_record_inscription_computation_time(
+            computation_start.elapsed().as_millis() as f64,
+        );
 
         if let Err(e) = augment_block_with_transfers(block, &ord_tx, ctx).await {
             prometheus.metrics_record_processing_error();
@@ -187,13 +189,15 @@ pub async fn index_block(
         }
 
         // Measure database write time
-        let db_write_start = std::time::Instant::now();
+        let inscription_db_write_start = std::time::Instant::now();
         // Write data
         if let Err(e) = ordinals_pg::insert_block(block, &ord_tx).await {
             prometheus.metrics_record_processing_error();
             return Err(format!("Failed to insert block: {}", e));
         }
-        prometheus.metrics_record_db_write_time(db_write_start.elapsed().as_millis() as f64);
+        prometheus.metrics_record_inscription_db_write_time(
+            inscription_db_write_start.elapsed().as_millis() as f64,
+        );
 
         // BRC-20
         if let (Some(brc20_cache), Some(brc20_pool)) = (brc20_cache, &pg_pools.brc20) {
