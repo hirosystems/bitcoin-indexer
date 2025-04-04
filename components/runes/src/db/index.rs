@@ -173,13 +173,13 @@ pub async fn index_block(
     prometheus.metrics_record_rune_computation_time(computation_start.elapsed().as_millis() as f64);
 
     // Measure database write time
-    let db_write_start = std::time::Instant::now();
+    let rune_db_write_start = std::time::Instant::now();
     index_cache.db_cache.flush(&mut db_tx, ctx).await;
     db_tx
         .commit()
         .await
         .expect("Unable to commit pg transaction");
-    prometheus.metrics_record_db_write_time(db_write_start.elapsed().as_millis() as f64);
+    prometheus.metrics_record_rune_db_write_time(rune_db_write_start.elapsed().as_millis() as f64);
 
     // Record metrics
     prometheus.metrics_record_runes_in_block(operations_count);

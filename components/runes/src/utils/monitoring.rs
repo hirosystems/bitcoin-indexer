@@ -19,7 +19,7 @@ pub struct PrometheusMonitoring {
     pub block_processing_time: Histogram,
     pub rune_parsing_time: Histogram,
     pub rune_computation_time: Histogram,
-    pub db_write_time: Histogram,
+    pub rune_db_write_time: Histogram,
 
     // Volumetric metrics
     pub runes_per_block: U64Counter,
@@ -75,9 +75,9 @@ impl PrometheusMonitoring {
             "Time taken to compute Runes data in milliseconds",
             vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
         );
-        let db_write_time = Self::create_and_register_histogram(
+        let rune_db_write_time = Self::create_and_register_histogram(
             &registry,
-            "db_write_time",
+            "rune_db_write_time",
             "Time taken to write Runes data to database in milliseconds",
             vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
         );
@@ -149,7 +149,7 @@ impl PrometheusMonitoring {
             block_processing_time,
             rune_parsing_time,
             rune_computation_time,
-            db_write_time,
+            rune_db_write_time,
             runes_per_block,
             chain_tip_distance,
             processing_errors,
@@ -217,8 +217,8 @@ impl PrometheusMonitoring {
         self.rune_computation_time.observe(ms);
     }
 
-    pub fn metrics_record_db_write_time(&self, ms: f64) {
-        self.db_write_time.observe(ms);
+    pub fn metrics_record_rune_db_write_time(&self, ms: f64) {
+        self.rune_db_write_time.observe(ms);
     }
 
     // Volumetric metrics methods
@@ -445,15 +445,15 @@ mod tests {
     }
 
     #[test]
-    fn test_db_write_time() {
+    fn test_rune_db_write_time() {
         let monitoring = PrometheusMonitoring::new();
 
         // Test with different write times
-        monitoring.metrics_record_db_write_time(25.0);
-        monitoring.metrics_record_db_write_time(100.0);
+        monitoring.metrics_record_rune_db_write_time(25.0);
+        monitoring.metrics_record_rune_db_write_time(100.0);
 
         // Get the histogram values directly
-        let mut mfs = monitoring.db_write_time.collect();
+        let mut mfs = monitoring.rune_db_write_time.collect();
         assert_eq!(mfs.len(), 1);
 
         let mf = mfs.pop().unwrap();
@@ -506,7 +506,7 @@ mod tests {
         // Record some test metrics
         monitoring.metrics_record_rune_parsing_time(50.0);
         monitoring.metrics_record_rune_computation_time(75.0);
-        monitoring.metrics_record_db_write_time(25.0);
+        monitoring.metrics_record_rune_db_write_time(25.0);
 
         // Verify registry contains the metrics
         let metrics = monitoring.registry.gather();
@@ -514,7 +514,7 @@ mod tests {
         // Verify all expected metrics exist
         assert!(verify_metric_exists(&metrics, "rune_parsing_time"));
         assert!(verify_metric_exists(&metrics, "rune_computation_time"));
-        assert!(verify_metric_exists(&metrics, "db_write_time"));
+        assert!(verify_metric_exists(&metrics, "rune_db_write_time"));
     }
 
     #[test]
