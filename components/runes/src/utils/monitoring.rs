@@ -54,27 +54,31 @@ impl PrometheusMonitoring {
             &registry,
             "runes_block_processing_time",
             "Time taken to process a block in milliseconds",
-            vec![
-                10.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0,
-            ],
+            vec![10_000.0, 20_000.0, 30_000.0, 60_000.0, 120_000.0, 300_000.0],
         );
         let rune_parsing_time = Self::create_and_register_histogram(
             &registry,
             "rune_parsing_time",
             "Time taken to parse Runes operations in milliseconds",
-            vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
+            vec![
+                1_000.0, 5_000.0, 10_000.0, 20_000.0, 60_000.0, 120_000.0, 300_000.0,
+            ],
         );
         let rune_computation_time = Self::create_and_register_histogram(
             &registry,
             "rune_computation_time",
             "Time taken to compute Runes data in milliseconds",
-            vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
+            vec![
+                1_000.0, 5_000.0, 10_000.0, 20_000.0, 60_000.0, 120_000.0, 300_000.0,
+            ],
         );
         let rune_db_write_time = Self::create_and_register_histogram(
             &registry,
             "rune_db_write_time",
             "Time taken to write Runes data to database in milliseconds",
-            vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
+            vec![
+                1_000.0, 5_000.0, 10_000.0, 20_000.0, 60_000.0, 120_000.0, 300_000.0,
+            ],
         );
 
         // Volumetric metrics

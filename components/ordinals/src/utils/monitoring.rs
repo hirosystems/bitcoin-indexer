@@ -69,27 +69,31 @@ impl PrometheusMonitoring {
             &registry,
             "block_processing_time",
             "Time taken to process a block in milliseconds",
-            vec![
-                10.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0,
-            ],
+            vec![10_000.0, 20_000.0, 30_000.0, 60_000.0, 120_000.0, 300_000.0],
         );
         let inscription_parsing_time = Self::create_and_register_histogram(
             &registry,
             "inscription_parsing_time",
             "Time taken to parse inscriptions in a block in milliseconds",
-            vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
+            vec![
+                1_000.0, 5_000.0, 10_000.0, 20_000.0, 60_000.0, 120_000.0, 300_000.0,
+            ],
         );
         let inscription_computation_time = Self::create_and_register_histogram(
             &registry,
             "inscription_computation_time",
             "Time taken to compute inscription in milliseconds",
-            vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
+            vec![
+                1_000.0, 5_000.0, 10_000.0, 20_000.0, 60_000.0, 120_000.0, 300_000.0,
+            ],
         );
         let inscription_db_write_time = Self::create_and_register_histogram(
             &registry,
             "inscription_db_write_time",
             "Time taken to write to the database in milliseconds",
-            vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
+            vec![
+                1_000.0, 5_000.0, 10_000.0, 20_000.0, 60_000.0, 120_000.0, 300_000.0,
+            ],
         );
 
         // Volumetric metrics
@@ -111,11 +115,6 @@ impl PrometheusMonitoring {
             &registry,
             "chain_tip_distance",
             "Distance in blocks from the Bitcoin chain tip",
-        );
-        let processing_errors = Self::create_and_register_counter(
-            &registry,
-            "processing_errors",
-            "Count of processing errors encountered",
         );
 
         // BRC-20 specific metrics
