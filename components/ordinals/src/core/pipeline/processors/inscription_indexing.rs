@@ -145,7 +145,6 @@ pub async fn index_block(
         ) {
             Ok(result) => result,
             Err(e) => {
-                prometheus.metrics_record_processing_error();
                 return Err(format!("Failed to compute inscription data: {}", e));
             }
         };
@@ -159,7 +158,6 @@ pub async fn index_block(
             )
             .await
             {
-                prometheus.metrics_record_processing_error();
                 return Err(format!("Failed to update block inscriptions: {}", e));
             }
         }
@@ -168,7 +166,6 @@ pub async fn index_block(
         );
 
         if let Err(e) = augment_block_with_transfers(block, &ord_tx, ctx).await {
-            prometheus.metrics_record_processing_error();
             return Err(format!("Failed to augment block with transfers: {}", e));
         }
 
@@ -176,7 +173,6 @@ pub async fn index_block(
         let inscription_db_write_start = std::time::Instant::now();
         // Write data
         if let Err(e) = ordinals_pg::insert_block(block, &ord_tx).await {
-            prometheus.metrics_record_processing_error();
             return Err(format!("Failed to insert block: {}", e));
         }
         prometheus.metrics_record_inscription_db_write_time(
@@ -202,12 +198,10 @@ pub async fn index_block(
             )
             .await
             {
-                prometheus.metrics_record_processing_error();
                 return Err(format!("Failed to process BRC-20 operations: {}", e));
             }
 
             if let Err(e) = brc20_tx.commit().await {
-                prometheus.metrics_record_processing_error();
                 return Err(format!("unable to commit brc20 pg transaction: {}", e));
             }
         }
@@ -219,7 +213,6 @@ pub async fn index_block(
                 .unwrap_or(0) as u64,
         );
         if let Err(e) = ord_tx.commit().await {
-            prometheus.metrics_record_processing_error();
             return Err(format!("unable to commit ordinals pg transaction: {}", e));
         }
     }

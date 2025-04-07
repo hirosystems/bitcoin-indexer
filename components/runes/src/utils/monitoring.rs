@@ -26,7 +26,6 @@ pub struct PrometheusMonitoring {
 
     // Health metrics
     pub chain_tip_distance: UInt64Gauge,
-    pub processing_errors: U64Counter,
 
     // Runes specific metrics
     pub runes_etching_operations: U64Counter,
@@ -91,11 +90,6 @@ impl PrometheusMonitoring {
             "runes_chain_tip_distance",
             "Distance in blocks from the Bitcoin chain tip",
         );
-        let processing_errors = Self::create_and_register_counter(
-            &registry,
-            "processing_errors",
-            "Count of processing errors encountered",
-        );
 
         // Runes specific metrics
         let runes_etching_operations = Self::create_and_register_counter(
@@ -136,7 +130,6 @@ impl PrometheusMonitoring {
             rune_db_write_time,
             runes_per_block,
             chain_tip_distance,
-            processing_errors,
             runes_etching_operations,
             runes_mint_operations,
             runes_burn_operations,
@@ -211,10 +204,6 @@ impl PrometheusMonitoring {
     // Health metrics methods
     pub fn metrics_update_chain_tip_distance(&self, distance: u64) {
         self.chain_tip_distance.set(distance);
-    }
-
-    pub fn metrics_record_processing_errors(&self) {
-        self.processing_errors.inc();
     }
 
     // Runes specific metrics methods
@@ -488,31 +477,6 @@ mod tests {
         assert!(verify_metric_exists(&metrics, "rune_parsing_time"));
         assert!(verify_metric_exists(&metrics, "rune_computation_time"));
         assert!(verify_metric_exists(&metrics, "rune_db_write_time"));
-    }
-
-    #[test]
-    fn test_runes_processing_error() {
-        let monitoring = PrometheusMonitoring::new();
-
-        // Record some processing errors
-        monitoring.metrics_record_processing_errors();
-        monitoring.metrics_record_processing_errors();
-        monitoring.metrics_record_processing_errors();
-
-        // Get the counter value
-        let mut mfs = monitoring.processing_errors.collect();
-        assert_eq!(mfs.len(), 1);
-
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
-
-        // Verify we recorded exactly 3 processing errors
-        assert_eq!(
-            counter.get_value(),
-            3.0,
-            "Should have recorded 3 processing errors"
-        );
     }
 
     #[test]

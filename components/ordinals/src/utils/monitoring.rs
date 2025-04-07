@@ -31,7 +31,6 @@ pub struct PrometheusMonitoring {
 
     // Health metrics
     pub chain_tip_distance: UInt64Gauge,
-    pub processing_errors: U64Counter,
 
     // BRC-20 specific metrics
     pub brc20_deploy_operations: U64Counter,
@@ -151,7 +150,6 @@ impl PrometheusMonitoring {
             inscriptions_per_block,
             brc20_operations_per_block,
             chain_tip_distance,
-            processing_errors,
             brc20_deploy_operations,
             brc20_mint_operations,
             brc20_transfer_operations,
@@ -216,10 +214,6 @@ impl PrometheusMonitoring {
     // Health metrics methods
     pub fn metrics_update_chain_tip_distance(&self, distance: u64) {
         self.chain_tip_distance.set(distance);
-    }
-
-    pub fn metrics_record_processing_error(&self) {
-        self.processing_errors.inc();
     }
 
     // Performance metrics methods
@@ -596,31 +590,6 @@ mod tests {
             "inscription_computation_time"
         ));
         assert!(verify_metric_exists(&metrics, "inscription_db_write_time"));
-    }
-
-    #[test]
-    fn test_processing_errors() {
-        let monitoring = PrometheusMonitoring::new();
-
-        // Record some processing errors
-        monitoring.metrics_record_processing_error();
-        monitoring.metrics_record_processing_error();
-        monitoring.metrics_record_processing_error();
-
-        // Get the counter value
-        let mut mfs = monitoring.processing_errors.collect();
-        assert_eq!(mfs.len(), 1);
-
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
-
-        // Verify we recorded exactly 3 processing errors
-        assert_eq!(
-            counter.get_value(),
-            3.0,
-            "Should have recorded 3 processing errors"
-        );
     }
 
     #[test]

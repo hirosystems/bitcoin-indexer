@@ -74,8 +74,6 @@ pub async fn index_block(
     prometheus: &PrometheusMonitoring,
     ctx: &Context,
 ) {
-    // TODO: is there no way to have processing errors as we have on ordinals?
-    // if so, delete the processing errors metrics
     let stopwatch = std::time::Instant::now();
     let block_hash = &block.block_identifier.hash;
     let block_height = block.block_identifier.index;
