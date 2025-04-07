@@ -47,7 +47,6 @@ pub async fn process_blocks(
     pg_pools: &PgConnectionPools,
     ctx: &Context,
 ) -> Result<Vec<BitcoinBlockData>, String> {
-    let process_start_time = std::time::Instant::now();
     let mut cache_l1 = BTreeMap::new();
     let mut updated_blocks = vec![];
 
@@ -70,10 +69,6 @@ pub async fn process_blocks(
 
         updated_blocks.push(block);
     }
-
-    // Record overall processing time
-    prometheus
-        .metrics_record_block_processing_time(process_start_time.elapsed().as_millis() as f64);
 
     Ok(updated_blocks)
 }
@@ -216,6 +211,9 @@ pub async fn index_block(
             return Err(format!("unable to commit ordinals pg transaction: {}", e));
         }
     }
+
+    // Record overall processing time
+    prometheus.metrics_record_block_processing_time(stopwatch.elapsed().as_millis() as f64);
 
     try_info!(
         ctx,
