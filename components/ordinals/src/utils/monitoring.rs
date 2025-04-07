@@ -39,10 +39,6 @@ pub struct PrometheusMonitoring {
     pub brc20_transfer_operations: U64Counter,
     pub brc20_transfer_send_operations: U64Counter,
 
-    // Resource metrics
-    pub cache_size: UInt64Gauge,
-    pub memory_usage: F64Gauge,
-
     // Registry
     pub registry: Registry,
 }
@@ -145,18 +141,6 @@ impl PrometheusMonitoring {
             "Count of BRC-20 transfer send operations processed",
         );
 
-        // Resource metrics
-        let cache_size = Self::create_and_register_uint64_gauge(
-            &registry,
-            "cache_size",
-            "Current size of the cache in entries",
-        );
-        let memory_usage = Self::create_and_register_f64_gauge(
-            &registry,
-            "memory_usage_mb",
-            "Estimated memory usage in MB",
-        );
-
         PrometheusMonitoring {
             last_indexed_block_height,
             last_indexed_inscription_number,
@@ -172,8 +156,6 @@ impl PrometheusMonitoring {
             brc20_mint_operations,
             brc20_transfer_operations,
             brc20_transfer_send_operations,
-            cache_size,
-            memory_usage,
             registry,
         }
     }
@@ -281,15 +263,6 @@ impl PrometheusMonitoring {
 
     pub fn metrics_record_brc20_transfer_send(&self) {
         self.brc20_transfer_send_operations.inc();
-    }
-
-    // Resource metrics methods
-    pub fn metrics_update_cache_size(&self, size: u64) {
-        self.cache_size.set(size);
-    }
-
-    pub fn metrics_update_memory_usage(&self, mb: f64) {
-        self.memory_usage.set(mb);
     }
 }
 
@@ -715,50 +688,6 @@ mod tests {
             gauge.get_value(),
             100.0,
             "Highest inscription number indexed should be 100"
-        );
-    }
-
-    #[test]
-    fn test_cache_size() {
-        let monitoring = PrometheusMonitoring::new();
-
-        // Update cache size
-        monitoring.metrics_update_cache_size(100);
-        monitoring.metrics_update_cache_size(200);
-
-        // Get the gauge value
-        let mut mfs = monitoring.cache_size.collect();
-        assert_eq!(mfs.len(), 1);
-
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let gauge = m.get_gauge();
-
-        // Verify the final value is 200
-        assert_eq!(gauge.get_value(), 200.0, "Cache size should be 200");
-    }
-
-    #[test]
-    fn test_memory_usage() {
-        let monitoring = PrometheusMonitoring::new();
-
-        // Update memory usage
-        monitoring.metrics_update_memory_usage(100.5);
-        monitoring.metrics_update_memory_usage(200.75);
-
-        // Get the gauge value
-        let mut mfs = monitoring.memory_usage.collect();
-        assert_eq!(mfs.len(), 1);
-
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let gauge = m.get_gauge();
-
-        // Verify the final value is 200.75
-        assert_eq!(
-            gauge.get_value(),
-            200.75,
-            "Memory usage should be 200.75 MB"
         );
     }
 

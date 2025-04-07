@@ -75,22 +75,6 @@ pub async fn process_blocks(
     prometheus
         .metrics_record_block_processing_time(process_start_time.elapsed().as_millis() as f64);
 
-    // Update cache size metric
-    prometheus.metrics_update_cache_size(cache_l2.len() as u64);
-
-    // Memory usage metric - include all caches
-    let mut total_memory = cache_l2.len() as f64 * 0.1; // L2 cache estimate
-    total_memory += cache_l1.len() as f64 * 0.05; // L1 cache estimate
-    if brc20_cache.is_some() {
-        // Add BRC20 cache memory estimate based on config's lru_cache_size
-        let lru_size = config
-            .ordinals_brc20_config()
-            .map(|c| c.lru_cache_size)
-            .unwrap_or(0);
-        total_memory += lru_size as f64 * 0.02; // Estimate based on configured cache size
-    }
-    prometheus.metrics_update_memory_usage(total_memory);
-
     Ok(updated_blocks)
 }
 

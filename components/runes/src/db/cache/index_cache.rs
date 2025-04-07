@@ -433,20 +433,4 @@ impl IndexCache {
             }
         }
     }
-
-    // TODO: what do we expect to have on these cache and memory metrics?
-    pub fn get_total_cache_size(&self) -> u64 {
-        (self.rune_cache.len()
-            + self.rune_total_mints_cache.len()
-            + self.output_cache.len()
-            + self.block_output_cache.len()) as u64
-    }
-
-    pub fn estimate_memory_usage(&self) -> f64 {
-        let mut total_memory = self.rune_cache.len() as f64 * 0.1; // Rune cache estimate
-        total_memory += self.rune_total_mints_cache.len() as f64 * 0.05; // Total mints cache estimate
-        total_memory += self.output_cache.len() as f64 * 0.2; // Output cache estimate
-        total_memory += self.block_output_cache.len() as f64 * 0.15; // Block output cache estimate
-        total_memory
-    }
 }

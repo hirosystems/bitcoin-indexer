@@ -187,10 +187,6 @@ pub async fn index_block(
     let current_rune_number = pg_get_max_rune_number(pg_client, ctx).await;
     prometheus.metrics_rune_indexed(current_rune_number as u64);
 
-    // Update cache size and memory usage metrics
-    prometheus.metrics_update_cache_size(index_cache.get_total_cache_size());
-    prometheus.metrics_update_memory_usage(index_cache.estimate_memory_usage());
-
     try_info!(
         ctx,
         "Block {} indexed in {}s",
