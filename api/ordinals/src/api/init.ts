@@ -11,6 +11,8 @@ import { SatRoutes } from './routes/sats';
 import { StatsRoutes } from './routes/stats';
 import { StatusRoutes } from './routes/status';
 import { Brc20PgStore } from '../pg/brc20/brc20-pg-store';
+import { ApiMetrics } from '../metrics/metrics';
+import { registerMetricsMiddleware } from './middleware/metrics';
 
 export const Api: FastifyPluginAsync<
   Record<never, never>,
@@ -32,9 +34,18 @@ export async function buildApiServer(args: { db: PgStore; brc20Db: Brc20PgStore 
 
   fastify.decorate('db', args.db);
   fastify.decorate('brc20Db', args.brc20Db);
+
   if (isProdEnv) {
     await fastify.register(FastifyMetrics, { endpoint: null });
+    // Configure API metrics and register middleware
+    const metrics = ApiMetrics.configure(args.db);
+    registerMetricsMiddleware(fastify, metrics);
+
+    // Set the Fastify instance on PgStore for metrics tracking
+    args.db.setFastify(fastify);
+    args.brc20Db.setFastify(fastify);
   }
+
   await fastify.register(FastifyCors);
   await fastify.register(Api, { prefix: '/ordinals/v1' });
   await fastify.register(Api, { prefix: '/ordinals' });

@@ -18,11 +18,13 @@ import {
   DbLocation,
   DbPaginatedResult,
 } from './types';
+import { FastifyInstance } from 'fastify';
 
 type InscriptionIdentifier = { genesis_id: string } | { number: number };
 
 export class PgStore extends BasePgStore {
   readonly counts: CountsPgStore;
+  private fastify?: FastifyInstance;
 
   static async connect(): Promise<PgStore> {
     const pgConfig: PgConnectionVars = {
@@ -51,27 +53,58 @@ export class PgStore extends BasePgStore {
     this.counts = new CountsPgStore(this);
   }
 
+  /**
+   * Set the Fastify instance for metrics tracking
+   */
+  setFastify(fastify: FastifyInstance) {
+    this.fastify = fastify;
+  }
+
+  /**
+   * Utility method to track a database query with metrics
+   */
+  private trackQuery<T>(operationType: string, fn: () => Promise<T>): Promise<T> {
+    if (!this.fastify) {
+      return fn();
+    }
+
+    const startTime = process.hrtime();
+    return fn().finally(() => {
+      // Use string indexing to access the trackDbQuery method
+      const tracker = this.fastify as any;
+      if (typeof tracker.trackDbQuery === 'function') {
+        tracker.trackDbQuery(operationType, startTime);
+      }
+    });
+  }
+
   async getChainTipBlockHeight(): Promise<number | undefined> {
-    const result = await this.sql<{ block_height: string }[]>`SELECT block_height FROM chain_tip`;
-    if (result[0].block_height) return parseInt(result[0].block_height);
+    return this.trackQuery('chain_tip_height', async () => {
+      const result = await this.sql<{ block_height: string }[]>`SELECT block_height FROM chain_tip`;
+      if (result[0].block_height) return parseInt(result[0].block_height);
+    });
   }
 
   async getMaxInscriptionNumber(): Promise<number | undefined> {
-    const result = await this.sql<{ max: string }[]>`
-      SELECT MAX(number) FROM inscriptions WHERE number >= 0
-    `;
-    if (result[0].max) {
-      return parseInt(result[0].max);
-    }
+    return this.trackQuery('max_inscription_number', async () => {
+      const result = await this.sql<{ max: string }[]>`
+        SELECT MAX(number) FROM inscriptions WHERE number >= 0
+      `;
+      if (result[0].max) {
+        return parseInt(result[0].max);
+      }
+    });
   }
 
   async getMaxCursedInscriptionNumber(): Promise<number | undefined> {
-    const result = await this.sql<{ min: string }[]>`
-      SELECT MIN(number) FROM inscriptions WHERE number < 0
-    `;
-    if (result[0].min) {
-      return parseInt(result[0].min);
-    }
+    return this.trackQuery('max_cursed_inscription_number', async () => {
+      const result = await this.sql<{ min: string }[]>`
+        SELECT MIN(number) FROM inscriptions WHERE number < 0
+      `;
+      if (result[0].min) {
+        return parseInt(result[0].min);
+      }
+    });
   }
 
   async getInscriptionsIndexETag(): Promise<string> {
@@ -94,47 +127,51 @@ export class PgStore extends BasePgStore {
   async getInscriptionContent(
     args: InscriptionIdentifier
   ): Promise<DbInscriptionContent | undefined> {
-    const result = await this.sql<DbInscriptionContent[]>`
-      WITH content_id AS (
-        SELECT
-          CASE
-            WHEN delegate IS NOT NULL THEN delegate
-            ELSE inscription_id
-          END AS genesis_id
+    return this.trackQuery('get_inscription_content', async () => {
+      const result = await this.sql<DbInscriptionContent[]>`
+        WITH content_id AS (
+          SELECT
+            CASE
+              WHEN delegate IS NOT NULL THEN delegate
+              ELSE inscription_id
+            END AS genesis_id
+          FROM inscriptions
+          WHERE ${
+            'genesis_id' in args
+              ? this.sql`inscription_id = ${args.genesis_id}`
+              : this.sql`number = ${args.number}`
+          }
+        )
+        SELECT content, content_type, content_length
         FROM inscriptions
-        WHERE ${
-          'genesis_id' in args
-            ? this.sql`inscription_id = ${args.genesis_id}`
-            : this.sql`number = ${args.number}`
-        }
-      )
-      SELECT content, content_type, content_length
-      FROM inscriptions
-      WHERE inscription_id = (SELECT genesis_id FROM content_id)
-    `;
-    if (result.count > 0) {
-      return result[0];
-    }
+        WHERE inscription_id = (SELECT genesis_id FROM content_id)
+      `;
+      if (result.count > 0) {
+        return result[0];
+      }
+    });
   }
 
   async getInscriptionETag(args: InscriptionIdentifier): Promise<string | undefined> {
-    const result = await this.sql<{ etag: string }[]>`
-      SELECT l.timestamp::text AS etag
-      FROM inscriptions AS i
-      INNER JOIN current_locations AS c ON i.ordinal_number = c.ordinal_number
-      INNER JOIN locations AS l ON
-        l.ordinal_number = c.ordinal_number AND
-        l.block_height = c.block_height AND
-        l.tx_index = c.tx_index
-      WHERE ${
-        'genesis_id' in args
-          ? this.sql`i.inscription_id = ${args.genesis_id}`
-          : this.sql`i.number = ${args.number}`
+    return this.trackQuery('get_inscription_etag', async () => {
+      const result = await this.sql<{ etag: string }[]>`
+        SELECT l.timestamp::text AS etag
+        FROM inscriptions AS i
+        INNER JOIN current_locations AS c ON i.ordinal_number = c.ordinal_number
+        INNER JOIN locations AS l ON
+          l.ordinal_number = c.ordinal_number AND
+          l.block_height = c.block_height AND
+          l.tx_index = c.tx_index
+        WHERE ${
+          'genesis_id' in args
+            ? this.sql`i.inscription_id = ${args.genesis_id}`
+            : this.sql`i.number = ${args.number}`
+        }
+      `;
+      if (result.count > 0) {
+        return result[0].etag;
       }
-    `;
-    if (result.count > 0) {
-      return result[0].etag;
-    }
+    });
   }
 
   async getInscriptions(
@@ -142,25 +179,27 @@ export class PgStore extends BasePgStore {
     filters?: DbInscriptionIndexFilters,
     sort?: DbInscriptionIndexOrder
   ): Promise<DbPaginatedResult<DbFullyLocatedInscriptionResult>> {
-    return await this.sqlTransaction(async sql => {
-      const order = sort?.order === Order.asc ? sql`ASC` : sql`DESC`;
-      let orderBy = sql`i.number ${order}`;
-      switch (sort?.order_by) {
-        case OrderBy.genesis_block_height:
-          orderBy = sql`i.block_height ${order}, i.tx_index ${order}`;
-          break;
-        case OrderBy.ordinal:
-          orderBy = sql`i.ordinal_number ${order}`;
-          break;
-        case OrderBy.rarity:
-          orderBy = sql`ARRAY_POSITION(ARRAY['common','uncommon','rare','epic','legendary','mythic'], s.rarity) ${order}, i.number DESC`;
-          break;
-      }
-      // Do we need a filtered `COUNT(*)`? If so, try to use the pre-calculated counts we have in
-      // cached tables to speed up these queries.
-      const countType = getIndexResultCountType(filters);
-      const total = await this.counts.fromResults(countType, filters);
-      const results = await sql<(DbFullyLocatedInscriptionResult & { total: number })[]>`
+    const startTime = process.hrtime();
+    try {
+      return await this.sqlTransaction(async sql => {
+        const order = sort?.order === Order.asc ? sql`ASC` : sql`DESC`;
+        let orderBy = sql`i.number ${order}`;
+        switch (sort?.order_by) {
+          case OrderBy.genesis_block_height:
+            orderBy = sql`i.block_height ${order}, i.tx_index ${order}`;
+            break;
+          case OrderBy.ordinal:
+            orderBy = sql`i.ordinal_number ${order}`;
+            break;
+          case OrderBy.rarity:
+            orderBy = sql`ARRAY_POSITION(ARRAY['common','uncommon','rare','epic','legendary','mythic'], s.rarity) ${order}, i.number DESC`;
+            break;
+        }
+        // Do we need a filtered `COUNT(*)`? If so, try to use the pre-calculated counts we have in
+        // cached tables to speed up these queries.
+        const countType = getIndexResultCountType(filters);
+        const total = await this.counts.fromResults(countType, filters);
+        const results = await sql<(DbFullyLocatedInscriptionResult & { total: number })[]>`
         WITH results AS (
           SELECT
             i.inscription_id AS genesis_id,
@@ -295,107 +334,117 @@ export class PgStore extends BasePgStore {
         INNER JOIN locations AS gen_l ON gen_l.ordinal_number = r.sat_ordinal AND gen_l.block_height = r.genesis_block_height AND gen_l.tx_index = r.genesis_tx_index
         ORDER BY r.row_num ASC
       `;
-      return {
-        total: total ?? results[0]?.total ?? 0,
-        results: results ?? [],
-      };
-    });
+        return {
+          total: total ?? results[0]?.total ?? 0,
+          results: results ?? [],
+        };
+      });
+    } finally {
+      const tracker = this.fastify as any;
+      if (this.fastify && typeof tracker.trackDbQuery === 'function') {
+        tracker.trackDbQuery('get_inscriptions', startTime);
+      }
+    }
   }
 
   async getInscriptionLocations(
     args: InscriptionIdentifier & { limit: number; offset: number }
   ): Promise<DbPaginatedResult<DbLocation>> {
-    const results = await this.sql<({ total: number } & DbLocation)[]>`
-      SELECT l.*, COUNT(*) OVER() as total
-      FROM locations AS l
-      INNER JOIN inscriptions AS i ON i.ordinal_number = l.ordinal_number
-      WHERE ${
-        'number' in args
-          ? this.sql`i.number = ${args.number}`
-          : this.sql`i.inscription_id = ${args.genesis_id}`
-      }
-        AND (
-          (l.block_height > i.block_height)
-          OR (l.block_height = i.block_height AND l.tx_index >= i.tx_index)
-        )
-      ORDER BY l.block_height DESC, l.tx_index DESC
-      LIMIT ${args.limit}
-      OFFSET ${args.offset}
-    `;
-    return {
-      total: results[0]?.total ?? 0,
-      results: results ?? [],
-    };
+    return this.trackQuery('get_inscription_locations', async () => {
+      const results = await this.sql<({ total: number } & DbLocation)[]>`
+        SELECT l.*, COUNT(*) OVER() as total
+        FROM locations AS l
+        INNER JOIN inscriptions AS i ON i.ordinal_number = l.ordinal_number
+        WHERE ${
+          'number' in args
+            ? this.sql`i.number = ${args.number}`
+            : this.sql`i.inscription_id = ${args.genesis_id}`
+        }
+          AND (
+            (l.block_height > i.block_height)
+            OR (l.block_height = i.block_height AND l.tx_index >= i.tx_index)
+          )
+        ORDER BY l.block_height DESC, l.tx_index DESC
+        LIMIT ${args.limit}
+        OFFSET ${args.offset}
+      `;
+      return {
+        total: results[0]?.total ?? 0,
+        results: results ?? [],
+      };
+    });
   }
 
   async getTransfersPerBlock(
     args: { block_height?: number; block_hash?: string } & DbInscriptionIndexPaging
   ): Promise<DbPaginatedResult<DbInscriptionLocationChange>> {
-    const results = await this.sql<({ total: number } & DbInscriptionLocationChange)[]>`
-      WITH transfer_total AS (
-        SELECT MAX(block_transfer_index) AS total FROM inscription_transfers WHERE ${
-          'block_height' in args
-            ? this.sql`block_height = ${args.block_height}`
-            : this.sql`block_hash = ${args.block_hash}`
-        }
-      ),
-      transfer_data AS (
-        SELECT
-          t.number,
-          t.inscription_id AS genesis_id,
-          t.ordinal_number,
-          t.block_height,
-          t.tx_index,
-          t.block_transfer_index,
-          (
-            SELECT l.block_height || ',' || l.tx_index
-            FROM locations AS l
-            WHERE l.ordinal_number = t.ordinal_number AND (
-              l.block_height < t.block_height OR
-              (l.block_height = t.block_height AND l.tx_index < t.tx_index)
-            )
-            ORDER BY l.block_height DESC, l.tx_index DESC
-            LIMIT 1
-          ) AS from_data
-        FROM inscription_transfers AS t
-        WHERE
-          ${
+    return this.trackQuery('get_transfers_per_block', async () => {
+      const results = await this.sql<({ total: number } & DbInscriptionLocationChange)[]>`
+        WITH transfer_total AS (
+          SELECT MAX(block_transfer_index) AS total FROM inscription_transfers WHERE ${
             'block_height' in args
-              ? this.sql`t.block_height = ${args.block_height}`
-              : this.sql`t.block_hash = ${args.block_hash}`
+              ? this.sql`block_height = ${args.block_height}`
+              : this.sql`block_hash = ${args.block_hash}`
           }
-          AND t.block_transfer_index <= ((SELECT total FROM transfer_total) - ${args.offset}::int)
-          AND t.block_transfer_index >
-            ((SELECT total FROM transfer_total) - (${args.offset}::int + ${args.limit}::int))
-      )
-      SELECT
-        td.genesis_id,
-        td.number,
-        lf.block_height AS from_block_height,
-        lf.block_hash AS from_block_hash,
-        lf.tx_id AS from_tx_id,
-        lf.address AS from_address,
-        lf.output AS from_output,
-        lf.offset AS from_offset,
-        lf.value AS from_value,
-        lf.timestamp AS from_timestamp,
-        lt.block_height AS to_block_height,
-        lt.block_hash AS to_block_hash,
-        lt.tx_id AS to_tx_id,
-        lt.address AS to_address,
-        lt.output AS to_output,
-        lt.offset AS to_offset,
-        lt.value AS to_value,
-        lt.timestamp AS to_timestamp,
-        (SELECT total FROM transfer_total) + 1 AS total
-      FROM transfer_data AS td
-      INNER JOIN locations AS lf ON td.ordinal_number = lf.ordinal_number AND lf.block_height = SPLIT_PART(td.from_data, ',', 1)::int AND lf.tx_index = SPLIT_PART(td.from_data, ',', 2)::int
-      INNER JOIN locations AS lt ON td.ordinal_number = lt.ordinal_number AND td.block_height = lt.block_height AND td.tx_index = lt.tx_index
-      ORDER BY td.block_height DESC, td.block_transfer_index DESC
-    `;
-    return {
-      total: results[0]?.total ?? 0,
-      results: results ?? [],
-    };
+        ),
+        transfer_data AS (
+          SELECT
+            t.number,
+            t.inscription_id AS genesis_id,
+            t.ordinal_number,
+            t.block_height,
+            t.tx_index,
+            t.block_transfer_index,
+            (
+              SELECT l.block_height || ',' || l.tx_index
+              FROM locations AS l
+              WHERE l.ordinal_number = t.ordinal_number AND (
+                l.block_height < t.block_height OR
+                (l.block_height = t.block_height AND l.tx_index < t.tx_index)
+              )
+              ORDER BY l.block_height DESC, l.tx_index DESC
+              LIMIT 1
+            ) AS from_data
+          FROM inscription_transfers AS t
+          WHERE
+            ${
+              'block_height' in args
+                ? this.sql`t.block_height = ${args.block_height}`
+                : this.sql`t.block_hash = ${args.block_hash}`
+            }
+            AND t.block_transfer_index <= ((SELECT total FROM transfer_total) - ${args.offset}::int)
+            AND t.block_transfer_index >
+              ((SELECT total FROM transfer_total) - (${args.offset}::int + ${args.limit}::int))
+        )
+        SELECT
+          td.genesis_id,
+          td.number,
+          lf.block_height AS from_block_height,
+          lf.block_hash AS from_block_hash,
+          lf.tx_id AS from_tx_id,
+          lf.address AS from_address,
+          lf.output AS from_output,
+          lf.offset AS from_offset,
+          lf.value AS from_value,
+          lf.timestamp AS from_timestamp,
+          lt.block_height AS to_block_height,
+          lt.block_hash AS to_block_hash,
+          lt.tx_id AS to_tx_id,
+          lt.address AS to_address,
+          lt.output AS to_output,
+          lt.offset AS to_offset,
+          lt.value AS to_value,
+          lt.timestamp AS to_timestamp,
+          (SELECT total FROM transfer_total) + 1 AS total
+        FROM transfer_data AS td
+        INNER JOIN locations AS lf ON td.ordinal_number = lf.ordinal_number AND lf.block_height = SPLIT_PART(td.from_data, ',', 1)::int AND lf.tx_index = SPLIT_PART(td.from_data, ',', 2)::int
+        INNER JOIN locations AS lt ON td.ordinal_number = lt.ordinal_number AND td.block_height = lt.block_height AND td.tx_index = lt.tx_index
+        ORDER BY td.block_height DESC, td.block_transfer_index DESC
+      `;
+      return {
+        total: results[0]?.total ?? 0,
+        results: results ?? [],
+      };
+    });
   }
 }
