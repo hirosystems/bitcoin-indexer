@@ -16,7 +16,7 @@ hex = "0.4.3"
 rand = "0.8.5"
 hiro-system-kit = { workspace = true }
 ctrlc = { version = "3.2.2", optional = true }
-crossbeam-channel = "0.5.8"
+crossbeam-channel = "0.5.15"
 clap = { version = "4.3.2", features = ["derive"] }
 clap_generate = { version = "3.0.3" }
 postgres = { path = "../postgres" }
