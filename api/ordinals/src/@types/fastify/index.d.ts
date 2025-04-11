@@ -16,4 +16,9 @@ declare module 'fastify' {
     metrics?: ApiMetrics;
     trackDbQuery: (operationType: string, startTime: [number, number]) => void;
   }
+  interface FastifyRequest {
+    metrics?: {
+      timer: any;
+    };
+  }
 }

@@ -33,7 +33,6 @@ async function initApiService(db: PgStore, brc20Db: Brc20PgStore) {
       },
     });
 
-    ApiMetrics.configure(db);
     await promServer.listen({ host: ENV.API_HOST, port: 9153 });
 
     const profilerServer = await buildProfilerServer();

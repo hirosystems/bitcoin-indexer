@@ -303,3 +303,7 @@ export function blockParam(param: string | undefined, name: string) {
   }
   return out;
 }
+
+export function convertInMs(time: [number, number]): number {
+  return time[0] * 1000 + time[1] / 1000000;
+}

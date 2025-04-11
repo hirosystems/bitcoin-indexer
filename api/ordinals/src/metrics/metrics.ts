@@ -1,5 +1,6 @@
 import * as prom from 'prom-client';
 import { PgStore } from '../pg/pg-store';
+import { convertInMs } from '../api/util/helpers';
 
 export class ApiMetrics {
   /** The most recent Bitcoin block height ingested by the API */
@@ -81,5 +82,41 @@ export class ApiMetrics {
       help: 'Count of BRC-20 API requests',
       labelNames: ['endpoint_type'], // tokens, balances, transfers
     });
+  }
+
+  handleMetric(route: string) {
+    this.ordinals_api_request_rate.inc({ category: route });
+    return this.ordinals_api_request_duration.startTimer();
+  }
+
+  handleResponse(route: string, statusCode: number, timer: any) {
+    const errorClass = statusCode >= 400 ? (statusCode >= 500 ? 'client' : 'server') : false;
+
+    if (errorClass) {
+      this.ordinals_api_error_rate.inc({ error_class: errorClass }, 1);
+    }
+
+    const time: number = timer({
+      category: route,
+      status_code_class: statusCode,
+    });
+
+    this.ordinals_api_request_duration.observe(
+      { category: route, status_code_class: statusCode },
+      time
+    );
+  }
+
+  handleDbMetric(operationType: string, startTime: [number, number], endTime: [number, number]) {
+    //convert to ms
+    const startInMs = convertInMs(startTime);
+    const endTimeMs = convertInMs(endTime);
+    const durationInMs = endTimeMs - startInMs;
+    this.ordinals_api_db_query_duration.observe(
+      {
+        operation_type: operationType,
+      },
+      durationInMs
+    );
   }
 }
