@@ -50,15 +50,11 @@ export async function buildApiServer(args: { db: PgStore; brc20Db: Brc20PgStore 
     // Configure API metrics and register middleware
     const metrics = ApiMetrics.configure(args.db);
 
-    fastify.addHook(
-      'preHandler',
-      (request: FastifyRequest, _response: FastifyReply, done: () => void) => {
-        request.metrics = {
-          timer: metrics.handleMetric(request.routerPath),
-        };
-        done();
-      }
-    );
+    fastify.addHook('preHandler', async (request: FastifyRequest, _response: FastifyReply) => {
+      request.metrics = {
+        timer: metrics.handleMetric(request.routerPath),
+      };
+    });
 
     fastify.addHook('onResponse', async (request: FastifyRequest, response: FastifyReply) => {
       metrics.handleResponse(request.routerPath, response.statusCode, request.metrics?.timer);

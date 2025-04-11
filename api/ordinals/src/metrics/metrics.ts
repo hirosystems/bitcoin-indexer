@@ -93,7 +93,7 @@ export class ApiMetrics {
     const errorClass = statusCode >= 400 ? (statusCode >= 500 ? 'client' : 'server') : false;
 
     if (errorClass) {
-      this.ordinals_api_error_rate.inc({ error_class: errorClass }, 1);
+      this.ordinals_api_error_rate.inc({ error_class: statusCode }, 1);
     }
 
     const time: number = timer({
