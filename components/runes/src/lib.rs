@@ -121,7 +121,7 @@ pub async fn start_runes_indexer(
             let ctx_cloned = ctx.clone();
             let port = metrics.prometheus_port;
             let _ = std::thread::spawn(move || {
-                let _ = hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
+                hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
                     port,
                     registry_moved,
                     ctx_cloned,
