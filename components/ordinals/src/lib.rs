@@ -23,7 +23,7 @@ use db::{
 };
 use deadpool_postgres::Pool;
 use postgres::{pg_pool, pg_pool_client};
-use utils::monitoring::PrometheusMonitoring;
+use utils::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring};
 
 #[macro_use]
 extern crate serde_derive;
@@ -215,8 +215,24 @@ pub async fn start_ordinals_indexer(
     ctx: &Context,
 ) -> Result<(), String> {
     migrate_dbs(config, ctx).await?;
+    let prometheus = PrometheusMonitoring::new();
+    let indexer = new_ordinals_indexer_runloop(&prometheus, config, ctx).await?;
 
-    let indexer = new_ordinals_indexer_runloop(&PrometheusMonitoring::new(), config, ctx).await?;
+    if let Some(metrics) = &config.metrics {
+        if metrics.enabled {
+            let registry_moved = prometheus.registry.clone();
+            let ctx_cloned = ctx.clone();
+            let port = metrics.prometheus_port;
+            let _ = std::thread::spawn(move || {
+                let _ = hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
+                    port,
+                    registry_moved,
+                    ctx_cloned,
+                ));
+            });
+        }
+    }
+
     start_bitcoin_indexer(
         &indexer,
         first_inscription_height(config),
