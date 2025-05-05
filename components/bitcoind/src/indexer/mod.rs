@@ -235,35 +235,17 @@ async fn block_ingestion_runloop(
         }
     }
 
-    let mut empty_cycles = 0;
     loop {
-        let (compacted_blocks, blocks) = match block_commands_rx.try_recv() {
+        let (compacted_blocks, blocks) = match block_commands_rx.recv() {
             Ok(BlockProcessorCommand::ProcessBlocks {
                 compacted_blocks,
                 blocks,
-            }) => {
-                empty_cycles = 0;
-                (compacted_blocks, blocks)
-            }
+            }) => (compacted_blocks, blocks),
             Ok(BlockProcessorCommand::Terminate) => {
                 let _ = block_events_tx.send(BlockProcessorEvent::Terminated);
                 return Ok(());
             }
-            Err(e) => match e {
-                TryRecvError::Empty => {
-                    empty_cycles += 1;
-                    if empty_cycles == 180 {
-                        try_info!(ctx, "Block processor reached expiration");
-                        let _ = block_events_tx.send(BlockProcessorEvent::Expired);
-                        return Ok(());
-                    }
-                    sleep(Duration::from_secs(1));
-                    continue;
-                }
-                _ => {
-                    return Ok(());
-                }
-            },
+            Err(e) => return Err(format!("block ingestion runloop error: {e}")),
         };
 
         if !compacted_blocks.is_empty() {

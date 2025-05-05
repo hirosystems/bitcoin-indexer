@@ -12,7 +12,7 @@ use std::{sync::Arc, thread::JoinHandle};
 
 use bitcoind::{
     indexer::{start_bitcoin_indexer, Indexer, IndexerCommand},
-    try_debug,
+    try_debug, try_error,
     types::BlockIdentifier,
     utils::{future_block_on, Context},
 };
@@ -137,7 +137,7 @@ async fn new_ordinals_indexer_runloop(
                                 }
                             }
                         },
-                        Err(_) => todo!(),
+                        Err(e) => return Err(format!("ordinals indexer channel error: {e}")),
                     }
                 }
             });
