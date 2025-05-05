@@ -137,7 +137,7 @@ async fn new_ordinals_indexer_runloop(
                                 }
                             }
                         },
-                        Err(_) => todo!(),
+                        Err(e) => return Err(format!("ordinals indexer channel error: {e}")),
                     }
                 }
             });
