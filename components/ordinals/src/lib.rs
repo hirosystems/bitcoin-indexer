@@ -12,7 +12,7 @@ use std::{sync::Arc, thread::JoinHandle};
 
 use bitcoind::{
     indexer::{start_bitcoin_indexer, Indexer, IndexerCommand},
-    try_debug, try_error,
+    try_debug,
     types::BlockIdentifier,
     utils::{future_block_on, Context},
 };
