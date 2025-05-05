@@ -5,8 +5,7 @@ pub mod fork_scratch_pad;
 use std::{
     collections::{HashMap, VecDeque},
     sync::{Arc, Mutex},
-    thread::{sleep, JoinHandle},
-    time::Duration,
+    thread::JoinHandle,
 };
 
 use bitcoin::{
@@ -14,7 +13,7 @@ use bitcoin::{
     pipeline::start_block_download_pipeline, standardize_bitcoin_block,
 };
 use config::Config;
-use crossbeam_channel::{Receiver, Sender, TryRecvError};
+use crossbeam_channel::{Receiver, Sender};
 use reqwest::Client;
 
 use self::fork_scratch_pad::ForkScratchPad;
