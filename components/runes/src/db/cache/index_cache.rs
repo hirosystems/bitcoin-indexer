@@ -1,7 +1,7 @@
 use std::{collections::HashMap, num::NonZeroUsize, str::FromStr};
 
 use bitcoin::{Network, ScriptBuf};
-use bitcoind::{try_debug, try_info, try_warn, types::bitcoin::TxIn, utils::Context};
+use bitcoind::{try_debug, try_warn, types::bitcoin::TxIn, utils::Context};
 use config::Config;
 use lru::LruCache;
 use ordinals_parser::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
@@ -157,7 +157,7 @@ impl IndexCache {
         ctx: &Context,
     ) {
         let (rune_id, db_rune, entry) = self.tx_cache.apply_etching(etching, self.next_rune_number);
-        try_info!(
+        try_debug!(
             ctx,
             "Etching {} ({}) {}",
             db_rune.spaced_name,
@@ -179,7 +179,7 @@ impl IndexCache {
         let (rune_id, db_rune, entry) = self
             .tx_cache
             .apply_cenotaph_etching(rune, self.next_rune_number);
-        try_info!(
+        try_debug!(
             ctx,
             "Etching cenotaph {} ({}) {}",
             db_rune.spaced_name,
@@ -268,7 +268,7 @@ impl IndexCache {
         };
         let entries = self.tx_cache.apply_edict(edict, ctx);
         for entry in entries.iter() {
-            try_info!(
+            try_debug!(
                 ctx,
                 "Edict {} {} {}",
                 db_rune.spaced_name,

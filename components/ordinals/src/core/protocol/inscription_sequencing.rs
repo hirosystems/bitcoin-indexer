@@ -433,7 +433,7 @@ pub async fn update_block_inscriptions_with_consensus_sequence_data(
         inscription_data.ordinal_offset = unbound_sequence as u64;
         inscription_data.unbound_sequence = Some(unbound_sequence);
 
-        try_info!(
+        try_debug!(
             ctx,
             "Unbound inscription {} (#{}) detected on Satoshi {} (block #{}, {} transfers)",
             inscription_data.inscription_id,
@@ -511,7 +511,7 @@ async fn update_tx_inscriptions_with_consensus_sequence_data(
             if let Some(exisiting_inscription_id) =
                 reinscriptions_data.get(&traversal.ordinal_number)
             {
-                try_info!(
+                try_debug!(
                     ctx,
                     "Satoshi {} was previously inscribed with blessed inscription {}, cursing inscription {}",
                     traversal.ordinal_number,
@@ -584,7 +584,7 @@ async fn update_tx_inscriptions_with_consensus_sequence_data(
             reinscriptions_data.insert(traversal.ordinal_number, traversal.get_inscription_id());
         }
 
-        try_info!(
+        try_debug!(
             ctx,
             "Inscription reveal {} (#{}) detected on Satoshi {} at block #{}",
             inscription.inscription_id,

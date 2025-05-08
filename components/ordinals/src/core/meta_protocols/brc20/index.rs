@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bitcoind::{
-    try_info,
+    try_debug,
     types::{
         BitcoinBlockData, BlockIdentifier, Brc20BalanceData, Brc20Operation, Brc20TokenDeployData,
         Brc20TransferData, OrdinalInscriptionTransferData, OrdinalOperation, TransactionIdentifier,
@@ -61,7 +61,7 @@ async fn index_unverified_brc20_transfers(
                 brc20_db_tx,
             )
             .await?;
-        try_info!(
+        try_debug!(
             ctx,
             "BRC-20 transfer_send {} {} ({} -> {}) at block {}",
             data.tick,
@@ -149,7 +149,7 @@ pub async fn index_block_and_insert_brc20_operations(
                                 &tx.transaction_identifier,
                                 tx_index as u64,
                             )?;
-                            try_info!(
+                            try_debug!(
                                 ctx,
                                 "BRC-20 deploy {} ({}) at block {}",
                                 token.tick,
@@ -181,7 +181,7 @@ pub async fn index_block_and_insert_brc20_operations(
                                     brc20_db_tx,
                                 )
                                 .await?;
-                            try_info!(
+                            try_debug!(
                                 ctx,
                                 "BRC-20 mint {} {} ({}) at block {}",
                                 balance.tick,
@@ -214,7 +214,7 @@ pub async fn index_block_and_insert_brc20_operations(
                                     brc20_db_tx,
                                 )
                                 .await?;
-                            try_info!(
+                            try_debug!(
                                 ctx,
                                 "BRC-20 transfer {} {} ({}) at block {}",
                                 balance.tick,

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use bitcoin::{Address, ScriptBuf};
-use bitcoind::{try_info, try_warn, types::bitcoin::TxIn, utils::Context};
+use bitcoind::{try_debug, try_warn, types::bitcoin::TxIn, utils::Context};
 use lru::LruCache;
 use ordinals_parser::RuneId;
 use tokio_postgres::Transaction;
@@ -167,7 +167,7 @@ pub fn move_rune_balance_to_output(
                 }
             },
             None => {
-                try_info!(
+                try_debug!(
                     ctx,
                     "Attempted move to non-eligible output {}, runes will be burnt {}",
                     output,
@@ -230,7 +230,7 @@ pub fn move_rune_balance_to_output(
             DbLedgerOperation::Receive,
             next_event_index,
         ));
-        try_info!(
+        try_debug!(
             ctx,
             "{} {} ({}) {} {}",
             DbLedgerOperation::Receive,
@@ -252,7 +252,7 @@ pub fn move_rune_balance_to_output(
             operation.clone(),
             next_event_index,
         ));
-        try_info!(
+        try_debug!(
             ctx,
             "{} {} ({}) {} -> {:?} {}",
             operation,

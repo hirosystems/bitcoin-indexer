@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use bitcoin::{Address, Network, ScriptBuf};
 use bitcoind::{
-    try_info,
+    try_debug, try_info,
     types::{
         BitcoinBlockData, BitcoinTransactionData, BlockIdentifier, OrdinalInscriptionTransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,
@@ -233,7 +233,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
             let entry = block_transferred_satpoints.entry(output).or_default();
             entry.push(watched_satpoint.clone());
 
-            try_info!(
+            try_debug!(
                 ctx,
                 "Inscription transfer detected on Satoshi {} ({} -> {}) at block #{}",
                 transfer_data.ordinal_number,

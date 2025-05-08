@@ -4,7 +4,7 @@ use std::{
 };
 
 use bitcoin::ScriptBuf;
-use bitcoind::{try_debug, try_info, try_warn, utils::Context};
+use bitcoind::{try_debug, try_warn, utils::Context};
 use ordinals_parser::{Cenotaph, Edict, Etching, Rune, RuneId};
 
 use super::{
@@ -188,7 +188,7 @@ impl TransactionCache {
             return None;
         }
         let terms_amount = db_rune.terms_amount.unwrap();
-        try_info!(
+        try_debug!(
             ctx,
             "MINT {} ({}) {} {}",
             rune_id,
@@ -227,7 +227,7 @@ impl TransactionCache {
             return None;
         }
         let terms_amount = db_rune.terms_amount.unwrap();
-        try_info!(
+        try_debug!(
             ctx,
             "CENOTAPH MINT {} {} {}",
             db_rune.spaced_name,
@@ -264,7 +264,7 @@ impl TransactionCache {
         };
         // Take all the available inputs for the rune we're trying to move.
         let Some(available_inputs) = self.input_runes.get_mut(&rune_id) else {
-            try_info!(
+            try_debug!(
                 ctx,
                 "No unallocated runes {} remain for edict {}",
                 edict.id,
@@ -282,7 +282,7 @@ impl TransactionCache {
         let mut results = vec![];
         if self.eligible_outputs.is_empty() {
             // No eligible outputs means burn.
-            try_info!(
+            try_debug!(
                 ctx,
                 "No eligible outputs for edict on rune {} {}",
                 edict.id,
@@ -364,7 +364,7 @@ impl TransactionCache {
                     ));
                 }
                 _ => {
-                    try_info!(
+                    try_debug!(
                         ctx,
                         "Edict for {} attempted move to nonexistent output {}, amount will be burnt {}",
                         edict.id,
