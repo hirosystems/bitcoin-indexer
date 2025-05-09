@@ -192,7 +192,7 @@ jobs:
           sudo apt-get install -y libclang-dev clang llvm-dev libssl-dev pkg-config libsnappy-dev libgflags-dev zlib1g-dev libbz2-dev liblz4-dev libzstd-dev
           ls -la /usr/lib/llvm*/lib/
           echo "LIBCLANG_PATH=/usr/lib/llvm-11/lib" >> $GITHUB_ENV
-          echo "RUST_BACKTRACE=1" >> $GITHUB_ENV
+          echo "RUST_BACKTRACE=FULL" >> $GITHUB_ENV
 
       - name: Run clippy
         id: clippy
