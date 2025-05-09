@@ -92,11 +92,11 @@ pub async fn augment_block_with_transfers(
 
     try_info!(
         ctx,
-        "Found {} inscription reveals and {} inscription transfers at block #{} in {:.2?}",
+        "Found {} inscription reveals and {} inscription transfers at block #{} in {:.0}s",
         reveals_count,
         transfers_count,
         block.block_identifier.index,
-        elapsed
+        elapsed.as_secs_f32()
     );
 
     Ok(())

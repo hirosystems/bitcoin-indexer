@@ -281,13 +281,13 @@ pub async fn index_block_and_insert_brc20_operations(
     let elapsed = brc20_block_indexing_time.elapsed();
     try_info!(
         ctx,
-        "Completed BRC-20 indexing for block #{}: found {} deploys, {} mints, {} transfers, and {} transfer_sends in {:.2?}",
+        "Completed BRC-20 indexing for block #{}: found {} deploys, {} mints, {} transfers, and {} transfer_sends in {:.0}s",
         block.block_identifier.index,
         deploy_count,
         mint_count,
         transfer_count,
         transfer_send_count,
-        elapsed
+        elapsed.as_secs_f32()
     );
 
     Ok(())
