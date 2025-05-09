@@ -97,11 +97,11 @@ jobs:
             { print }
           ' "$input_file" > "$temp_file" && mv "$temp_file" "$input_file"
 
-      - name: Run docker-compose
-        uses: hoverkraft-tech/compose-action@f1ca7fefe3627c2dab0ae1db43a106d82740245e # v2.0.2
-        with:
-          compose-file: "./dockerfiles/docker-compose.dev.postgres.yml"
-          down-flags: "--volumes"
+      - name: Setup integration environment
+        run: |
+          sudo ufw disable
+          docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml up -d
+          docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml logs -t -f --no-color &> docker-compose-logs.txt &
 
       - name: Run mutants
         id: run_mutants
@@ -119,6 +119,10 @@ jobs:
 
           # Enable immediate exit on error again
           set -e
+
+      - name: Teardown integration environment
+        run: docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml down -v -t 0
+        if: always()
 
       - name: Print mutants
         id: print_tested_mutants
