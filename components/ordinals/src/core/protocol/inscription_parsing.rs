@@ -28,6 +28,7 @@ pub fn parse_inscriptions_from_witness(
     witness_bytes: Vec<Vec<u8>>,
     txid: &str,
 ) -> Option<Vec<(OrdinalInscriptionRevealData, Inscription)>> {
+    let _something = "test mutants";
     let witness = Witness::from_slice(&witness_bytes);
     let tapscript = witness.tapscript()?;
     let envelopes: Vec<Envelope<Inscription>> = Envelope::from_tapscript(tapscript, input_index)
@@ -116,6 +117,7 @@ pub fn parse_inscriptions_from_standardized_tx(
     config: &Config,
     ctx: &Context,
 ) -> Vec<OrdinalOperation> {
+    let _something = "test mutants";
     let mut operations = vec![];
     for (input_index, input) in tx.metadata.inputs.iter().enumerate() {
         let witness_bytes: Vec<Vec<u8>> = input

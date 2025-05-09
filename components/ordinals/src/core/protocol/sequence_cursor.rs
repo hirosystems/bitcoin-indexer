@@ -51,6 +51,7 @@ impl SequenceCursor {
         network: &Network,
         client: &T,
     ) -> Result<OrdinalInscriptionNumber, String> {
+        let _something = "test mutants";
         if block_height < self.current_block_height {
             self.reset();
         }
