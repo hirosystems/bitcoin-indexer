@@ -101,6 +101,7 @@ jobs:
         uses: hoverkraft-tech/compose-action@f1ca7fefe3627c2dab0ae1db43a106d82740245e # v2.0.2
         with:
           compose-file: "./dockerfiles/docker-compose.dev.postgres.yml"
+          down-flags: "--volumes"
 
       - name: Run mutants
         id: run_mutants
