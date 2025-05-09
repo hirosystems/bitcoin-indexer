@@ -16,7 +16,7 @@ RUN cp /src/target/release/bitcoin-indexer /out
 
 FROM debian:bullseye-slim
 
-RUN apt-get update && apt-get install -y ca-certificates libssl-dev libclang-11-dev libunwind-dev libunwind8 sqlite3
+RUN apt-get update && apt-get install -y ca-certificates libssl-dev libclang-11-dev libunwind-dev libunwind8
 COPY --from=build /out/bitcoin-indexer /bin/bitcoin-indexer
 
 WORKDIR /workspace
