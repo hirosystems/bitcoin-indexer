@@ -66,6 +66,27 @@ pub async fn augment_block_with_transfers(
         )
         .await?;
     }
+    
+    // Count total reveals and transfers in the block
+    let mut reveals_count = 0;
+    let mut transfers_count = 0;
+    for tx in &block.transactions {
+        for op in &tx.metadata.ordinal_operations {
+            match op {
+                OrdinalOperation::InscriptionRevealed(_) => reveals_count += 1,
+                OrdinalOperation::InscriptionTransferred(_) => transfers_count += 1,
+            }
+        }
+    }
+    
+    try_info!(
+        ctx,
+        "Found {} inscription reveals and {} inscription transfers at block #{}",
+        reveals_count,
+        transfers_count,
+        block.block_identifier.index
+    );
+    
     Ok(())
 }
 
