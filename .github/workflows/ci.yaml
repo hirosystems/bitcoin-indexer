@@ -189,7 +189,7 @@ jobs:
       - name: Install RocksDB dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libclang-dev clang llvm-dev libssl-dev pkg-config libsnappy-dev libgflags-dev zlib1g-dev liblz2-dev liblz4-dev libzstd-dev
+          sudo apt-get install -y libclang-dev clang llvm-dev libssl-dev pkg-config libsnappy-dev libgflags-dev zlib1g-dev libbz2-dev liblz4-dev libzstd-dev
 
       - name: Run clippy
         id: clippy
