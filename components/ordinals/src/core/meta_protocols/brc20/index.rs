@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bitcoind::{
-    try_debug,
+    try_debug, try_info,
     types::{
         BitcoinBlockData, BlockIdentifier, Brc20BalanceData, Brc20Operation, Brc20TokenDeployData,
         Brc20TransferData, OrdinalInscriptionTransferData, OrdinalOperation, TransactionIdentifier,
@@ -85,10 +85,24 @@ pub async fn index_block_and_insert_brc20_operations(
     if block.block_identifier.index < brc20_activation_height(&block.metadata.network) {
         return Ok(());
     }
+    // Log start of BRC-20 indexing
+    try_info!(
+        ctx,
+        "Starting BRC-20 indexing for block #{}...",
+        block.block_identifier.index
+    );
+    let brc20_block_indexing_time = std::time::Instant::now();
+
     // Ordinal transfers may be BRC-20 transfers. We group them into a vector to minimize round trips to the db when analyzing
     // them. We will always insert them correctly in between new BRC-20 operations.
     let mut unverified_ordinal_transfers = vec![];
     let mut verified_brc20_transfers = vec![];
+
+    // Track counts of each operation type
+    let mut deploy_count = 0;
+    let mut mint_count = 0;
+    let mut transfer_count = 0;
+    let mut transfer_send_count = 0;
 
     // Check every transaction in the block. Look for BRC-20 operations.
     for (tx_index, tx) in block.transactions.iter_mut().enumerate() {
@@ -102,17 +116,17 @@ pub async fn index_block_and_insert_brc20_operations(
                         continue;
                     };
                     // First, verify any pending transfers as they may affect balances for the next operation.
-                    verified_brc20_transfers.append(
-                        &mut index_unverified_brc20_transfers(
-                            &unverified_ordinal_transfers,
-                            &block.block_identifier,
-                            block.timestamp,
-                            brc20_cache,
-                            brc20_db_tx,
-                            ctx,
-                        )
-                        .await?,
-                    );
+                    let brc20_transfers = index_unverified_brc20_transfers(
+                        &unverified_ordinal_transfers,
+                        &block.block_identifier,
+                        block.timestamp,
+                        brc20_cache,
+                        brc20_db_tx,
+                        ctx,
+                    )
+                    .await?;
+                    transfer_send_count += brc20_transfers.len();
+                    verified_brc20_transfers.append(&mut brc20_transfers.clone());
                     unverified_ordinal_transfers.clear();
                     // Then continue with the new operation.
                     let Some(operation) = verify_brc20_operation(
@@ -131,6 +145,7 @@ pub async fn index_block_and_insert_brc20_operations(
                     };
                     match operation {
                         VerifiedBrc20Operation::TokenDeploy(token) => {
+                            deploy_count += 1;
                             tx.metadata.brc20_operation =
                                 Some(Brc20Operation::Deploy(Brc20TokenDeployData {
                                     tick: token.tick.clone(),
@@ -158,6 +173,7 @@ pub async fn index_block_and_insert_brc20_operations(
                             );
                         }
                         VerifiedBrc20Operation::TokenMint(balance) => {
+                            mint_count += 1;
                             let Some(token) =
                                 brc20_cache.get_token(&balance.tick, brc20_db_tx).await?
                             else {
@@ -191,6 +207,7 @@ pub async fn index_block_and_insert_brc20_operations(
                             );
                         }
                         VerifiedBrc20Operation::TokenTransfer(balance) => {
+                            transfer_count += 1;
                             let Some(token) =
                                 brc20_cache.get_token(&balance.tick, brc20_db_tx).await?
                             else {
@@ -237,17 +254,18 @@ pub async fn index_block_and_insert_brc20_operations(
         }
     }
     // Verify any dangling ordinal transfers and augment these results back to the block.
-    verified_brc20_transfers.append(
-        &mut index_unverified_brc20_transfers(
-            &unverified_ordinal_transfers,
-            &block.block_identifier,
-            block.timestamp,
-            brc20_cache,
-            brc20_db_tx,
-            ctx,
-        )
-        .await?,
-    );
+    let final_transfers = index_unverified_brc20_transfers(
+        &unverified_ordinal_transfers,
+        &block.block_identifier,
+        block.timestamp,
+        brc20_cache,
+        brc20_db_tx,
+        ctx,
+    )
+    .await?;
+    transfer_send_count += final_transfers.len();
+    verified_brc20_transfers.append(&mut final_transfers.clone());
+
     for (tx_index, verified_transfer) in verified_brc20_transfers.into_iter() {
         block
             .transactions
@@ -258,6 +276,20 @@ pub async fn index_block_and_insert_brc20_operations(
     }
     // Write all changes to DB.
     brc20_cache.db_cache.flush(brc20_db_tx).await?;
+
+    // Log completion of BRC-20 indexing with metrics
+    let elapsed = brc20_block_indexing_time.elapsed();
+    try_info!(
+        ctx,
+        "Completed BRC-20 indexing for block #{}: found {} deploys, {} mints, {} transfers, and {} transfer_sends in {:.2?}",
+        block.block_identifier.index,
+        deploy_count,
+        mint_count,
+        transfer_count,
+        transfer_send_count,
+        elapsed
+    );
+
     Ok(())
 }
 

@@ -52,6 +52,14 @@ pub async fn augment_block_with_transfers(
     db_tx: &Transaction<'_>,
     ctx: &Context,
 ) -> Result<(), String> {
+    // Start timing the block processing
+    try_info!(
+        ctx,
+        "Starting inscriptions indexing for block #{}...",
+        block.block_identifier.index
+    );
+    let inscription_block_indexing_time = std::time::Instant::now();
+
     let network = get_bitcoin_network(&block.metadata.network);
     let mut block_transferred_satpoints = HashMap::new();
     for (tx_index, tx) in block.transactions.iter_mut().enumerate() {
@@ -66,7 +74,7 @@ pub async fn augment_block_with_transfers(
         )
         .await?;
     }
-    
+
     // Count total reveals and transfers in the block
     let mut reveals_count = 0;
     let mut transfers_count = 0;
@@ -78,15 +86,19 @@ pub async fn augment_block_with_transfers(
             }
         }
     }
-    
+
+    // Calculate elapsed time
+    let elapsed = inscription_block_indexing_time.elapsed();
+
     try_info!(
         ctx,
-        "Found {} inscription reveals and {} inscription transfers at block #{}",
+        "Found {} inscription reveals and {} inscription transfers at block #{} in {:.2?}",
         reveals_count,
         transfers_count,
-        block.block_identifier.index
+        block.block_identifier.index,
+        elapsed
     );
-    
+
     Ok(())
 }
 

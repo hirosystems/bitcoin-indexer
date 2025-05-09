@@ -72,7 +72,19 @@ pub async fn index_block(
     let stopwatch = std::time::Instant::now();
     let block_hash = &block.block_identifier.hash;
     let block_height = block.block_identifier.index;
-    try_info!(ctx, "Indexing block {}...", block_height);
+    try_info!(
+        ctx,
+        "Starting runes indexing for block #{}...",
+        block_height
+    );
+
+    // Track operation counts
+    let mut etchings_count = 0;
+    let mut mints_count = 0;
+    let mut edicts_count = 0;
+    let mut cenotaphs_etchings_count = 0;
+    let mut cenotaphs_mints_count = 0;
+    let mut cenotaphs_count = 0;
 
     let mut db_tx = pg_client
         .transaction()
@@ -110,23 +122,29 @@ pub async fn index_block(
                         .apply_runestone(&runestone, &mut db_tx, ctx)
                         .await;
                     if let Some(etching) = runestone.etching {
+                        etchings_count += 1;
                         index_cache.apply_etching(&etching, &mut db_tx, ctx).await;
                     }
                     if let Some(mint_rune_id) = runestone.mint {
+                        mints_count += 1;
                         index_cache.apply_mint(&mint_rune_id, &mut db_tx, ctx).await;
                     }
+                    edicts_count += runestone.edicts.len();
                     for edict in runestone.edicts.iter() {
                         index_cache.apply_edict(edict, &mut db_tx, ctx).await;
                     }
                 }
                 Artifact::Cenotaph(cenotaph) => {
+                    cenotaphs_count += 1;
                     index_cache.apply_cenotaph(&cenotaph, &mut db_tx, ctx).await;
                     if let Some(etching) = cenotaph.etching {
+                        cenotaphs_etchings_count += 1;
                         index_cache
                             .apply_cenotaph_etching(&etching, &mut db_tx, ctx)
                             .await;
                     }
                     if let Some(mint_rune_id) = cenotaph.mint {
+                        cenotaphs_mints_count += 1;
                         index_cache
                             .apply_cenotaph_mint(&mint_rune_id, &mut db_tx, ctx)
                             .await;
@@ -142,11 +160,19 @@ pub async fn index_block(
         .commit()
         .await
         .expect("Unable to commit pg transaction");
+
+    let elapsed = stopwatch.elapsed();
     try_info!(
         ctx,
-        "Block {} indexed in {}s",
+        "Completed runes indexing for block #{}: found {} etchings, {} mints, {} edicts, and {} cenotaphs, of which {} etchings and {} mints in {:.2?}",
         block_height,
-        stopwatch.elapsed().as_millis() as f32 / 1000.0
+        etchings_count,
+        mints_count,
+        edicts_count,
+        cenotaphs_count,
+        cenotaphs_etchings_count,
+        cenotaphs_mints_count,
+        elapsed
     );
 }
 
