@@ -116,7 +116,7 @@ pub async fn index_block_and_insert_brc20_operations(
                         continue;
                     };
                     // First, verify any pending transfers as they may affect balances for the next operation.
-                    let brc20_transfers = index_unverified_brc20_transfers(
+                    let mut brc20_transfers = index_unverified_brc20_transfers(
                         &unverified_ordinal_transfers,
                         &block.block_identifier,
                         block.timestamp,
@@ -126,7 +126,7 @@ pub async fn index_block_and_insert_brc20_operations(
                     )
                     .await?;
                     transfer_send_count += brc20_transfers.len();
-                    verified_brc20_transfers.append(&mut brc20_transfers.clone());
+                    verified_brc20_transfers.append(&mut brc20_transfers);
                     unverified_ordinal_transfers.clear();
                     // Then continue with the new operation.
                     let Some(operation) = verify_brc20_operation(
@@ -254,7 +254,7 @@ pub async fn index_block_and_insert_brc20_operations(
         }
     }
     // Verify any dangling ordinal transfers and augment these results back to the block.
-    let final_transfers = index_unverified_brc20_transfers(
+    let mut final_transfers = index_unverified_brc20_transfers(
         &unverified_ordinal_transfers,
         &block.block_identifier,
         block.timestamp,
@@ -264,7 +264,7 @@ pub async fn index_block_and_insert_brc20_operations(
     )
     .await?;
     transfer_send_count += final_transfers.len();
-    verified_brc20_transfers.append(&mut final_transfers.clone());
+    verified_brc20_transfers.append(&mut final_transfers);
 
     for (tx_index, verified_transfer) in verified_brc20_transfers.into_iter() {
         block
