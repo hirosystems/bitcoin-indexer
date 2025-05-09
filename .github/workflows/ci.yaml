@@ -186,6 +186,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install RocksDB dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev clang llvm-dev libssl-dev pkg-config libsnappy-dev libgflags-dev zlib1g-dev liblz2-dev liblz4-dev libzstd-dev
+
       - name: Run clippy
         id: clippy
         run: |
@@ -250,6 +255,11 @@ jobs:
           sudo ufw disable
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml up -d
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml logs -t -f --no-color &> docker-compose-logs.txt &
+
+      - name: Install RocksDB dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev clang llvm-dev libssl-dev pkg-config libsnappy-dev libgflags-dev zlib1g-dev libbz2-dev liblz4-dev libzstd-dev
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
