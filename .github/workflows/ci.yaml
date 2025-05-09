@@ -428,3 +428,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # Only push if (there's a new release on main branch, or if building a non-main branch) and (Only run on non-PR events or only PRs that aren't from forks)
           push: ${{ (github.ref != 'refs/heads/main' || needs.semantic-release.outputs.new_release_published == 'true') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+
+  mutants:
+    name: Mutation Testing
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./
+    steps:
+      # ... existing steps ...
