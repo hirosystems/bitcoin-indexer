@@ -72,7 +72,7 @@ pub async fn index_block(
     let stopwatch = std::time::Instant::now();
     let block_hash = &block.block_identifier.hash;
     let block_height = block.block_identifier.index;
-    try_info!(ctx, "Starting runes indexing for block #{block_height}...",);
+    try_info!(ctx, "Starting runes indexing for block #{block_height}...");
 
     // Track operation counts
     let mut etchings_count = 0;

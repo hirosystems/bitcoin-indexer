@@ -86,7 +86,7 @@ pub async fn index_block_and_insert_brc20_operations(
         return Ok(());
     }
     let block_height = block.block_identifier.index;
-    try_info!(ctx, "Starting BRC-20 indexing for block #{block_height}...",);
+    try_info!(ctx, "Starting BRC-20 indexing for block #{block_height}...");
     let stopwatch = std::time::Instant::now();
 
     // Ordinal transfers may be BRC-20 transfers. We group them into a vector to minimize round trips to the db when analyzing
