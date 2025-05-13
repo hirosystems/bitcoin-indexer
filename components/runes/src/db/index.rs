@@ -122,31 +122,43 @@ pub async fn index_block(
                         .apply_runestone(&runestone, &mut db_tx, ctx)
                         .await;
                     if let Some(etching) = runestone.etching {
-                        etchings_count += 1;
-                        index_cache.apply_etching(&etching, &mut db_tx, ctx).await;
+                        index_cache
+                            .apply_etching(&etching, &mut db_tx, ctx, &mut etchings_count)
+                            .await;
                     }
                     if let Some(mint_rune_id) = runestone.mint {
-                        mints_count += 1;
-                        index_cache.apply_mint(&mint_rune_id, &mut db_tx, ctx).await;
+                        index_cache
+                            .apply_mint(&mint_rune_id, &mut db_tx, ctx, &mut mints_count)
+                            .await;
                     }
-                    edicts_count += runestone.edicts.len();
                     for edict in runestone.edicts.iter() {
-                        index_cache.apply_edict(edict, &mut db_tx, ctx).await;
+                        index_cache
+                            .apply_edict(edict, &mut db_tx, ctx, &mut edicts_count)
+                            .await;
                     }
                 }
                 Artifact::Cenotaph(cenotaph) => {
-                    cenotaphs_count += 1;
-                    index_cache.apply_cenotaph(&cenotaph, &mut db_tx, ctx).await;
+                    index_cache
+                        .apply_cenotaph(&cenotaph, &mut db_tx, ctx, &mut cenotaphs_count)
+                        .await;
                     if let Some(etching) = cenotaph.etching {
-                        cenotaphs_etchings_count += 1;
                         index_cache
-                            .apply_cenotaph_etching(&etching, &mut db_tx, ctx)
+                            .apply_cenotaph_etching(
+                                &etching,
+                                &mut db_tx,
+                                ctx,
+                                &mut cenotaphs_etchings_count,
+                            )
                             .await;
                     }
                     if let Some(mint_rune_id) = cenotaph.mint {
-                        cenotaphs_mints_count += 1;
                         index_cache
-                            .apply_cenotaph_mint(&mint_rune_id, &mut db_tx, ctx)
+                            .apply_cenotaph_mint(
+                                &mint_rune_id,
+                                &mut db_tx,
+                                ctx,
+                                &mut cenotaphs_mints_count,
+                            )
                             .await;
                     }
                 }

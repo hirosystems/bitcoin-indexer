@@ -144,10 +144,12 @@ impl IndexCache {
         cenotaph: &Cenotaph,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        cenotaphs_counter: &mut usize,
     ) {
         try_debug!(ctx, "{:?} {}", cenotaph, self.tx_cache.location);
         let entries = self.tx_cache.apply_cenotaph_input_burn(cenotaph);
         self.add_ledger_entries_to_db_cache(&entries);
+        *cenotaphs_counter += 1;
     }
 
     pub async fn apply_etching(
@@ -155,6 +157,7 @@ impl IndexCache {
         etching: &Etching,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        etchings_counter: &mut usize,
     ) {
         let (rune_id, db_rune, entry) = self.tx_cache.apply_etching(etching, self.next_rune_number);
         try_debug!(
@@ -168,6 +171,7 @@ impl IndexCache {
         self.rune_cache.put(rune_id, db_rune);
         self.add_ledger_entries_to_db_cache(&vec![entry]);
         self.next_rune_number += 1;
+        *etchings_counter += 1;
     }
 
     pub async fn apply_cenotaph_etching(
@@ -175,6 +179,7 @@ impl IndexCache {
         rune: &Rune,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        cenotaph_etchings_counter: &mut usize,
     ) {
         let (rune_id, db_rune, entry) = self
             .tx_cache
@@ -190,6 +195,7 @@ impl IndexCache {
         self.rune_cache.put(rune_id, db_rune);
         self.add_ledger_entries_to_db_cache(&vec![entry]);
         self.next_rune_number += 1;
+        *cenotaph_etchings_counter += 1;
     }
 
     pub async fn apply_mint(
@@ -197,6 +203,7 @@ impl IndexCache {
         rune_id: &RuneId,
         db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        mints_counter: &mut usize,
     ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(rune_id, db_tx, ctx).await else {
             try_warn!(
@@ -221,6 +228,7 @@ impl IndexCache {
             } else {
                 self.rune_total_mints_cache.put(*rune_id, 1);
             }
+            *mints_counter += 1;
         }
     }
 
@@ -229,6 +237,7 @@ impl IndexCache {
         rune_id: &RuneId,
         db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        cenotaph_mints_counter: &mut usize,
     ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(rune_id, db_tx, ctx).await else {
             try_warn!(
@@ -253,10 +262,17 @@ impl IndexCache {
             } else {
                 self.rune_total_mints_cache.put(*rune_id, 1);
             }
+            *cenotaph_mints_counter += 1;
         }
     }
 
-    pub async fn apply_edict(&mut self, edict: &Edict, db_tx: &mut Transaction<'_>, ctx: &Context) {
+    pub async fn apply_edict(
+        &mut self,
+        edict: &Edict,
+        db_tx: &mut Transaction<'_>,
+        ctx: &Context,
+        edicts_number: &mut usize,
+    ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(&edict.id, db_tx, ctx).await else {
             try_warn!(
                 ctx,
@@ -276,6 +292,7 @@ impl IndexCache {
                 self.tx_cache.location
             );
         }
+        *edicts_number += entries.len();
         self.add_ledger_entries_to_db_cache(&entries);
     }
 
