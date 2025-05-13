@@ -292,7 +292,7 @@ impl IndexCache {
                 self.tx_cache.location
             );
         }
-        *edicts_number += entries.len();
+        *edicts_number += 1;
         self.add_ledger_entries_to_db_cache(&entries);
     }
 
