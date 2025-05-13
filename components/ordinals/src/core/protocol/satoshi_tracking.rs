@@ -51,15 +51,9 @@ pub async fn augment_block_with_transfers(
     block: &mut BitcoinBlockData,
     db_tx: &Transaction<'_>,
     ctx: &Context,
+    reveals_count: &mut usize,
+    transfers_count: &mut usize,
 ) -> Result<(), String> {
-    // Start timing the block processing
-    try_info!(
-        ctx,
-        "Starting inscriptions indexing for block #{}...",
-        block.block_identifier.index
-    );
-    let inscription_block_indexing_time = std::time::Instant::now();
-
     let network = get_bitcoin_network(&block.metadata.network);
     let mut block_transferred_satpoints = HashMap::new();
     for (tx_index, tx) in block.transactions.iter_mut().enumerate() {
@@ -75,29 +69,14 @@ pub async fn augment_block_with_transfers(
         .await?;
     }
 
-    // Count total reveals and transfers in the block
-    let mut reveals_count = 0;
-    let mut transfers_count = 0;
     for tx in &block.transactions {
         for op in &tx.metadata.ordinal_operations {
             match op {
-                OrdinalOperation::InscriptionRevealed(_) => reveals_count += 1,
-                OrdinalOperation::InscriptionTransferred(_) => transfers_count += 1,
+                OrdinalOperation::InscriptionRevealed(_) => *reveals_count += 1,
+                OrdinalOperation::InscriptionTransferred(_) => *transfers_count += 1,
             }
         }
     }
-
-    // Calculate elapsed time
-    let elapsed = inscription_block_indexing_time.elapsed();
-
-    try_info!(
-        ctx,
-        "Found {} inscription reveals and {} inscription transfers at block #{} in {:.0}s",
-        reveals_count,
-        transfers_count,
-        block.block_identifier.index,
-        elapsed.as_secs_f32()
-    );
 
     Ok(())
 }
@@ -413,7 +392,7 @@ mod test {
                         .build()
                 )
                 .build();
-            augment_block_with_transfers(&mut block, &client, &ctx).await?;
+            augment_block_with_transfers(&mut block, &client, &ctx, &mut 0, &mut 0).await?;
 
             // 3. Make sure the correct transfers were produced
             assert_eq!(
