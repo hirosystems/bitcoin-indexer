@@ -85,13 +85,9 @@ pub async fn index_block_and_insert_brc20_operations(
     if block.block_identifier.index < brc20_activation_height(&block.metadata.network) {
         return Ok(());
     }
-    // Log start of BRC-20 indexing
-    try_info!(
-        ctx,
-        "Starting BRC-20 indexing for block #{}...",
-        block.block_identifier.index
-    );
-    let brc20_block_indexing_time = std::time::Instant::now();
+    let block_height = block.block_identifier.index;
+    try_info!(ctx, "Starting BRC-20 indexing for block #{block_height}...",);
+    let stopwatch = std::time::Instant::now();
 
     // Ordinal transfers may be BRC-20 transfers. We group them into a vector to minimize round trips to the db when analyzing
     // them. We will always insert them correctly in between new BRC-20 operations.
@@ -278,15 +274,11 @@ pub async fn index_block_and_insert_brc20_operations(
     brc20_cache.db_cache.flush(brc20_db_tx).await?;
 
     // Log completion of BRC-20 indexing with metrics
-    let elapsed = brc20_block_indexing_time.elapsed();
+    let elapsed = stopwatch.elapsed();
+
     try_info!(
         ctx,
-        "Completed BRC-20 indexing for block #{}: found {} deploys, {} mints, {} transfers, and {} transfer_sends in {:.0}s",
-        block.block_identifier.index,
-        deploy_count,
-        mint_count,
-        transfer_count,
-        transfer_send_count,
+        "Completed BRC-20 indexing for block #{block_height}: found {deploy_count} deploys, {mint_count} mints, {transfer_count} transfers, and {transfer_send_count} transfer_sends in {:.0}s",
         elapsed.as_secs_f32()
     );
 

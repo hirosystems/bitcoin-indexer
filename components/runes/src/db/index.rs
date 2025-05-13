@@ -72,11 +72,7 @@ pub async fn index_block(
     let stopwatch = std::time::Instant::now();
     let block_hash = &block.block_identifier.hash;
     let block_height = block.block_identifier.index;
-    try_info!(
-        ctx,
-        "Starting runes indexing for block #{}...",
-        block_height
-    );
+    try_info!(ctx, "Starting runes indexing for block #{block_height}...",);
 
     // Track operation counts
     let mut etchings_count = 0;
@@ -176,14 +172,7 @@ pub async fn index_block(
     let elapsed = stopwatch.elapsed();
     try_info!(
         ctx,
-        "Completed runes indexing for block #{}: found {} etchings, {} mints, {} edicts, and {} cenotaphs, of which {} etchings and {} mints in {:.0}s",
-        block_height,
-        etchings_count,
-        mints_count,
-        edicts_count,
-        cenotaphs_count,
-        cenotaphs_etchings_count,
-        cenotaphs_mints_count,
+        "Completed runes indexing for block #{block_height}: found {etchings_count} etchings, {mints_count} mints, {edicts_count} edicts, and {cenotaphs_count} cenotaphs, of which {cenotaphs_etchings_count} etchings and {cenotaphs_mints_count} mints in {:.0}s",
         elapsed.as_secs_f32()
     );
 }
@@ -191,7 +180,7 @@ pub async fn index_block(
 /// Roll back a Bitcoin block because of a re-org.
 pub async fn roll_back_block(pg_client: &mut Client, block_height: u64, ctx: &Context) {
     let stopwatch = std::time::Instant::now();
-    try_info!(ctx, "Rolling back block {}...", block_height);
+    try_info!(ctx, "Rolling back block {block_height}...");
     let mut db_tx = pg_client
         .transaction()
         .await
@@ -203,8 +192,7 @@ pub async fn roll_back_block(pg_client: &mut Client, block_height: u64, ctx: &Co
         .expect("Unable to commit pg transaction");
     try_info!(
         ctx,
-        "Block {} rolled back in {:.4}s",
-        block_height,
+        "Block {block_height} rolled back in {:.4}s",
         stopwatch.elapsed().as_secs_f32()
     );
 }

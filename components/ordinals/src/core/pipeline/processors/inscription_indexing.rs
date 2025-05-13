@@ -88,7 +88,7 @@ pub async fn index_block(
     let block_height = block.block_identifier.index;
     try_info!(
         ctx,
-        "Starting inscription indexing for block #{block_height}"
+        "Starting inscription indexing for block #{block_height}..."
     );
     // Count total reveals and transfers in the block
     let mut reveals_count = 0;
