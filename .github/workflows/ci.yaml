@@ -298,8 +298,8 @@ jobs:
             libbz2-dev \
             liblz4-dev \
             libzstd-dev
+          ls -la /usr/lib/llvm*/lib/
           echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=/usr/lib/llvm-18/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
