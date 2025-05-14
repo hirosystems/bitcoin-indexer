@@ -182,8 +182,8 @@ pub async fn index_block(
 
     try_info!(
         ctx,
-        "Completed inscription indexing for block #{block_height}: found {reveals_count} inscription reveals and {transfers_count} inscription transfers in {:.0}s",
-        elapsed.as_secs_f32(),
+        "Completed inscription indexing for block #{block_height}: found {reveals_count} inscription reveals and {transfers_count} inscription transfers in {elapsed:.0}s",
+        elapsed = elapsed.as_secs_f32(),
     );
 
     Ok(())

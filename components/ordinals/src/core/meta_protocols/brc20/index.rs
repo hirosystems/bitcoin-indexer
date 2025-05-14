@@ -162,10 +162,9 @@ pub async fn index_block_and_insert_brc20_operations(
                             )?;
                             try_debug!(
                                 ctx,
-                                "BRC-20 deploy {} ({}) at block {}",
-                                token.tick,
-                                token.address,
-                                block.block_identifier.index
+                                "BRC-20 deploy {tick} ({address}) at block {block_height}",
+                                tick = &token.tick,
+                                address = &token.address
                             );
                         }
                         VerifiedBrc20Operation::TokenMint(balance) => {
@@ -195,11 +194,10 @@ pub async fn index_block_and_insert_brc20_operations(
                                 .await?;
                             try_debug!(
                                 ctx,
-                                "BRC-20 mint {} {} ({}) at block {}",
-                                balance.tick,
-                                balance.amt,
-                                balance.address,
-                                block.block_identifier.index
+                                "BRC-20 mint {tick} {amount} ({address}) at block {block_height}",
+                                tick = &balance.tick,
+                                amount = balance.amt,
+                                address = &balance.address
                             );
                         }
                         VerifiedBrc20Operation::TokenTransfer(balance) => {
@@ -229,11 +227,10 @@ pub async fn index_block_and_insert_brc20_operations(
                                 .await?;
                             try_debug!(
                                 ctx,
-                                "BRC-20 transfer {} {} ({}) at block {}",
-                                balance.tick,
-                                balance.amt,
-                                balance.address,
-                                block.block_identifier.index
+                                "BRC-20 transfer {tick} {amount} ({address}) at block {block_height}",
+                                tick = &balance.tick,
+                                amount = balance.amt,
+                                address = &balance.address
                             );
                         }
                         VerifiedBrc20Operation::TokenTransferSend(_) => {
@@ -278,8 +275,8 @@ pub async fn index_block_and_insert_brc20_operations(
 
     try_info!(
         ctx,
-        "Completed BRC-20 indexing for block #{block_height}: found {deploy_count} deploys, {mint_count} mints, {transfer_count} transfers, and {transfer_send_count} transfer_sends in {:.0}s",
-        elapsed.as_secs_f32()
+        "Completed BRC-20 indexing for block #{block_height}: found {deploy_count} deploys, {mint_count} mints, {transfer_count} transfers, and {transfer_send_count} transfer_sends in {elapsed:.0}s",
+        elapsed = elapsed.as_secs_f32()
     );
 
     Ok(())

@@ -121,8 +121,8 @@ pub fn compute_satpoint_post_transfer(
                         Err(e) => {
                             try_info!(
                                 ctx,
-                                "unable to retrieve address from {script_pub_key_hex}: {}",
-                                e.to_string()
+                                "unable to retrieve address from {script_pub_key_hex}: {error}",
+                                error = e.to_string()
                             );
                             OrdinalInscriptionTransferDestination::Burnt(script.to_string())
                         }
@@ -130,8 +130,8 @@ pub fn compute_satpoint_post_transfer(
                     Err(e) => {
                         try_info!(
                             ctx,
-                            "unable to retrieve address from {script_pub_key_hex}: {}",
-                            e.to_string()
+                            "unable to retrieve address from {script_pub_key_hex}: {error}",
+                            error = e.to_string()
                         );
                         OrdinalInscriptionTransferDestination::Burnt(script_pub_key_hex.to_string())
                     }
@@ -247,11 +247,10 @@ pub async fn augment_transaction_with_ordinal_transfers(
 
             try_debug!(
                 ctx,
-                "Inscription transfer detected on Satoshi {} ({} -> {}) at block #{}",
-                transfer_data.ordinal_number,
-                satpoint_pre_transfer,
-                satpoint_post_transfer,
-                block_identifier.index
+                "Inscription transfer detected on Satoshi {ordinal_number} ({satpoint_pre_transfer} -> {satpoint_post_transfer}) \
+                at block #{block_index}",
+                ordinal_number = transfer_data.ordinal_number,
+                block_index = block_identifier.index
             );
             tx.metadata
                 .ordinal_operations

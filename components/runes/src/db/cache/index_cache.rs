@@ -162,10 +162,10 @@ impl IndexCache {
         let (rune_id, db_rune, entry) = self.tx_cache.apply_etching(etching, self.next_rune_number);
         try_debug!(
             ctx,
-            "Etching {} ({}) {}",
-            db_rune.spaced_name,
-            db_rune.id,
-            self.tx_cache.location
+            "Etching {spaced_name} ({id}) {location}",
+            spaced_name = &db_rune.spaced_name,
+            id = &db_rune.id,
+            location = self.tx_cache.location.to_string()
         );
         self.db_cache.runes.push(db_rune.clone());
         self.rune_cache.put(rune_id, db_rune);
@@ -186,10 +186,10 @@ impl IndexCache {
             .apply_cenotaph_etching(rune, self.next_rune_number);
         try_debug!(
             ctx,
-            "Etching cenotaph {} ({}) {}",
-            db_rune.spaced_name,
-            db_rune.id,
-            self.tx_cache.location
+            "Etching cenotaph {spaced_name} ({id}) {location}",
+            spaced_name = &db_rune.spaced_name,
+            id = &db_rune.id,
+            location = self.tx_cache.location.to_string()
         );
         self.db_cache.runes.push(db_rune.clone());
         self.rune_cache.put(rune_id, db_rune);
@@ -208,9 +208,8 @@ impl IndexCache {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(rune_id, db_tx, ctx).await else {
             try_warn!(
                 ctx,
-                "Rune {} not found for mint {}",
-                rune_id,
-                self.tx_cache.location
+                "Rune {rune_id} not found for mint {location}",
+                location = self.tx_cache.location.to_string()
             );
             return;
         };
@@ -242,9 +241,8 @@ impl IndexCache {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(rune_id, db_tx, ctx).await else {
             try_warn!(
                 ctx,
-                "Rune {} not found for cenotaph mint {}",
-                rune_id,
-                self.tx_cache.location
+                "Rune {rune_id} not found for cenotaph mint {location}",
+                location = self.tx_cache.location.to_string()
             );
             return;
         };
@@ -276,9 +274,9 @@ impl IndexCache {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(&edict.id, db_tx, ctx).await else {
             try_warn!(
                 ctx,
-                "Rune {} not found for edict {}",
-                edict.id,
-                self.tx_cache.location
+                "Rune {id} not found for edict {location}",
+                id = edict.id.to_string(),
+                location = self.tx_cache.location.to_string()
             );
             return;
         };
@@ -286,10 +284,10 @@ impl IndexCache {
         for entry in entries.iter() {
             try_debug!(
                 ctx,
-                "Edict {} {} {}",
-                db_rune.spaced_name,
-                entry.amount.unwrap().0,
-                self.tx_cache.location
+                "Edict {spaced_name} {amount} {location}",
+                spaced_name = &db_rune.spaced_name,
+                amount = entry.amount.unwrap().0,
+                location = self.tx_cache.location.to_string()
             );
         }
         *edicts_number += 1;

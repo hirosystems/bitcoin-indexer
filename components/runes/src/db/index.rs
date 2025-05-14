@@ -172,8 +172,8 @@ pub async fn index_block(
     let elapsed = stopwatch.elapsed();
     try_info!(
         ctx,
-        "Completed runes indexing for block #{block_height}: found {etchings_count} etchings, {mints_count} mints, {edicts_count} edicts, and {cenotaphs_count} cenotaphs, of which {cenotaphs_etchings_count} etchings and {cenotaphs_mints_count} mints in {:.0}s",
-        elapsed.as_secs_f32()
+        "Completed runes indexing for block #{block_height}: found {etchings_count} etchings, {mints_count} mints, {edicts_count} edicts, and {cenotaphs_count} cenotaphs, of which {cenotaphs_etchings_count} etchings and {cenotaphs_mints_count} mints in {elapsed:.0}s",
+        elapsed = elapsed.as_secs_f32()
     );
 }
 
@@ -192,7 +192,7 @@ pub async fn roll_back_block(pg_client: &mut Client, block_height: u64, ctx: &Co
         .expect("Unable to commit pg transaction");
     try_info!(
         ctx,
-        "Block {block_height} rolled back in {:.4}s",
-        stopwatch.elapsed().as_secs_f32()
+        "Block {block_height} rolled back in {elapsed:.4}s",
+        elapsed = stopwatch.elapsed().as_secs_f32()
     );
 }
