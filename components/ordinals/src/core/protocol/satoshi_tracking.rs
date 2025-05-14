@@ -65,17 +65,10 @@ pub async fn augment_block_with_transfers(
             &network,
             db_tx,
             ctx,
+            reveals_count,
+            transfers_count
         )
         .await?;
-    }
-
-    for tx in &block.transactions {
-        for op in &tx.metadata.ordinal_operations {
-            match op {
-                OrdinalOperation::InscriptionRevealed(_) => *reveals_count += 1,
-                OrdinalOperation::InscriptionTransferred(_) => *transfers_count += 1,
-            }
-        }
     }
 
     Ok(())
@@ -171,6 +164,8 @@ pub async fn augment_transaction_with_ordinal_transfers(
     network: &Network,
     db_tx: &Transaction<'_>,
     ctx: &Context,
+    reveals_count: &mut usize,
+    transfers_count: &mut usize,
 ) -> Result<(), String> {
     // The transfers are inserted in storage after the inscriptions.
     // We have a unicity constraing, and can only have 1 ordinals per satpoint.
@@ -178,6 +173,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
     for op in tx.metadata.ordinal_operations.iter() {
         if let OrdinalOperation::InscriptionRevealed(data) = op {
             updated_sats.insert(data.ordinal_number);
+            *reveals_count += 1
         }
     }
 
@@ -255,6 +251,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
             tx.metadata
                 .ordinal_operations
                 .push(OrdinalOperation::InscriptionTransferred(transfer_data));
+            *transfers_count += 1;
         }
     }
 
