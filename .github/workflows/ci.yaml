@@ -186,19 +186,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install LLVM and Clang 11
+      - name: Install LLVM and Clang 18
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 11 all
+          sudo ./llvm.sh 18 all
           sudo apt-get update
       
       - name: Install RocksDB dependencies
         run: |
           sudo apt-get install -y \
-            libclang-11-dev \
-            clang-11 \
-            llvm-11-dev \
+            libclang-18-dev \
+            clang-18 \
+            llvm-18-dev \
             libssl-dev \
             pkg-config \
             libsnappy-dev \
@@ -208,7 +208,7 @@ jobs:
             liblz4-dev \
             libzstd-dev
           ls -la /usr/lib/llvm*/lib/
-          echo "LIBCLANG_PATH=/usr/lib/llvm-11/lib" >> $GITHUB_ENV
+          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
           echo "RUST_BACKTRACE=FULL" >> $GITHUB_ENV
 
       - name: Run clippy
@@ -276,19 +276,19 @@ jobs:
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml up -d
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml logs -t -f --no-color &> docker-compose-logs.txt &
 
-      - name: Install LLVM and Clang 11
+      - name: Install LLVM and Clang 18
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 11 all
+          sudo ./llvm.sh 18 all
           sudo apt-get update
 
       - name: Install RocksDB dependencies
         run: |
           sudo apt-get install -y \
-            libclang-11-dev \
-            clang-11 \
-            llvm-11-dev \
+            libclang-18-dev \
+            clang-18 \
+            llvm-18-dev \
             libssl-dev \
             pkg-config \
             libsnappy-dev \
@@ -298,7 +298,7 @@ jobs:
             liblz4-dev \
             libzstd-dev
           ls -la /usr/lib/llvm*/lib/
-          echo "LIBCLANG_PATH=/usr/lib/llvm-11/lib" >> $GITHUB_ENV
+          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
