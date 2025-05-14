@@ -21,30 +21,23 @@ services:
       timeout: 5s
       retries: 5
 
-  test-builder:
+  test-environment:
     build:
       context: .
       dockerfile: components/test-environment.dockerfile
     volumes:
-      - ..:/app
+      - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      # # libclang configuration - try multiple paths
-      # LIBCLANG_PATH: /usr/lib/llvm-11/lib:/usr/lib:/usr/lib/x86_64-linux-gnu
-      # LLVM_CONFIG_PATH: /usr/bin/llvm-config-11
-      # RUST_BACKTRACE: FULL
-      # BINDGEN_EXTRA_CLANG_ARGS: "-I/usr/lib/llvm-11/include"
-      # # RocksDB configuration
-      # ROCKSDB_LIB_DIR: /usr/lib/x86_64-linux-gnu
-      # ROCKSDB_STATIC: 1
-      # Debug flags
-      # CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG: "true"
-      # Docker config
-      # DOCKER_HOST: unix:///var/run/docker.sock
-      # Database configuration for tests
+      RUST_BACKTRACE: full
+      LIBCLANG_PATH: /usr/lib/llvm-11/lib:/usr/lib:/usr/lib/x86_64-linux-gnu
+      LD_LIBRARY_PATH: /usr/lib/llvm-11/lib:/usr/lib:/usr/lib/x86_64-linux-gnu
+      BINDGEN_EXTRA_CLANG_ARGS: "-I/usr/lib/llvm-11/include"
+      ROCKSDB_LIB_DIR: /usr/lib/x86_64-linux-gnu
+      ROCKSDB_STATIC: 1
       ORDINALS_PGHOST: postgres
       ORDINALS_PGPORT: 5432
       ORDINALS_PGUSER: postgres
@@ -58,42 +51,5 @@ services:
       BRC20_PGDATABASE: postgres
       BRC20_SCHEMA: public
     working_dir: /app
-    command: >
-      bash -c "
-        set -e
-        # Print clang/LLVM diagnostic info
-        echo '====== LLVM/Clang Diagnostic Info ======'
-        which clang || echo 'clang not found'
-        which llvm-config || echo 'llvm-config not found'
-        find /usr -name 'libclang*.so*' || echo 'No libclang found'
-        
-        echo '====== Building all dependencies first ======'
-        cargo build --workspace --all-features
-        
-        echo '====== Running Clippy ======'
-        cargo bitcoin-indexer-clippy | tee /app/clippy_results.log || true
-        
-        echo '====== Running Cargo Doc Tests ======'
-        cargo test --doc --workspace | tee /app/doctest_results.log || true
-        
-        echo '====== Running CLI Tests ======'
-        cd components/cli && cargo test --all-features | tee /app/cli_test_results.log || true
-        
-        echo '====== Running Ordinals Tests ======'
-        cd ../ordinals && cargo test --all-features | tee /app/ordinals_test_results.log || true
-        
-        echo '====== Running all other tests ======'
-        cd /app && cargo test --workspace --all-features | tee /app/all_tests_results.log || true
-        
-        echo '====== Test Results Summary ======'
-        echo 'Clippy results:' 
-        grep -E 'error:|warning:' /app/clippy_results.log || echo 'No clippy errors or warnings!'
-        
-        echo 'Test results:'
-        grep -E 'test result|FAILED|^failures:' /app/cli_test_results.log /app/ordinals_test_results.log /app/all_tests_results.log || echo 'No test failures!'
-        
-        # Keep container alive for inspection if needed
-        echo 'Tests completed. Container will exit in 5 seconds unless you connect to it.'
-        sleep 5
-      "
-    tty: true 
+    command: cargo test --workspace
+    tty: true

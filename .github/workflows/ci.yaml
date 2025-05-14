@@ -185,10 +185,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-  
+
+      - name: Install LLVM and Clang 11
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 11 all
+          sudo apt-get update
+      
       - name: Install RocksDB dependencies
         run: |
-          sudo apt-get update
           sudo apt-get install -y \
             libclang-11-dev \
             clang-11 \
@@ -270,9 +276,15 @@ jobs:
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml up -d
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml logs -t -f --no-color &> docker-compose-logs.txt &
 
+      - name: Install LLVM and Clang 11
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 11 all
+          sudo apt-get update
+
       - name: Install RocksDB dependencies
         run: |
-          sudo apt-get update
           sudo apt-get install -y \
             libclang-11-dev \
             clang-11 \
