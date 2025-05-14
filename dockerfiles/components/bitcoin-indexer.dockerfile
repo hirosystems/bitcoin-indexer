@@ -2,8 +2,22 @@ FROM rust:bullseye AS build
 
 WORKDIR /src
 
-RUN apt-get update && apt-get install -y ca-certificates pkg-config libssl-dev libclang-11-dev libunwind-dev libunwind8 curl gnupg libsnappy-dev libgflags-dev zlib1g-dev libbz2-dev liblz4-dev libzstd-dev
-RUN rustup update 1.81 && rustup default 1.81
+RUN apt-get update && apt-get install -y \
+  ca-certificates \
+  pkg-config \
+  libssl-dev \
+  libunwind-dev \
+  libunwind8 \
+  curl \
+  gnupg \
+  libsnappy-dev \
+  libgflags-dev \
+  zlib1g-dev \
+  libbz2-dev \
+  liblz4-dev \
+  libzstd-dev \
+  libclang-11-dev
+RUN rustup update 1.85 && rustup default 1.85
 
 RUN mkdir /out
 COPY ./Cargo.toml /src/Cargo.toml
