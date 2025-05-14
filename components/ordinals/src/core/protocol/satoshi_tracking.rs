@@ -66,7 +66,7 @@ pub async fn augment_block_with_transfers(
             db_tx,
             ctx,
             reveals_count,
-            transfers_count
+            transfers_count,
         )
         .await?;
     }
