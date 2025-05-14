@@ -223,7 +223,7 @@ jobs:
           set +e
 
           # Run clippy and capture output
-          LD_LIBRARY_PATH=/usr/lib/llvm-18/lib:$LD_LIBRARY_PATH cargo bitcoin-indexer-clippy-cli 2>&1 | tee /tmp/clippy_output.log
+          cargo bitcoin-indexer-clippy-cli 2>&1 | tee /tmp/clippy_output.log
           CLIPPY_EXIT_CODE=${PIPESTATUS[0]}
 
           # Print output if clippy failed
