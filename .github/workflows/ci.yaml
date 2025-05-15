@@ -19,6 +19,9 @@ jobs:
   clippy:
     name: rust-clippy
     runs-on: ubuntu-latest
+    env:
+      LIBCLANG_PATH: /usr/lib/llvm-18/lib
+      LD_LIBRARY_PATH: /usr/lib/llvm-18/lib
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,12 +29,9 @@ jobs:
 
       - name: Install libclang and dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y clang-18 libclang-18-dev
+          sudo apt-get update && sudo apt-get install -y clang-18 libclang-18-dev llvm-18-dev
           ls -la /usr/lib/llvm*/lib/
 
+
       - name: Run clippy
-        run: |
-          export LIBCLANG_PATH=/usr/lib/llvm-18/lib
-          export LD_LIBRARY_PATH=/usr/lib/llvm-18/lib
-          find /usr/lib/llvm-18 -name "libclang.so*" || true
-          cargo bitcoin-indexer-clippy
+        run: cargo bitcoin-indexer-clippy
