@@ -55,6 +55,6 @@ test-case = "3.1.0"
 # [profile.release]
 # debug = true
 
-# [features]
-# debug = ["hiro-system-kit/debug", "pprof"]
-# release = ["hiro-system-kit/release"]
+[features]
+debug = ["hiro-system-kit/debug", "pprof"]
+release = ["hiro-system-kit/release"]
