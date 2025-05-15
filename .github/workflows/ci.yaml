@@ -32,6 +32,11 @@ jobs:
           sudo apt-get update && sudo apt-get install -y clang-18 libclang-18-dev llvm-18-dev
           ls -la /usr/lib/llvm*/lib/
 
+      - name: Symlink libclang.so if missing
+        run: |
+          if [ ! -f /usr/lib/llvm-18/lib/libclang.so ] && [ -f /usr/lib/llvm-18/lib/libclang.so.1 ]; then
+            sudo ln -s /usr/lib/llvm-18/lib/libclang.so.1 /usr/lib/llvm-18/lib/libclang.so
+          fi
 
       - name: Run clippy
         run: cargo bitcoin-indexer-clippy
