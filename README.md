@@ -110,7 +110,7 @@ It is recommended to use Postgres 17+ for optimal performance.
 
 ## Bitcoin Node
 
-To index data, a Bitcoin Node is required per index (ordinals, runes, etc.).
+To index data, a Bitcoin Node is required.
 The indexer officially supports Bitcoin Core versions 0.24.x and 0.25.x.
 
 # Contribute
