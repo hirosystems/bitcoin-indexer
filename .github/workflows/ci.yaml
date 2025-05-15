@@ -215,10 +215,15 @@ jobs:
         with:
           toolchain: '1.85'
           components: clippy
+
+      - name: Enable build script debug logging
+        run: |
+          echo "RUST_BACKTRACE=1" >> $GITHUB_ENV
+          echo "CARGO_TERM_VERBOSE=true" >> $GITHUB_ENV
        
       - name: Run clippy
         id: clippy
-        run: cargo bitcoin-indexer-clippy
+        run: cargo build --all-targets --verbose
 
       # - name: Run clippy
       #   id: clippy
