@@ -19,36 +19,19 @@ jobs:
   clippy:
     name: rust-clippy
     runs-on: ubuntu-latest
-    env:
-      LIBCLANG_PATH: /usr/lib/llvm-18/lib
-      LD_LIBRARY_PATH: /usr/lib/llvm-18/lib
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Install LLVM and Clang 18
+      - name: Install LLVM and Clang
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 18 all
           sudo apt-get update
+          sudo apt-get install -y llvm-18 clang-18 libclang-18-dev
 
-      - name: Install RocksDB dependencies
+      - name: Set LLVM environment variables
         run: |
-          sudo apt-get install -y \
-            libclang-18-dev \
-            clang-18 \
-            llvm-18-dev \
-            libssl-dev \
-            pkg-config \
-            libsnappy-dev \
-            libgflags-dev \
-            zlib1g-dev \
-            libbz2-dev \
-            liblz4-dev \
-            libzstd-dev
-          ls -la /usr/lib/llvm*/lib/
+          echo "LLVM_CONFIG_PATH=/usr/bin/llvm-config-18" >> $GITHUB_ENV
           echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
 
       - name: Run clippy
