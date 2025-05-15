@@ -18,16 +18,21 @@ concurrency:
 jobs:
   clippy:
     name: rust-clippy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "18.0"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-18 clang-18 libclang-18-dev
+
+      - name: Set LLVM environment variables
+        run: |
+          echo "LLVM_CONFIG_PATH=/usr/bin/llvm-config-18" >> $GITHUB_ENV
+          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
 
       - name: Run clippy
         run: cargo bitcoin-indexer-clippy
