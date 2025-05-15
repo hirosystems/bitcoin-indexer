@@ -31,3 +31,6 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy -p ordinals
+
+      - name: Run clippy all targets
+        run: cargo clippy -p ordinals --all-targets
