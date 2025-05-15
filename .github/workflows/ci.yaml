@@ -216,7 +216,7 @@ jobs:
           toolchain: '1.85'
           components: clippy
        
-       - name: Run clippy
+      - name: Run clippy
         id: clippy
         run: cargo bitcoin-indexer-clippy
 
