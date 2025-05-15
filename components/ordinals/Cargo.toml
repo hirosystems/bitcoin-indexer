@@ -34,7 +34,7 @@ fxhash = "0.2.1"
 anyhow = { version = "1.0.56", features = ["backtrace"] }
 progressing = '3'
 futures = "0.3.28"
-rocksdb = { version = "0.23.0", default-features = false, features = [
+rocksdb = { git = "https://github.com/rust-rocksdb/rust-rocksdb", default-features = false, features = [
     "snappy",
 ] }
 pprof = { version = "0.14.0", features = ["flamegraph"], optional = true }
@@ -55,6 +55,6 @@ test-case = "3.1.0"
 # [profile.release]
 # debug = true
 
-[features]
-debug = ["hiro-system-kit/debug", "pprof"]
-release = ["hiro-system-kit/release"]
+# [features]
+# debug = ["hiro-system-kit/debug", "pprof"]
+# release = ["hiro-system-kit/release"]
