@@ -28,9 +28,10 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y clang-18 libclang-18-dev
           ls -la /usr/lib/llvm*/lib/
-          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
 
       - name: Run clippy
-        run: cargo bitcoin-indexer-clippy
-        env:
-          LD_LIBRARY_PATH: ${{ env.LIBCLANG_PATH }}
+        run: |
+          export LIBCLANG_PATH=/usr/lib/llvm-18/lib
+          export LD_LIBRARY_PATH=/usr/lib/llvm-18/lib
+          find /usr/lib/llvm-18 -name "libclang.so*" || true
+          cargo bitcoin-indexer-clippy
