@@ -105,8 +105,13 @@ using the `ulimit` command or the `launchctl limit` command.
 
 ## Postgres
 
-To store indexed data, a Postgres database is required per index (ordinals, runes, etc.). It is
-recommended to use Postgres 17+ for optimal performance.
+To store indexed data, a Postgres database is required per index (ordinals, runes, etc.).
+It is recommended to use Postgres 17+ for optimal performance.
+
+## Bitcoin Node
+
+To index data, a Bitcoin Node is required.
+The indexer officially supports Bitcoin Core versions 0.24.x and 0.25.x.
 
 # Contribute
 
