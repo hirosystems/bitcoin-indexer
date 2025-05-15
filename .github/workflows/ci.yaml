@@ -24,36 +24,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install LLVM and Clang 18
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 18 all
-          sudo apt-get update
-
-      - name: Install RocksDB dependencies
-        run: |
-          sudo apt-get install -y \
-            libclang-18-dev \
-            clang-18 \
-            llvm-18-dev \
-            libssl-dev \
-            pkg-config \
-            libsnappy-dev \
-            libgflags-dev \
-            zlib1g-dev \
-            libbz2-dev \
-            liblz4-dev \
-            libzstd-dev
-          ls -la /usr/lib/llvm*/lib/
-          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
-
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: '1.85'
-          components: clippy
+      - name: Install libclang and dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev
 
       - name: Run clippy
-        id: clippy
         run: cargo bitcoin-indexer-clippy
