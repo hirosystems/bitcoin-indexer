@@ -32,5 +32,8 @@ jobs:
       - name: Run clippy
         run: cargo clippy -p ordinals
 
-      - name: Run clippy all targets
-        run: cargo clippy -p ordinals --all-targets
+      - name: Run clippy all targets all features
+        run: cargo clippy -p ordinals --all-targets --all-features
+
+      - name: Run clippy bitcoin-indexer-clippy
+        run: cargo bitcoin-indexer-clippy
