@@ -25,7 +25,12 @@ jobs:
           persist-credentials: false
 
       - name: Install libclang and dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang-18 libclang-18-dev
+          ls -la /usr/lib/llvm*/lib/
+          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
 
       - name: Run clippy
         run: cargo bitcoin-indexer-clippy
+        env:
+          LD_LIBRARY_PATH: ${{ env.LIBCLANG_PATH }}
