@@ -86,7 +86,13 @@ pub async fn index_block(
 ) -> Result<(), String> {
     let stopwatch = std::time::Instant::now();
     let block_height = block.block_identifier.index;
-    try_info!(ctx, "Indexing block #{block_height}");
+    try_info!(
+        ctx,
+        "Starting inscription indexing for block #{block_height}..."
+    );
+    // Count total reveals and transfers in the block
+    let mut reveals_count = 0;
+    let mut transfers_count = 0;
 
     // Invalidate and recompute cursor when crossing the jubilee height
     if block.block_identifier.index
@@ -128,7 +134,14 @@ pub async fn index_block(
             )
             .await?;
         }
-        augment_block_with_transfers(block, &ord_tx, ctx).await?;
+        augment_block_with_transfers(
+            block,
+            &ord_tx,
+            ctx,
+            &mut reveals_count,
+            &mut transfers_count,
+        )
+        .await?;
 
         // Write data
         ordinals_pg::insert_block(block, &ord_tx).await?;
@@ -165,11 +178,14 @@ pub async fn index_block(
             .map_err(|e| format!("unable to commit ordinals pg transaction: {e}"))?;
     }
 
+    let elapsed = stopwatch.elapsed();
+
     try_info!(
         ctx,
-        "Block #{block_height} indexed in {}s",
-        stopwatch.elapsed().as_millis() as f32 / 1000.0
+        "Completed inscription indexing for block #{block_height}: found {reveals_count} inscription reveals and {transfers_count} inscription transfers in {elapsed:.0}s",
+        elapsed = elapsed.as_secs_f32(),
     );
+
     Ok(())
 }
 
