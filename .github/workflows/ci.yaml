@@ -24,7 +24,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: KyleMayes/install-llvm-action@v2
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
         with:
           version: "18.0"
 
