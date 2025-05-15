@@ -27,16 +27,29 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install libclang and dependencies
+      - name: Install LLVM and Clang 18
         run: |
-          sudo apt-get update && sudo apt-get install -y clang-18 libclang-18-dev llvm-18-dev
-          ls -la /usr/lib/llvm*/lib/
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18 all
+          sudo apt-get update
 
-      - name: Symlink libclang.so if missing
+      - name: Install RocksDB dependencies
         run: |
-          if [ ! -f /usr/lib/llvm-18/lib/libclang.so ] && [ -f /usr/lib/llvm-18/lib/libclang.so.1 ]; then
-            sudo ln -s /usr/lib/llvm-18/lib/libclang.so.1 /usr/lib/llvm-18/lib/libclang.so
-          fi
+          sudo apt-get install -y \
+            libclang-18-dev \
+            clang-18 \
+            llvm-18-dev \
+            libssl-dev \
+            pkg-config \
+            libsnappy-dev \
+            libgflags-dev \
+            zlib1g-dev \
+            libbz2-dev \
+            liblz4-dev \
+            libzstd-dev
+          ls -la /usr/lib/llvm*/lib/
+          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
 
       - name: Run clippy
         run: cargo bitcoin-indexer-clippy
