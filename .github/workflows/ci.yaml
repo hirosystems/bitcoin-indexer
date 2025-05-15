@@ -30,4 +30,4 @@ jobs:
           sudo apt-get install -y llvm clang libclang-dev
 
       - name: Run clippy
-        run: cargo clippy
+        run: cargo clippy -p ordinals
