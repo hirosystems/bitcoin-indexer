@@ -7,6 +7,5 @@ extern crate hiro_system_kit;
 // static GLOBAL: tcmalloc2::TcMalloc = tcmalloc2::TcMalloc;
 
 fn main() {
-    let a = 'aaa';
     cli::main();
 }
