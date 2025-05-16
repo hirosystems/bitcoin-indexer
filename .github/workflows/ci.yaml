@@ -207,38 +207,38 @@ jobs:
           echo "RUST_BACKTRACE=full" >> $GITHUB_ENV
           echo "CARGO_TERM_VERBOSE=true" >> $GITHUB_ENV
        
-      - name: Run clippy
-        id: clippy
-        run: cargo build --all-targets --verbose
-
       # - name: Run clippy
       #   id: clippy
-      #   run: |
-      #     # Disable immediate exit on error
-      #     set +e
+      #   run: cargo build --all-targets --verbose
 
-      #     # Run clippy and capture output
-      #     cargo bitcoin-indexer-clippy-cli 2>&1 | tee /tmp/clippy_output.log
-      #     CLIPPY_EXIT_CODE=${PIPESTATUS[0]}
+      - name: Run clippy
+        id: clippy
+        run: |
+          # Disable immediate exit on error
+          set +e
 
-      #     # Print output if clippy failed
-      #     if [ $CLIPPY_EXIT_CODE -ne 0 ]; then
-      #       echo "## ❌ Clippy Check Failed
+          # Run clippy and capture output
+          cargo bitcoin-indexer-clippy-cli 2>&1 | tee /tmp/clippy_output.log
+          CLIPPY_EXIT_CODE=${PIPESTATUS[0]}
 
-      #     To see and fix these issues, run:
-      #     \`\`\`bash
-      #     cargo bitcoin-indexer-clippy
-      #     \`\`\`
+          # Print output if clippy failed
+          if [ $CLIPPY_EXIT_CODE -ne 0 ]; then
+            echo "## ❌ Clippy Check Failed
 
-      #     ### Clippy Errors
-      #     \`\`\`
-      #     $(cat /tmp/clippy_output.log | grep -E '(error\:)|(warning\:)')
-      #     \`\`\`" >> $GITHUB_STEP_SUMMARY
-      #     fi
+          To see and fix these issues, run:
+          \`\`\`bash
+          cargo bitcoin-indexer-clippy
+          \`\`\`
 
-      #     # Enable immediate exit on error again
-      #     set -e
-      #     exit $CLIPPY_EXIT_CODE
+          ### Clippy Errors
+          \`\`\`
+          $(cat /tmp/clippy_output.log | grep -E '(error\:)|(warning\:)')
+          \`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Enable immediate exit on error again
+          set -e
+          exit $CLIPPY_EXIT_CODE
 
   test:
     strategy:
