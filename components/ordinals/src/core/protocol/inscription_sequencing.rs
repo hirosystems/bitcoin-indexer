@@ -65,7 +65,6 @@ pub fn parallelize_inscription_data_computations(
     ctx: &Context,
 ) -> Result<bool, String> {
     let inner_ctx = ctx.clone();
-    let a = 23;
 
     try_debug!(
         inner_ctx,
