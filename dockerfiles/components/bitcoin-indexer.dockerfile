@@ -2,12 +2,15 @@ FROM rust:bullseye AS build
 
 WORKDIR /src
 
-RUN apt-get update && apt-get install -y --no-install-recommends wget gnupg ca-certificates && \
-    wget https://apt.llvm.org/llvm.sh && \
-    chmod +x llvm.sh && \
-    ./llvm.sh 18 bullseye && \
+RUN apt-get update && \
+    apt-get install -y \
+    gnupg \
+    ca-certificates \
+    wget && \
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
     apt-get update && \
-    apt-get install -y --no-install-recommends \
+    apt-get install -y \
     pkg-config \
     libssl-dev \
     libunwind-dev \
@@ -36,12 +39,16 @@ RUN cp /src/target/release/bitcoin-indexer /out
 FROM debian:bullseye-slim
 
 # Install runtime dependencies for LLVM/Clang 18 and other necessary libs
-RUN apt-get update && apt-get install -y --no-install-recommends wget gnupg ca-certificates && \
-    wget https://apt.llvm.org/llvm.sh && \
-    chmod +x llvm.sh && \
-    ./llvm.sh 18 bullseye && \
+RUN apt-get update && \
+    apt-get install -y \
+    gnupg \
+    ca-certificates \
+    wget && \
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
     apt-get update && \
-    apt-get install -y --no-install-recommends \
+    apt-get install -y \
+    pkg-config \
     libssl-dev \
     libunwind-dev \
     libunwind8 \
@@ -51,10 +58,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends wget gnupg ca-c
     libbz2-1.0 \
     liblz4-1 \
     libzstd1 \
-    libclang-18-dev # Or specific runtime libraries like libclang1-18, libllvm18
-    # We might need more specific runtime libraries here instead of libclang-18-dev.
-    # For now, let's include libclang-18-dev and see if it pulls the necessary .so files.
-    # Alternatively, it might be libllvm18, libclang1-18 etc.
+    libclang-common-18-dev \
+    libclang1-18
+
 COPY --from=build /out/bitcoin-indexer /bin/bitcoin-indexer
 
 WORKDIR /workspace
