@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use bitcoin::{Address, ScriptBuf};
-use bitcoind::{try_info, try_warn, types::bitcoin::TxIn, utils::Context};
+use bitcoind::{try_debug, try_warn, types::bitcoin::TxIn, utils::Context};
 use lru::LruCache;
 use ordinals_parser::RuneId;
 use tokio_postgres::Transaction;
@@ -158,20 +158,15 @@ pub fn move_rune_balance_to_output(
                 Err(e) => {
                     try_warn!(
                         ctx,
-                        "Unable to decode address for output {}, {} {}",
-                        output,
-                        e,
-                        location
+                        "Unable to decode address for output {output}, {e} {location}"
                     );
                     None
                 }
             },
             None => {
-                try_info!(
+                try_debug!(
                     ctx,
-                    "Attempted move to non-eligible output {}, runes will be burnt {}",
-                    output,
-                    location
+                    "Attempted move to non-eligible output {output}, runes will be burnt {location}"
                 );
                 None
             }
@@ -230,14 +225,11 @@ pub fn move_rune_balance_to_output(
             DbLedgerOperation::Receive,
             next_event_index,
         ));
-        try_info!(
+        try_debug!(
             ctx,
-            "{} {} ({}) {} {}",
-            DbLedgerOperation::Receive,
-            rune_id,
-            total_sent,
-            receiver_address.as_ref().unwrap(),
-            location
+            "{operation} {rune_id} ({total_sent}) {address} {location}",
+            operation = DbLedgerOperation::Receive.to_string(),
+            address = receiver_address.as_ref().unwrap(),
         );
     }
     // Add the "send"/"burn" entries.
@@ -252,15 +244,9 @@ pub fn move_rune_balance_to_output(
             operation.clone(),
             next_event_index,
         ));
-        try_info!(
+        try_debug!(
             ctx,
-            "{} {} ({}) {} -> {:?} {}",
-            operation,
-            rune_id,
-            balance_taken,
-            sender_address,
-            receiver_address,
-            location
+            "{operation} {rune_id} ({balance_taken}) {sender_address} -> {receiver_address:?} {location}"
         );
     }
     results

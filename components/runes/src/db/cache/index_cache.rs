@@ -1,7 +1,7 @@
 use std::{collections::HashMap, num::NonZeroUsize, str::FromStr};
 
 use bitcoin::{Network, ScriptBuf};
-use bitcoind::{try_debug, try_info, try_warn, types::bitcoin::TxIn, utils::Context};
+use bitcoind::{try_debug, try_warn, types::bitcoin::TxIn, utils::Context};
 use config::Config;
 use lru::LruCache;
 use ordinals_parser::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
@@ -144,10 +144,12 @@ impl IndexCache {
         cenotaph: &Cenotaph,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        cenotaphs_counter: &mut usize,
     ) {
         try_debug!(ctx, "{:?} {}", cenotaph, self.tx_cache.location);
         let entries = self.tx_cache.apply_cenotaph_input_burn(cenotaph);
         self.add_ledger_entries_to_db_cache(&entries);
+        *cenotaphs_counter += 1;
     }
 
     pub async fn apply_etching(
@@ -155,19 +157,21 @@ impl IndexCache {
         etching: &Etching,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        etchings_counter: &mut usize,
     ) {
         let (rune_id, db_rune, entry) = self.tx_cache.apply_etching(etching, self.next_rune_number);
-        try_info!(
+        try_debug!(
             ctx,
-            "Etching {} ({}) {}",
-            db_rune.spaced_name,
-            db_rune.id,
-            self.tx_cache.location
+            "Etching {spaced_name} ({id}) {location}",
+            spaced_name = &db_rune.spaced_name,
+            id = &db_rune.id,
+            location = self.tx_cache.location.to_string()
         );
         self.db_cache.runes.push(db_rune.clone());
         self.rune_cache.put(rune_id, db_rune);
         self.add_ledger_entries_to_db_cache(&vec![entry]);
         self.next_rune_number += 1;
+        *etchings_counter += 1;
     }
 
     pub async fn apply_cenotaph_etching(
@@ -175,21 +179,23 @@ impl IndexCache {
         rune: &Rune,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        cenotaph_etchings_counter: &mut usize,
     ) {
         let (rune_id, db_rune, entry) = self
             .tx_cache
             .apply_cenotaph_etching(rune, self.next_rune_number);
-        try_info!(
+        try_debug!(
             ctx,
-            "Etching cenotaph {} ({}) {}",
-            db_rune.spaced_name,
-            db_rune.id,
-            self.tx_cache.location
+            "Etching cenotaph {spaced_name} ({id}) {location}",
+            spaced_name = &db_rune.spaced_name,
+            id = &db_rune.id,
+            location = self.tx_cache.location.to_string()
         );
         self.db_cache.runes.push(db_rune.clone());
         self.rune_cache.put(rune_id, db_rune);
         self.add_ledger_entries_to_db_cache(&vec![entry]);
         self.next_rune_number += 1;
+        *cenotaph_etchings_counter += 1;
     }
 
     pub async fn apply_mint(
@@ -197,13 +203,13 @@ impl IndexCache {
         rune_id: &RuneId,
         db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        mints_counter: &mut usize,
     ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(rune_id, db_tx, ctx).await else {
             try_warn!(
                 ctx,
-                "Rune {} not found for mint {}",
-                rune_id,
-                self.tx_cache.location
+                "Rune {rune_id} not found for mint {location}",
+                location = self.tx_cache.location.to_string()
             );
             return;
         };
@@ -221,6 +227,7 @@ impl IndexCache {
             } else {
                 self.rune_total_mints_cache.put(*rune_id, 1);
             }
+            *mints_counter += 1;
         }
     }
 
@@ -229,13 +236,13 @@ impl IndexCache {
         rune_id: &RuneId,
         db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        cenotaph_mints_counter: &mut usize,
     ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(rune_id, db_tx, ctx).await else {
             try_warn!(
                 ctx,
-                "Rune {} not found for cenotaph mint {}",
-                rune_id,
-                self.tx_cache.location
+                "Rune {rune_id} not found for cenotaph mint {location}",
+                location = self.tx_cache.location.to_string()
             );
             return;
         };
@@ -253,29 +260,37 @@ impl IndexCache {
             } else {
                 self.rune_total_mints_cache.put(*rune_id, 1);
             }
+            *cenotaph_mints_counter += 1;
         }
     }
 
-    pub async fn apply_edict(&mut self, edict: &Edict, db_tx: &mut Transaction<'_>, ctx: &Context) {
+    pub async fn apply_edict(
+        &mut self,
+        edict: &Edict,
+        db_tx: &mut Transaction<'_>,
+        ctx: &Context,
+        edicts_number: &mut usize,
+    ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(&edict.id, db_tx, ctx).await else {
             try_warn!(
                 ctx,
-                "Rune {} not found for edict {}",
-                edict.id,
-                self.tx_cache.location
+                "Rune {id} not found for edict {location}",
+                id = edict.id.to_string(),
+                location = self.tx_cache.location.to_string()
             );
             return;
         };
         let entries = self.tx_cache.apply_edict(edict, ctx);
         for entry in entries.iter() {
-            try_info!(
+            try_debug!(
                 ctx,
-                "Edict {} {} {}",
-                db_rune.spaced_name,
-                entry.amount.unwrap().0,
-                self.tx_cache.location
+                "Edict {spaced_name} {amount} {location}",
+                spaced_name = &db_rune.spaced_name,
+                amount = entry.amount.unwrap().0,
+                location = self.tx_cache.location.to_string()
             );
         }
+        *edicts_number += 1;
         self.add_ledger_entries_to_db_cache(&entries);
     }
 

@@ -66,11 +66,11 @@ pub fn parallelize_inscription_data_computations(
 ) -> Result<bool, String> {
     let inner_ctx = ctx.clone();
     let a = 23;
+    let block_height = block.block_identifier.index;
 
     try_debug!(
         inner_ctx,
-        "Inscriptions data computation for block #{} started",
-        block.block_identifier.index
+        "Inscriptions data computation for block #{block_height} started"
     );
 
     let (transactions_ids, l1_cache_hits) = get_transactions_to_process(block, cache_l1);
@@ -78,8 +78,7 @@ pub fn parallelize_inscription_data_computations(
     if !has_transactions_to_process {
         try_debug!(
             inner_ctx,
-            "No reveal transactions found at block #{}",
-            block.block_identifier.index
+            "No reveal transactions found at block #{block_height}"
         );
         return Ok(false);
     }
@@ -152,13 +151,13 @@ pub fn parallelize_inscription_data_computations(
 
     try_debug!(
         inner_ctx,
-        "Number of inscriptions in block #{} to process: {} (L1 cache hits: {}, queue: [{}], L1 cache len: {}, L2 cache len: {})",
-        block.block_identifier.index,
-        transactions_ids.len(),
-        l1_cache_hits.len(),
-        next_block_heights.join(", "),
-        cache_l1.len(),
-        cache_l2.len(),
+        "Number of inscriptions in block #{block_height} to process: {num_inscriptions} \
+        (L1 cache hits: {l1_hits}, queue: [{next_heights}], L1 cache len: {l1_len}, L2 cache len: {l2_len})",
+        num_inscriptions = transactions_ids.len(),
+        l1_hits = l1_cache_hits.len(),
+        next_heights = next_block_heights.join(", "),
+        l1_len = cache_l1.len(),
+        l2_len = cache_l2.len(),
     );
 
     let mut priority_queue = VecDeque::new();
@@ -192,13 +191,14 @@ pub fn parallelize_inscription_data_computations(
             Ok((traversal, inscription_pointer, _)) => {
                 try_debug!(
                     inner_ctx,
-                    "Completed ordinal number retrieval for Satpoint {}:{}:{} (block: #{}:{}, transfers: {}, progress: {traversals_received}/{expected_traversals}, priority queue: {prioritary}, thread: {thread_index})",
-                    traversal.transaction_identifier_inscription.hash,
-                    traversal.inscription_input_index,
-                    inscription_pointer,
-                    traversal.get_ordinal_coinbase_height(),
-                    traversal.get_ordinal_coinbase_offset(),
-                    traversal.transfers
+                    "Completed ordinal number retrieval for Satpoint {tx_hash}:{input_index}:{inscription_pointer} \
+                    (block: #{coinbase_height}:{coinbase_offset}, transfers: {transfers}, \
+                    progress: {traversals_received}/{expected_traversals}, priority queue: {prioritary}, thread: {thread_index})",
+                    tx_hash = &traversal.transaction_identifier_inscription.hash,
+                    input_index = traversal.inscription_input_index,
+                    coinbase_height = traversal.get_ordinal_coinbase_height(),
+                    coinbase_offset = traversal.get_ordinal_coinbase_offset(),
+                    transfers = traversal.transfers
                 );
                 cache_l1.insert(
                     (
@@ -227,9 +227,8 @@ pub fn parallelize_inscription_data_computations(
 
             try_info!(
                 inner_ctx,
-                "Number of inscriptions in block #{} to pre-process: {}",
-                block.block_identifier.index,
-                transactions_ids.len()
+                "Number of inscriptions in block #{block_height} to pre-process: {num_inscriptions}",
+                num_inscriptions = transactions_ids.len()
             );
 
             for (transaction_id, input_index, inscription_pointer) in transactions_ids.into_iter() {
@@ -246,8 +245,7 @@ pub fn parallelize_inscription_data_computations(
     }
     try_debug!(
         inner_ctx,
-        "Inscriptions data computation for block #{} collected",
-        block.block_identifier.index
+        "Inscriptions data computation for block #{block_height} collected"
     );
 
     // Collect eventual results for incoming blocks
@@ -257,15 +255,15 @@ pub fn parallelize_inscription_data_computations(
             traversal_rx.try_recv()
         {
             try_debug!(
-                    inner_ctx,
-                    "Completed ordinal number retrieval for Satpoint {}:{}:{} (block: #{}:{}, transfers: {}, pre-retrieval, thread: {thread_index})",
-                    traversal.transaction_identifier_inscription.hash,
-                    traversal.inscription_input_index,
-                    inscription_pointer,
-                    traversal.get_ordinal_coinbase_height(),
-                    traversal.get_ordinal_coinbase_offset(),
-                    traversal.transfers
-                );
+                inner_ctx,
+                "Completed ordinal number retrieval for Satpoint {tx_hash}:{input_index}:{inscription_pointer} \
+                (block: #{coinbase_height}:{coinbase_offset}, transfers: {transfers}, pre-retrieval, thread: {thread_index})",
+                tx_hash = &traversal.transaction_identifier_inscription.hash,
+                input_index = traversal.inscription_input_index,
+                coinbase_height = traversal.get_ordinal_coinbase_height(),
+                coinbase_offset = traversal.get_ordinal_coinbase_offset(),
+                transfers = traversal.transfers
+            );
             cache_l1.insert(
                 (
                     traversal.transaction_identifier_inscription.clone(),
@@ -286,8 +284,7 @@ pub fn parallelize_inscription_data_computations(
 
     try_debug!(
         inner_ctx,
-        "Inscriptions data computation for block #{} ended",
-        block.block_identifier.index
+        "Inscriptions data computation for block #{block_height} ended"
     );
 
     Ok(has_transactions_to_process)
@@ -395,6 +392,7 @@ pub async fn update_block_inscriptions_with_consensus_sequence_data(
     // Keep a reference of inscribed satoshis that will go towards miner fees. These would be unbound inscriptions.
     let mut sat_overflows = VecDeque::new();
     let network = get_bitcoin_network(&block.metadata.network);
+    let block_height = block.block_identifier.index;
 
     for (tx_index, tx) in block.transactions.iter_mut().enumerate() {
         update_tx_inscriptions_with_consensus_sequence_data(
@@ -422,7 +420,7 @@ pub async fn update_block_inscriptions_with_consensus_sequence_data(
 
         let is_cursed = inscription_data.curse_type.is_some();
         let inscription_number = sequence_cursor
-            .pick_next(is_cursed, block.block_identifier.index, &network, db_tx)
+            .pick_next(is_cursed, block_height, &network, db_tx)
             .await?;
         inscription_data.inscription_number = inscription_number;
         sequence_cursor.increment(is_cursed, db_tx).await?;
@@ -433,15 +431,14 @@ pub async fn update_block_inscriptions_with_consensus_sequence_data(
             format!("{UNBOUND_INSCRIPTION_SATPOINT}:{unbound_sequence}");
         inscription_data.ordinal_offset = unbound_sequence as u64;
         inscription_data.unbound_sequence = Some(unbound_sequence);
-
-        try_info!(
+        try_debug!(
             ctx,
-            "Unbound inscription {} (#{}) detected on Satoshi {} (block #{}, {} transfers)",
-            inscription_data.inscription_id,
-            inscription_data.get_inscription_number(),
-            inscription_data.ordinal_number,
-            block.block_identifier.index,
-            inscription_data.transfers_pre_inscription,
+            "Unbound inscription {inscription_id} (#{inscription_number}) detected on Satoshi {ordinal_number} \
+            (block #{block_height}, {transfers} transfers)",
+            inscription_id = &inscription_data.inscription_id,
+            inscription_number = inscription_data.get_inscription_number(),
+            ordinal_number = inscription_data.ordinal_number,
+            transfers = inscription_data.transfers_pre_inscription
         );
     }
     Ok(())
@@ -509,15 +506,15 @@ async fn update_tx_inscriptions_with_consensus_sequence_data(
             .await?;
         let mut curse_type_override = None;
         if !is_cursed {
-            if let Some(exisiting_inscription_id) =
+            if let Some(existing_inscription_id) =
                 reinscriptions_data.get(&traversal.ordinal_number)
             {
-                try_info!(
+                try_debug!(
                     ctx,
-                    "Satoshi {} was previously inscribed with blessed inscription {}, cursing inscription {}",
-                    traversal.ordinal_number,
-                    exisiting_inscription_id,
-                    traversal.get_inscription_id(),
+                    "Satoshi {ordinal_number} was previously inscribed with blessed inscription {existing_inscription_id}, \
+                    cursing inscription {cursed_id}",
+                    ordinal_number = traversal.ordinal_number,
+                    cursed_id = &traversal.get_inscription_id()
                 );
                 is_cursed = true;
                 inscription_number = sequence_cursor
@@ -585,13 +582,14 @@ async fn update_tx_inscriptions_with_consensus_sequence_data(
             reinscriptions_data.insert(traversal.ordinal_number, traversal.get_inscription_id());
         }
 
-        try_info!(
+        try_debug!(
             ctx,
-            "Inscription reveal {} (#{}) detected on Satoshi {} at block #{}",
-            inscription.inscription_id,
-            inscription.get_inscription_number(),
-            inscription.ordinal_number,
-            block_identifier.index,
+            "Inscription reveal {inscription_id} (#{inscription_number}) detected on Satoshi {ordinal_number} \
+            at block #{block_index}",
+            inscription_id = &inscription.inscription_id,
+            inscription_number = inscription.get_inscription_number(),
+            ordinal_number = inscription.ordinal_number,
+            block_index = block_identifier.index
         );
         sequence_cursor.increment(is_cursed, db_tx).await?;
     }
