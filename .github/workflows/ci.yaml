@@ -186,29 +186,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install LLVM and Clang 18
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 18 all
-          sudo apt-get update
-      
       - name: Install RocksDB dependencies
         run: |
+          sudo apt-get update
           sudo apt-get install -y \
-            libclang-18-dev \
-            clang-18 \
+            llvm \
+            clang \
             llvm-18-dev \
-            libssl-dev \
-            pkg-config \
-            libsnappy-dev \
-            libgflags-dev \
-            zlib1g-dev \
-            libbz2-dev \
-            liblz4-dev \
-            libzstd-dev
-          ls -la /usr/lib/llvm*/lib/
-          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
+            libclang-dev
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -216,9 +201,10 @@ jobs:
           toolchain: '1.85'
           components: clippy
 
+      # TODO: remove after debugging
       - name: Enable build script debug logging
         run: |
-          echo "RUST_BACKTRACE=1" >> $GITHUB_ENV
+          echo "RUST_BACKTRACE=full" >> $GITHUB_ENV
           echo "CARGO_TERM_VERBOSE=true" >> $GITHUB_ENV
        
       - name: Run clippy
@@ -232,7 +218,7 @@ jobs:
       #     set +e
 
       #     # Run clippy and capture output
-      #     RUST_BACKTRACE=full cargo bitcoin-indexer-clippy-cli 2>&1 | tee /tmp/clippy_output.log
+      #     cargo bitcoin-indexer-clippy-cli 2>&1 | tee /tmp/clippy_output.log
       #     CLIPPY_EXIT_CODE=${PIPESTATUS[0]}
 
       #     # Print output if clippy failed
@@ -289,13 +275,6 @@ jobs:
           sudo ufw disable
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml up -d
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml logs -t -f --no-color &> docker-compose-logs.txt &
-
-      - name: Install LLVM and Clang 18
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 18 all
-          sudo apt-get update
 
       - name: Install RocksDB dependencies
         run: |
