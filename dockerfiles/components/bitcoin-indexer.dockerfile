@@ -4,21 +4,16 @@ WORKDIR /src
 
 RUN apt-get update && \
     apt-get install -y \
+    wget && \
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
     gnupg \
     ca-certificates \
-    apt-get update && \
-    apt-get install -y \
     pkg-config \
     libssl-dev \
     libunwind-dev \
     libunwind8 \
     curl \
-    libsnappy-dev \
-    libgflags-dev \
-    zlib1g-dev \
-    libbz2-dev \
-    liblz4-dev \
-    libzstd-dev \
     clang-18 \
     libclang-18-dev \
     llvm-18-dev
@@ -38,20 +33,15 @@ FROM debian:bullseye-slim
 # Install runtime dependencies for LLVM/Clang 18 and other necessary libs
 RUN apt-get update && \
     apt-get install -y \
+    wget && \
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
     gnupg \
     ca-certificates \
-    apt-get update && \
-    apt-get install -y \
     pkg-config \
     libssl-dev \
     libunwind-dev \
     libunwind8 \
-    libsnappy1v5 \
-    libgflags2.2 \
-    zlib1g \
-    libbz2-1.0 \
-    liblz4-1 \
-    libzstd1 \
     clang-18 \
     libclang-18-dev \
     llvm-18-dev
