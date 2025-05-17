@@ -262,22 +262,10 @@ jobs:
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml up -d
           docker compose -f ../../dockerfiles/docker-compose.dev.postgres.yml logs -t -f --no-color &> docker-compose-logs.txt &
 
-      - name: Install RocksDB dependencies
+      - name: Install LLVM and CLang
         run: |
-          sudo apt-get install -y \
-            libclang-18-dev \
-            clang-18 \
-            llvm-18-dev \
-            libssl-dev \
-            pkg-config \
-            libsnappy-dev \
-            libgflags-dev \
-            zlib1g-dev \
-            libbz2-dev \
-            liblz4-dev \
-            libzstd-dev
-          ls -la /usr/lib/llvm*/lib/
-          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> $GITHUB_ENV
+         sudo apt-get update
+          sudo apt-get install -y llvm clang libclang-dev
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -286,12 +274,12 @@ jobs:
 
       - name: Run doc tests
         run: |
-          RUST_BACKTRACE=full cargo test --doc
+          cargo test --doc
 
       - name: Run tests
         run: |
           cargo install --force cargo-tarpaulin
-          RUST_BACKTRACE=full cargo tarpaulin --skip-clean --out lcov -- --test-threads=1
+          cargo tarpaulin --skip-clean --out lcov -- --test-threads=1
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
