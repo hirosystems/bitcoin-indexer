@@ -6,9 +6,6 @@ RUN apt-get update && \
     apt-get install -y \
     gnupg \
     ca-certificates \
-    wget && \
-    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
-    echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
     apt-get update && \
     apt-get install -y \
     pkg-config \
@@ -43,9 +40,6 @@ RUN apt-get update && \
     apt-get install -y \
     gnupg \
     ca-certificates \
-    wget && \
-    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
-    echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
     apt-get update && \
     apt-get install -y \
     pkg-config \
@@ -58,8 +52,9 @@ RUN apt-get update && \
     libbz2-1.0 \
     liblz4-1 \
     libzstd1 \
-    libclang-common-18-dev \
-    libclang1-18
+    clang-18 \
+    libclang-18-dev \
+    llvm-18-dev
 
 COPY --from=build /out/bitcoin-indexer /bin/bitcoin-indexer
 

@@ -13,8 +13,21 @@ RUN apt-get update && apt-get install -y \
     libunwind8 \
     curl \
     gnupg \
-    libsnappy-dev
+    libsnappy-dev \
+    llvm \
+    clang \
+    libclang-dev
+
 RUN rustup update 1.85 && rustup default 1.85
+
+# Create symlinks for libclang
+RUN ln -s /usr/lib/llvm-11/lib/libclang.so.1 /usr/lib/libclang.so && \
+    ln -s /usr/lib/llvm-11/lib/libclang-11.so.1 /usr/lib/libclang-11.so
+
+# Set environment variables
+ENV LIBCLANG_PATH=/usr/lib/llvm-11/lib:/usr/lib:/usr/lib/aarch64-linux-gnu
+ENV LD_LIBRARY_PATH=/usr/lib/llvm-11/lib:/usr/lib:/usr/lib/aarch64-linux-gnu
+ENV BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/llvm-11/include"
 
 # Install Docker CLI and Docker Compose
 # RUN apt-get update && apt-get install -y \
