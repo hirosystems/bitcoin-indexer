@@ -14,6 +14,12 @@ RUN apt-get update && \
     libunwind-dev \
     libunwind8 \
     curl \
+    libsnappy-dev \
+    libgflags-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    liblz4-dev \
+    libzstd-dev \
     clang-18 \
     libclang-18-dev \
     llvm-18-dev
@@ -42,6 +48,12 @@ RUN apt-get update && \
     libssl-dev \
     libunwind-dev \
     libunwind8 \
+    libsnappy-dev \
+    libgflags-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    liblz4-dev \
+    libzstd-dev \
     clang-18 \
     libclang-18-dev \
     llvm-18-dev
