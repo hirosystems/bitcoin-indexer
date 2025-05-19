@@ -1,0 +1,6 @@
+[package]
+name = "cargo-tasks"
+edition = "2024"
+version.workspace = true
+
+[dependencies]

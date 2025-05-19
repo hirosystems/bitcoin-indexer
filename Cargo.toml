@@ -7,6 +7,7 @@ members = [
     "components/ordinals",
     "components/ord",
     "components/runes",
+    "cargo-tasks"
 ]
 default-members = ["components/cli"]
 resolver = "2"
