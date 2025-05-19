@@ -71,14 +71,14 @@ This script will:
 For more granular test control, you can run specific test suites using cargo:
 
 ```bash
+# Start docker postgres
+docker compose -f dockerfiles/docker-compose.dev.postgres.yml up -d
+
 # Run all tests
-cargo test
+cargo test --workspace
 
 # Run tests for a specific component
 cargo test -p components/bitcoind
-
-# Run tests with output
-cargo test -- --nocapture
 ```
 
 ## Running an API
