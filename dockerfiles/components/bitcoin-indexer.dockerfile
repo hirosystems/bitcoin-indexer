@@ -39,6 +39,8 @@ FROM debian:bullseye-slim
 # Install runtime dependencies for LLVM/Clang 18 and other necessary libs
 RUN apt-get update && \
     apt-get install -y \
+    gnupg \
+    ca-certificates \
     wget && \
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
     echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
