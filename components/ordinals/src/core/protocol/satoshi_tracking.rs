@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use bitcoin::{Address, Network, ScriptBuf};
 use bitcoind::{
-    try_info,
+    try_debug, try_info,
     types::{
         BitcoinBlockData, BitcoinTransactionData, BlockIdentifier, OrdinalInscriptionTransferData,
         OrdinalInscriptionTransferDestination, OrdinalOperation,
@@ -51,6 +51,8 @@ pub async fn augment_block_with_transfers(
     block: &mut BitcoinBlockData,
     db_tx: &Transaction<'_>,
     ctx: &Context,
+    reveals_count: &mut usize,
+    transfers_count: &mut usize,
 ) -> Result<(), String> {
     let network = get_bitcoin_network(&block.metadata.network);
     let mut block_transferred_satpoints = HashMap::new();
@@ -63,9 +65,12 @@ pub async fn augment_block_with_transfers(
             &network,
             db_tx,
             ctx,
+            reveals_count,
+            transfers_count,
         )
         .await?;
     }
+
     Ok(())
 }
 
@@ -109,8 +114,8 @@ pub fn compute_satpoint_post_transfer(
                         Err(e) => {
                             try_info!(
                                 ctx,
-                                "unable to retrieve address from {script_pub_key_hex}: {}",
-                                e.to_string()
+                                "unable to retrieve address from {script_pub_key_hex}: {error}",
+                                error = e.to_string()
                             );
                             OrdinalInscriptionTransferDestination::Burnt(script.to_string())
                         }
@@ -118,8 +123,8 @@ pub fn compute_satpoint_post_transfer(
                     Err(e) => {
                         try_info!(
                             ctx,
-                            "unable to retrieve address from {script_pub_key_hex}: {}",
-                            e.to_string()
+                            "unable to retrieve address from {script_pub_key_hex}: {error}",
+                            error = e.to_string()
                         );
                         OrdinalInscriptionTransferDestination::Burnt(script_pub_key_hex.to_string())
                     }
@@ -159,6 +164,8 @@ pub async fn augment_transaction_with_ordinal_transfers(
     network: &Network,
     db_tx: &Transaction<'_>,
     ctx: &Context,
+    reveals_count: &mut usize,
+    transfers_count: &mut usize,
 ) -> Result<(), String> {
     // The transfers are inserted in storage after the inscriptions.
     // We have a unicity constraing, and can only have 1 ordinals per satpoint.
@@ -166,6 +173,7 @@ pub async fn augment_transaction_with_ordinal_transfers(
     for op in tx.metadata.ordinal_operations.iter() {
         if let OrdinalOperation::InscriptionRevealed(data) = op {
             updated_sats.insert(data.ordinal_number);
+            *reveals_count += 1
         }
     }
 
@@ -233,17 +241,17 @@ pub async fn augment_transaction_with_ordinal_transfers(
             let entry = block_transferred_satpoints.entry(output).or_default();
             entry.push(watched_satpoint.clone());
 
-            try_info!(
+            try_debug!(
                 ctx,
-                "Inscription transfer detected on Satoshi {} ({} -> {}) at block #{}",
-                transfer_data.ordinal_number,
-                satpoint_pre_transfer,
-                satpoint_post_transfer,
-                block_identifier.index
+                "Inscription transfer detected on Satoshi {ordinal_number} ({satpoint_pre_transfer} -> {satpoint_post_transfer}) \
+                at block #{block_index}",
+                ordinal_number = transfer_data.ordinal_number,
+                block_index = block_identifier.index
             );
             tx.metadata
                 .ordinal_operations
                 .push(OrdinalOperation::InscriptionTransferred(transfer_data));
+            *transfers_count += 1;
         }
     }
 
@@ -380,7 +388,7 @@ mod test {
                         .build()
                 )
                 .build();
-            augment_block_with_transfers(&mut block, &client, &ctx).await?;
+            augment_block_with_transfers(&mut block, &client, &ctx, &mut 0, &mut 0).await?;
 
             // 3. Make sure the correct transfers were produced
             assert_eq!(

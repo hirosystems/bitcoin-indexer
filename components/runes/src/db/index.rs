@@ -77,7 +77,15 @@ pub async fn index_block(
     let stopwatch = std::time::Instant::now();
     let block_hash = &block.block_identifier.hash;
     let block_height = block.block_identifier.index;
-    try_info!(ctx, "Indexing block {}...", block_height);
+    try_info!(ctx, "Starting runes indexing for block #{block_height}...");
+
+    // Track operation counts
+    let mut etchings_count = 0;
+    let mut mints_count = 0;
+    let mut edicts_count = 0;
+    let mut cenotaphs_etchings_count = 0;
+    let mut cenotaphs_mints_count = 0;
+    let mut cenotaphs_count = 0;
 
     // Update chain tip distance
     if let Some(chain_tip) = get_chain_tip(pg_client, ctx).await {
@@ -128,11 +136,15 @@ pub async fn index_block(
                         .await;
                     if let Some(etching) = runestone.etching {
                         prometheus.metrics_record_runes_etching();
-                        index_cache.apply_etching(&etching, &mut db_tx, ctx).await;
+                        index_cache
+                            .apply_etching(&etching, &mut db_tx, ctx, &mut etchings_count)
+                            .await;
                     }
                     if let Some(mint_rune_id) = runestone.mint {
                         prometheus.metrics_record_runes_mint();
-                        index_cache.apply_mint(&mint_rune_id, &mut db_tx, ctx).await;
+                        index_cache
+                            .apply_mint(&mint_rune_id, &mut db_tx, ctx, &mut mints_count)
+                            .await;
                     }
                     for edict in runestone.edicts.iter() {
                         if edict.amount == 0 {
@@ -140,22 +152,36 @@ pub async fn index_block(
                         } else {
                             prometheus.metrics_record_runes_transfer();
                         }
-                        index_cache.apply_edict(edict, &mut db_tx, ctx).await;
+                        index_cache
+                            .apply_edict(edict, &mut db_tx, ctx, &mut edicts_count)
+                            .await;
                     }
                 }
                 Artifact::Cenotaph(cenotaph) => {
                     operations_count += 1;
-                    index_cache.apply_cenotaph(&cenotaph, &mut db_tx, ctx).await;
+                    index_cache
+                        .apply_cenotaph(&cenotaph, &mut db_tx, ctx, &mut cenotaphs_count)
+                        .await;
                     if let Some(etching) = cenotaph.etching {
                         prometheus.metrics_record_runes_etching();
                         index_cache
-                            .apply_cenotaph_etching(&etching, &mut db_tx, ctx)
+                            .apply_cenotaph_etching(
+                                &etching,
+                                &mut db_tx,
+                                ctx,
+                                &mut cenotaphs_etchings_count,
+                            )
                             .await;
                     }
                     if let Some(mint_rune_id) = cenotaph.mint {
                         prometheus.metrics_record_runes_mint();
                         index_cache
-                            .apply_cenotaph_mint(&mint_rune_id, &mut db_tx, ctx)
+                            .apply_cenotaph_mint(
+                                &mint_rune_id,
+                                &mut db_tx,
+                                ctx,
+                                &mut cenotaphs_mints_count,
+                            )
                             .await;
                     }
                 }
@@ -184,19 +210,18 @@ pub async fn index_block(
     prometheus.metrics_block_indexed(block_height);
     let current_rune_number = pg_get_max_rune_number(pg_client, ctx).await;
     prometheus.metrics_rune_indexed(current_rune_number as u64);
-
+    let elapsed = stopwatch.elapsed();
     try_info!(
         ctx,
-        "Block {} indexed in {}s",
-        block_height,
-        stopwatch.elapsed().as_millis() as f32 / 1000.0
+        "Completed runes indexing for block #{block_height}: found {etchings_count} etchings, {mints_count} mints, {edicts_count} edicts, and {cenotaphs_count} cenotaphs, of which {cenotaphs_etchings_count} etchings and {cenotaphs_mints_count} mints in {elapsed:.0}s",
+        elapsed = elapsed.as_secs_f32()
     );
 }
 
 /// Roll back a Bitcoin block because of a re-org.
 pub async fn roll_back_block(pg_client: &mut Client, block_height: u64, ctx: &Context) {
     let stopwatch = std::time::Instant::now();
-    try_info!(ctx, "Rolling back block {}...", block_height);
+    try_info!(ctx, "Rolling back block {block_height}...");
     let mut db_tx = pg_client
         .transaction()
         .await
@@ -208,8 +233,7 @@ pub async fn roll_back_block(pg_client: &mut Client, block_height: u64, ctx: &Co
         .expect("Unable to commit pg transaction");
     try_info!(
         ctx,
-        "Block {} rolled back in {}s",
-        block_height,
-        stopwatch.elapsed().as_millis() as f32 / 1000.0
+        "Block {block_height} rolled back in {elapsed:.4}s",
+        elapsed = stopwatch.elapsed().as_secs_f32()
     );
 }

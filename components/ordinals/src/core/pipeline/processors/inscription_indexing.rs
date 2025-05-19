@@ -87,7 +87,13 @@ pub async fn index_block(
 ) -> Result<(), String> {
     let stopwatch = std::time::Instant::now();
     let block_height = block.block_identifier.index;
-    try_info!(ctx, "Indexing block #{block_height}");
+    try_info!(
+        ctx,
+        "Starting inscription indexing for block #{block_height}..."
+    );
+    // Count total reveals and transfers in the block
+    let mut reveals_count = 0;
+    let mut transfers_count = 0;
 
     // Invalidate and recompute cursor when crossing the jubilee height
     if block.block_identifier.index
@@ -159,6 +165,14 @@ pub async fn index_block(
         prometheus.metrics_record_inscription_computation_time(
             computation_start.elapsed().as_millis() as f64,
         );
+        augment_block_with_transfers(
+            block,
+            &ord_tx,
+            ctx,
+            &mut reveals_count,
+            &mut transfers_count,
+        )
+        .await?;
 
         if let Err(e) = augment_block_with_transfers(block, &ord_tx, ctx).await {
             return Err(format!("Failed to augment block with transfers: {}", e));
@@ -211,15 +225,16 @@ pub async fn index_block(
             return Err(format!("unable to commit ordinals pg transaction: {}", e));
         }
     }
-
     // Record overall processing time
     prometheus.metrics_record_block_processing_time(stopwatch.elapsed().as_millis() as f64);
+    let elapsed = stopwatch.elapsed();
 
     try_info!(
         ctx,
-        "Block #{block_height} indexed in {}s",
-        stopwatch.elapsed().as_millis() as f32 / 1000.0
+        "Completed inscription indexing for block #{block_height}: found {reveals_count} inscription reveals and {transfers_count} inscription transfers in {elapsed:.0}s",
+        elapsed = elapsed.as_secs_f32(),
     );
+
     Ok(())
 }
 
