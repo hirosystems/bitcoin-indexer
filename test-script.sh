@@ -8,7 +8,7 @@ echo "PostgreSQL containers started"
 
 # Build the image targeting the build stage
 echo "Building Bitcoin Indexer image..."
-docker build --no-cache -t test-bitcoin-indexer -f dockerfiles/components/bitcoin-indexer.dockerfile .
+docker build --no-cache --target build -t test-bitcoin-indexer -f dockerfiles/components/bitcoin-indexer.dockerfile .
 
 # Run the tests
 echo "Running tests..."
