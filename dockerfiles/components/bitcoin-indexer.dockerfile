@@ -7,8 +7,8 @@ RUN apt-get update && \
     wget && \
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
     echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
-    gnupg \
-    ca-certificates \
+    apt-get update && \
+    apt-get install -y \
     pkg-config \
     libssl-dev \
     libunwind-dev \
@@ -42,8 +42,8 @@ RUN apt-get update && \
     wget && \
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
     echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
-    gnupg \
-    ca-certificates \
+    apt-get update && \
+    apt-get install -y \
     pkg-config \
     libssl-dev \
     libunwind-dev \
