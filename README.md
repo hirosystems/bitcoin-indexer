@@ -35,6 +35,8 @@ $ cargo bitcoin-indexer-install
 
 Docker images are also available at https://hub.docker.com/r/hirosystems/bitcoin-indexer
 
+Note: You may need to install additional LLVM and Clang dependencies if they are not already available on your system.
+
 ## Running the Indexer
 
 The following command will start indexing Ordinals activity and will continue to stream new blocks
