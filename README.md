@@ -35,6 +35,8 @@ $ cargo bitcoin-indexer-install
 
 Docker images are also available at https://hub.docker.com/r/hirosystems/bitcoin-indexer
 
+Note: You may need to install additional LLVM and Clang dependencies if they are not already available on your system.
+
 ## Running the Indexer
 
 The following command will start indexing Ordinals activity and will continue to stream new blocks
@@ -49,6 +51,38 @@ $ bitcoin-indexer runes service start --config-path <path>
 ```
 
 A fully synced Bitcoin node is required for indexing to start.
+
+### Running Tests
+
+The test suite can be run in a Docker environment that includes all necessary dependencies (PostgreSQL, Rust toolchain, etc.). This ensures consistent test execution across all development environments.
+
+To run the tests:
+
+```bash
+./scripts/run-tests.sh
+```
+
+This script will:
+1. Start a PostgreSQL container
+2. Build the Bitcoin Indexer Docker image
+3. Run all tests in the Docker environment
+4. Clean up containers after completion
+
+For more granular test control, you can run specific test suites using cargo:
+
+```bash
+# Start docker postgres
+docker compose -f dockerfiles/docker-compose.dev.postgres.yml up -d
+
+# Run all tests
+cargo test --workspace
+
+# Run tests for a specific component
+cargo test -p components/bitcoind
+
+# Stop and remove docker postgres
+docker compose -f dockerfiles/docker-compose.dev.postgres.yml down -v -t 0
+```
 
 ## Running an API
 
