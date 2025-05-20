@@ -26,12 +26,13 @@ RUN apt-get update && \
 RUN rustup update 1.85 && rustup default 1.85
 
 RUN mkdir /out
-COPY . /src/
+COPY ./Cargo.toml /src/Cargo.toml
+COPY ./Cargo.lock /src/Cargo.lock
+COPY ./components /src/components
+COPY ./migrations /src/migrations
 
-RUN cargo build --features release --release && \
-    cargo build --package cargo-tasks --release
-
-RUN cp /src/target/release/bitcoin-indexer /out/
+RUN cargo build --features release --release
+RUN cp /src/target/release/bitcoin-indexer /out
 
 FROM debian:bullseye-slim
 
