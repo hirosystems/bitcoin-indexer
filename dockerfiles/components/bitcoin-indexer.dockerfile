@@ -31,8 +31,7 @@ COPY . /src/
 RUN cargo build --features release --release && \
     cargo build --package cargo-tasks --release
 
-RUN cp /src/target/release/bitcoin-indexer /out/ && \
-    cp /src/target/release/cargo-tasks /out/
+RUN cp /src/target/release/bitcoin-indexer /out/
 
 FROM debian:bullseye-slim
 
@@ -61,7 +60,6 @@ RUN apt-get update && \
     llvm-18-dev
 
 COPY --from=build /out/bitcoin-indexer /bin/bitcoin-indexer
-COPY --from=build /out/cargo-tasks /bin/cargo-tasks
 
 WORKDIR /workspace
 
