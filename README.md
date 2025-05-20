@@ -89,7 +89,6 @@ docker compose -f dockerfiles/docker-compose.dev.postgres.yml down -v -t 0
 Once the index starts advancing, you can deploy the Ordinals API or Runes API to read the same data
 via REST endpoints.
 
-
 # Configuration
 
 Indexer configurations are set via a TOML file. To generate a new config file, run this command:
