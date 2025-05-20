@@ -79,6 +79,9 @@ cargo test --workspace
 
 # Run tests for a specific component
 cargo test -p components/bitcoind
+
+# Stop and remove docker postgres
+docker compose -f dockerfiles/docker-compose.dev.postgres.yml down -v -t 0
 ```
 
 ## Running an API
