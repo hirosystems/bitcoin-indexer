@@ -19,7 +19,7 @@ use bitcoind::{
 use config::Config;
 use db::{
     blocks::{self, find_last_block_inserted, open_blocks_db_with_retry},
-    migrate_dbs,
+    migrate_dbs, ordinals_pg,
 };
 use deadpool_postgres::Pool;
 use postgres::{pg_pool, pg_pool_client};
@@ -216,6 +216,20 @@ pub async fn start_ordinals_indexer(
 ) -> Result<(), String> {
     migrate_dbs(config, ctx).await?;
     let prometheus = PrometheusMonitoring::new();
+    let pg_pools = pg_pools(config);
+
+    // Initialize metrics with current state
+    let max_inscription_number = {
+        let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
+        ordinals_pg::get_highest_inscription_number(&ord_client)
+            .await?
+            .unwrap_or(0) as u64
+    };
+    let chain_tip = get_chain_tip(config).await?;
+    prometheus
+        .initialize(max_inscription_number, chain_tip.index, &pg_pools)
+        .await?;
+
     let indexer = new_ordinals_indexer_runloop(&prometheus, config, ctx).await?;
 
     if let Some(metrics) = &config.metrics {

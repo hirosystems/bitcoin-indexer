@@ -80,12 +80,12 @@ pub async fn index_block(
     try_info!(ctx, "Starting runes indexing for block #{block_height}...");
 
     // Track operation counts
-    let mut etchings_count = 0;
-    let mut mints_count = 0;
-    let mut edicts_count = 0;
-    let mut cenotaphs_etchings_count = 0;
-    let mut cenotaphs_mints_count = 0;
-    let mut cenotaphs_count = 0;
+    let mut etching_count: u64 = 0;
+    let mut mint_count: u64 = 0;
+    let mut edict_count: u64 = 0;
+    let mut cenotaph_etching_count: u64 = 0;
+    let mut cenotaph_mint_count: u64 = 0;
+    let mut cenotaph_count: u64 = 0;
 
     // Update chain tip distance
     if let Some(chain_tip) = get_chain_tip(pg_client, ctx).await {
@@ -101,7 +101,6 @@ pub async fn index_block(
 
     // Measure parsing time
     let parsing_start = std::time::Instant::now();
-    let mut operations_count = 0;
 
     for tx in block.transactions.iter() {
         let (transaction, eligible_outputs, first_eligible_output, total_outputs) =
@@ -130,57 +129,46 @@ pub async fn index_block(
         if let Some(artifact) = Runestone::decipher(&transaction) {
             match artifact {
                 Artifact::Runestone(runestone) => {
-                    operations_count += 1;
                     index_cache
                         .apply_runestone(&runestone, &mut db_tx, ctx)
                         .await;
                     if let Some(etching) = runestone.etching {
-                        prometheus.metrics_record_runes_etching();
                         index_cache
-                            .apply_etching(&etching, &mut db_tx, ctx, &mut etchings_count)
+                            .apply_etching(&etching, &mut db_tx, ctx, &mut etching_count)
                             .await;
                     }
                     if let Some(mint_rune_id) = runestone.mint {
-                        prometheus.metrics_record_runes_mint();
                         index_cache
-                            .apply_mint(&mint_rune_id, &mut db_tx, ctx, &mut mints_count)
+                            .apply_mint(&mint_rune_id, &mut db_tx, ctx, &mut mint_count)
                             .await;
                     }
                     for edict in runestone.edicts.iter() {
-                        if edict.amount == 0 {
-                            prometheus.metrics_record_runes_burn();
-                        } else {
-                            prometheus.metrics_record_runes_transfer();
-                        }
                         index_cache
-                            .apply_edict(edict, &mut db_tx, ctx, &mut edicts_count)
+                            .apply_edict(edict, &mut db_tx, ctx, &mut edict_count)
                             .await;
                     }
                 }
                 Artifact::Cenotaph(cenotaph) => {
-                    operations_count += 1;
                     index_cache
-                        .apply_cenotaph(&cenotaph, &mut db_tx, ctx, &mut cenotaphs_count)
+                        .apply_cenotaph(&cenotaph, &mut db_tx, ctx, &mut cenotaph_count)
                         .await;
                     if let Some(etching) = cenotaph.etching {
-                        prometheus.metrics_record_runes_etching();
                         index_cache
                             .apply_cenotaph_etching(
                                 &etching,
                                 &mut db_tx,
                                 ctx,
-                                &mut cenotaphs_etchings_count,
+                                &mut cenotaph_etching_count,
                             )
                             .await;
                     }
                     if let Some(mint_rune_id) = cenotaph.mint {
-                        prometheus.metrics_record_runes_mint();
                         index_cache
                             .apply_cenotaph_mint(
                                 &mint_rune_id,
                                 &mut db_tx,
                                 ctx,
-                                &mut cenotaphs_mints_count,
+                                &mut cenotaph_mint_count,
                             )
                             .await;
                     }
@@ -205,15 +193,28 @@ pub async fn index_block(
         .expect("Unable to commit pg transaction");
     prometheus.metrics_record_rune_db_write_time(rune_db_write_start.elapsed().as_millis() as f64);
 
+    prometheus.metrics_record_runes_etching_per_block(etching_count);
+    prometheus.metrics_record_runes_edict_per_block(edict_count);
+    prometheus.metrics_record_runes_mint_per_block(mint_count);
+    prometheus.metrics_record_runes_cenotaph_per_block(cenotaph_count);
+    prometheus.metrics_record_runes_cenotaph_etching_per_block(cenotaph_etching_count);
+    prometheus.metrics_record_runes_cenotaph_mint_per_block(cenotaph_mint_count);
+
+    prometheus.metrics_record_runes_etching_total(etching_count);
+    prometheus.metrics_record_runes_edict_total(edict_count);
+    prometheus.metrics_record_runes_mint_total(mint_count);
+    prometheus.metrics_record_runes_cenotaph_total(cenotaph_count);
+    prometheus.metrics_record_runes_cenotaph_etching_total(cenotaph_etching_count);
+    prometheus.metrics_record_runes_cenotaph_mint_total(cenotaph_mint_count);
+
     // Record metrics
-    prometheus.metrics_record_runes_in_block(operations_count);
     prometheus.metrics_block_indexed(block_height);
     let current_rune_number = pg_get_max_rune_number(pg_client, ctx).await;
     prometheus.metrics_rune_indexed(current_rune_number as u64);
     let elapsed = stopwatch.elapsed();
     try_info!(
         ctx,
-        "Completed runes indexing for block #{block_height}: found {etchings_count} etchings, {mints_count} mints, {edicts_count} edicts, and {cenotaphs_count} cenotaphs, of which {cenotaphs_etchings_count} etchings and {cenotaphs_mints_count} mints in {elapsed:.0}s",
+        "Completed runes indexing for block #{block_height}: found {etching_count} etchings, {mint_count} mints, {edict_count} edicts, and {cenotaph_count} cenotaphs, of which {cenotaph_etching_count} etchings and {cenotaph_mint_count} mints in {elapsed:.0}s",
         elapsed = elapsed.as_secs_f32()
     );
 }

@@ -1,4 +1,5 @@
 use bitcoind::{try_debug, try_info, try_warn, utils::Context};
+use config::Config;
 use hyper::{
     header::CONTENT_TYPE,
     service::{make_service_fn, service_fn},
@@ -9,12 +10,18 @@ use prometheus::{
     Encoder, Histogram, HistogramOpts, Registry, TextEncoder,
 };
 
+use crate::db::pg_connect;
+
 type UInt64Gauge = GenericGauge<AtomicU64>;
 type F64Gauge = GenericGauge<AtomicF64>;
 type U64Counter = GenericCounter<AtomicU64>;
 
 #[derive(Debug, Clone)]
 pub struct PrometheusMonitoring {
+    // TODO: up
+    pub last_indexed_block_height: UInt64Gauge,
+    pub last_indexed_rune_number: UInt64Gauge,
+
     // Performance metrics
     pub block_processing_time: Histogram,
     pub rune_parsing_time: Histogram,
@@ -28,12 +35,19 @@ pub struct PrometheusMonitoring {
     pub chain_tip_distance: UInt64Gauge,
 
     // Runes specific metrics
-    pub runes_etching_operations: U64Counter,
-    pub runes_mint_operations: U64Counter,
-    pub runes_burn_operations: U64Counter,
-    pub runes_transfer_operations: U64Counter,
-    pub last_indexed_block_height: UInt64Gauge,
-    pub last_indexed_rune_number: UInt64Gauge,
+    pub runes_etching_operations_per_block: UInt64Gauge,
+    pub runes_edict_operations_per_block: UInt64Gauge,
+    pub runes_mint_operations_per_block: UInt64Gauge,
+    pub runes_cenotaph_operations_per_block: UInt64Gauge,
+    pub runes_cenotaph_etching_operations_per_block: UInt64Gauge,
+    pub runes_cenotaph_mint_operations_per_block: UInt64Gauge,
+
+    pub runes_etching_operations_total: UInt64Gauge,
+    pub runes_edict_operations_total: UInt64Gauge,
+    pub runes_mint_operations_total: UInt64Gauge,
+    pub runes_cenotaph_operations_total: UInt64Gauge,
+    pub runes_cenotaph_etching_operations_total: UInt64Gauge,
+    pub runes_cenotaph_mint_operations_total: UInt64Gauge,
 
     // Registry
     pub registry: Registry,
@@ -48,6 +62,17 @@ impl Default for PrometheusMonitoring {
 impl PrometheusMonitoring {
     pub fn new() -> PrometheusMonitoring {
         let registry = Registry::new();
+
+        let last_indexed_block_height = Self::create_and_register_uint64_gauge(
+            &registry,
+            "last_indexed_block_height",
+            "Height of the last indexed block",
+        );
+        let last_indexed_rune_number = Self::create_and_register_uint64_gauge(
+            &registry,
+            "last_indexed_rune_number",
+            "Number of the last indexed Rune",
+        );
 
         // Performance metrics
         let block_processing_time = Self::create_and_register_histogram(
@@ -95,51 +120,91 @@ impl PrometheusMonitoring {
             "Distance in blocks from the Bitcoin chain tip",
         );
 
-        // Runes specific metrics
-        let runes_etching_operations = Self::create_and_register_counter(
+        // Runes specific metrics per block
+        let runes_etching_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
-            "runes_etching_operations",
-            "Number of Runes etchings processed",
+            "runes_etching_operations_per_block",
+            "Number of Runes etchings processed per block",
         );
-        let runes_mint_operations = Self::create_and_register_counter(
+        let runes_edict_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
-            "runes_mint_operations",
-            "Number of Runes mints processed",
+            "runes_edict_operations_per_block",
+            "Number of Runes edicts processed per block",
         );
-        let runes_burn_operations = Self::create_and_register_counter(
+        let runes_mint_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
-            "runes_burn_operations",
-            "Number of Runes burns processed",
+            "runes_mint_operations_per_block",
+            "Number of Runes mints processed per block",
         );
-        let runes_transfer_operations = Self::create_and_register_counter(
+        let runes_cenotaph_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
-            "runes_transfer_operations",
-            "Number of Runes transfers processed",
+            "runes_cenotaph_operations_per_block",
+            "Number of cenotaph Runes processed per block",
         );
-        let last_indexed_block_height = Self::create_and_register_uint64_gauge(
+        let runes_cenotaph_etching_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
-            "last_indexed_block_height",
-            "Height of the last indexed block",
+            "runes_cenotaph_etching_operations_per_block",
+            "Number of cenotaph Runes etchings processed per block",
         );
-        let last_indexed_rune_number = Self::create_and_register_uint64_gauge(
+        let runes_cenotaph_mint_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
-            "last_indexed_rune_number",
-            "Number of the last indexed Rune",
+            "runes_cenotaph_mint_operations_per_block",
+            "Number of cenotaph Runes mints processed per block",
+        );
+
+        // Runes specific metrics in total
+        let runes_etching_operations_total = Self::create_and_register_uint64_gauge(
+            &registry,
+            "runes_etching_operations_total",
+            "Number of Runes etchings processed in total",
+        );
+        let runes_mint_operations_total = Self::create_and_register_uint64_gauge(
+            &registry,
+            "runes_mint_operations_total",
+            "Number of Runes mints processed in total",
+        );
+        let runes_edict_operations_total = Self::create_and_register_uint64_gauge(
+            &registry,
+            "runes_edict_operations_total",
+            "Number of Runes edicts processed in total",
+        );
+        let runes_cenotaph_operations_total = Self::create_and_register_uint64_gauge(
+            &registry,
+            "runes_cenotaph_operations_total",
+            "Number of cenotaph Runes processed in total",
+        );
+        let runes_cenotaph_etching_operations_total = Self::create_and_register_uint64_gauge(
+            &registry,
+            "runes_cenotaph_etching_operations_total",
+            "Number of cenotaph Runes etchings processed in total",
+        );
+        let runes_cenotaph_mint_operations_total = Self::create_and_register_uint64_gauge(
+            &registry,
+            "runes_cenotaph_mint_operations_total",
+            "Number of cenotaph Runes mints processed in total",
         );
 
         PrometheusMonitoring {
+            last_indexed_block_height,
+            last_indexed_rune_number,
             block_processing_time,
             rune_parsing_time,
             rune_computation_time,
             rune_db_write_time,
             runes_per_block,
             chain_tip_distance,
-            runes_etching_operations,
-            runes_mint_operations,
-            runes_burn_operations,
-            runes_transfer_operations,
-            last_indexed_block_height,
-            last_indexed_rune_number,
+            runes_etching_operations_per_block,
+            runes_edict_operations_per_block,
+            runes_mint_operations_per_block,
+            runes_cenotaph_operations_per_block,
+            runes_cenotaph_etching_operations_per_block,
+            runes_cenotaph_mint_operations_per_block,
+            runes_etching_operations_total,
+            runes_edict_operations_total,
+            runes_mint_operations_total,
+            runes_cenotaph_operations_total,
+            runes_cenotaph_etching_operations_total,
+            runes_cenotaph_mint_operations_total,
             registry,
         }
     }
@@ -177,10 +242,85 @@ impl PrometheusMonitoring {
         h
     }
 
-    pub fn initialize(&self, max_rune_number: u64, block_height: u64) {
+    pub async fn initialize(
+        &self,
+        max_rune_number: u64,
+        block_height: u64,
+        config: &Config,
+        ctx: &Context,
+    ) -> Result<(), String> {
         self.metrics_block_indexed(block_height);
         self.metrics_rune_indexed(max_rune_number);
-        // TODO: add inital values for metrics here
+
+        // Reset per-block metrics to 0
+        self.metrics_record_runes_etching_per_block(0);
+        self.metrics_record_runes_mint_per_block(0);
+        self.metrics_record_runes_edict_per_block(0);
+        self.metrics_record_runes_cenotaph_per_block(0);
+        self.metrics_record_runes_cenotaph_etching_per_block(0);
+        self.metrics_record_runes_cenotaph_mint_per_block(0);
+
+        // Read initial values from the database for Runes
+        let mut runes_client = pg_connect(config, false, ctx).await;
+        let runes_tx = runes_client
+            .transaction()
+            .await
+            .map_err(|e| format!("Failed to begin transaction: {}", e))?;
+
+        // Get counts from ledger table
+        // TODO: check this table existence
+        let row = runes_tx
+            .query_opt(
+                "SELECT 
+                    COALESCE(SUM(CASE WHEN operation = 'etching' THEN 1 ELSE 0 END), 0) AS etching,
+                    COALESCE(SUM(CASE WHEN operation = 'mint' THEN 1 ELSE 0 END), 0) AS mint,
+                    COALESCE(SUM(CASE WHEN operation = 'edict' THEN 1 ELSE 0 END), 0) AS edict,
+                    COALESCE(SUM(CASE WHEN operation = 'cenotaph' THEN 1 ELSE 0 END), 0) AS cenotaph,
+                    COALESCE(SUM(CASE WHEN operation = 'cenotaph_etching' THEN 1 ELSE 0 END), 0) AS cenotaph_etching,
+                    COALESCE(SUM(CASE WHEN operation = 'cenotaph_mint' THEN 1 ELSE 0 END), 0) AS cenotaph_mint
+                FROM ledger",
+                &[],
+            )
+            .await
+            .map_err(|e| format!("Failed to query ledger: {}", e))?;
+
+        if let Some(row) = row {
+            let etching: i64 = row.get("etching");
+            let mint: i64 = row.get("mint");
+            let edict: i64 = row.get("edict");
+            let cenotaph: i64 = row.get("cenotaph");
+            let cenotaph_etching: i64 = row.get("cenotaph_etching");
+            let cenotaph_mint: i64 = row.get("cenotaph_mint");
+
+            // Set the total counts
+            self.metrics_record_runes_etching_total(etching as u64);
+            self.metrics_record_runes_mint_total(mint as u64);
+            self.metrics_record_runes_edict_total(edict as u64);
+            self.metrics_record_runes_cenotaph_total(cenotaph as u64);
+            self.metrics_record_runes_cenotaph_etching_total(cenotaph_etching as u64);
+            self.metrics_record_runes_cenotaph_mint_total(cenotaph_mint as u64);
+        }
+
+        runes_tx
+            .commit()
+            .await
+            .map_err(|e| format!("Failed to commit transaction: {}", e))?;
+
+        Ok(())
+    }
+
+    pub fn metrics_block_indexed(&self, block_height: u64) {
+        let highest_appended = self.last_indexed_block_height.get();
+        if block_height > highest_appended {
+            self.last_indexed_block_height.set(block_height);
+        }
+    }
+
+    pub fn metrics_rune_indexed(&self, rune_number: u64) {
+        let highest_appended = self.last_indexed_rune_number.get();
+        if rune_number > highest_appended {
+            self.last_indexed_rune_number.set(rune_number);
+        }
     }
 
     // Performance metrics methods
@@ -210,35 +350,58 @@ impl PrometheusMonitoring {
         self.chain_tip_distance.set(distance);
     }
 
-    // Runes specific metrics methods
-    pub fn metrics_record_runes_etching(&self) {
-        self.runes_etching_operations.inc();
+    // Runes specific metrics methods per block
+    pub fn metrics_record_runes_etching_per_block(&self, etching_count: u64) {
+        self.runes_etching_operations_per_block.set(etching_count);
     }
 
-    pub fn metrics_record_runes_mint(&self) {
-        self.runes_mint_operations.inc();
+    pub fn metrics_record_runes_edict_per_block(&self, edict_count: u64) {
+        self.runes_edict_operations_per_block.set(edict_count);
     }
 
-    pub fn metrics_record_runes_burn(&self) {
-        self.runes_burn_operations.inc();
+    pub fn metrics_record_runes_mint_per_block(&self, mint_count: u64) {
+        self.runes_mint_operations_per_block.set(mint_count);
     }
 
-    pub fn metrics_record_runes_transfer(&self) {
-        self.runes_transfer_operations.inc();
+    pub fn metrics_record_runes_cenotaph_per_block(&self, cenotaph_count: u64) {
+        self.runes_cenotaph_operations_per_block.set(cenotaph_count);
     }
 
-    pub fn metrics_block_indexed(&self, block_height: u64) {
-        let highest_appended = self.last_indexed_block_height.get();
-        if block_height > highest_appended {
-            self.last_indexed_block_height.set(block_height);
-        }
+    pub fn metrics_record_runes_cenotaph_etching_per_block(&self, cenotaph_etching_count: u64) {
+        self.runes_cenotaph_etching_operations_per_block
+            .set(cenotaph_etching_count);
     }
 
-    pub fn metrics_rune_indexed(&self, rune_number: u64) {
-        let highest_appended = self.last_indexed_rune_number.get();
-        if rune_number > highest_appended {
-            self.last_indexed_rune_number.set(rune_number);
-        }
+    pub fn metrics_record_runes_cenotaph_mint_per_block(&self, cenotaph_mint_count: u64) {
+        self.runes_cenotaph_mint_operations_per_block
+            .set(cenotaph_mint_count);
+    }
+
+    // Runes specific metrics methods in total
+    pub fn metrics_record_runes_etching_total(&self, etching_count: u64) {
+        self.runes_etching_operations_total.add(etching_count);
+    }
+
+    pub fn metrics_record_runes_edict_total(&self, edict_count: u64) {
+        self.runes_edict_operations_total.add(edict_count);
+    }
+
+    pub fn metrics_record_runes_mint_total(&self, mint_count: u64) {
+        self.runes_mint_operations_total.add(mint_count);
+    }
+
+    pub fn metrics_record_runes_cenotaph_total(&self, cenotaph_count: u64) {
+        self.runes_cenotaph_operations_total.add(cenotaph_count);
+    }
+
+    pub fn metrics_record_runes_cenotaph_etching_total(&self, cenotaph_etching_count: u64) {
+        self.runes_cenotaph_etching_operations_total
+            .add(cenotaph_etching_count);
+    }
+
+    pub fn metrics_record_runes_cenotaph_mint_total(&self, cenotaph_mint_count: u64) {
+        self.runes_cenotaph_mint_operations_total
+            .add(cenotaph_mint_count);
     }
 }
 
@@ -321,7 +484,7 @@ mod tests {
         let start_time = Instant::now();
 
         // Simulate some processing time
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(10_000));
 
         monitoring.metrics_record_block_processing_time(start_time.elapsed().as_millis() as f64);
 
@@ -343,8 +506,8 @@ mod tests {
         // Verify the observation value is within reasonable bounds
         let actual_time = proto_histogram.get_sample_sum();
         assert!(
-            actual_time >= 95.0 && actual_time <= 105.0,
-            "Observation should be within reasonable bounds (95-105ms)"
+            actual_time >= 9_500.0 && actual_time <= 10_500.0,
+            "Observation should be within reasonable bounds (9.5-10.5 seconds)"
         );
     }
 
@@ -507,58 +670,134 @@ mod tests {
     fn test_runes_operations() {
         let monitoring = PrometheusMonitoring::new();
 
-        // Record different types of Runes operations
-        monitoring.metrics_record_runes_etching();
-        monitoring.metrics_record_runes_etching();
-        monitoring.metrics_record_runes_mint();
-        monitoring.metrics_record_runes_mint();
-        monitoring.metrics_record_runes_mint();
-        monitoring.metrics_record_runes_burn();
-        monitoring.metrics_record_runes_transfer();
+        // Record different types of Runes operations per block
+        monitoring.metrics_record_runes_etching_per_block(2);
+        monitoring.metrics_record_runes_mint_per_block(3);
+        monitoring.metrics_record_runes_edict_per_block(1);
+        monitoring.metrics_record_runes_cenotaph_etching_per_block(1);
+        monitoring.metrics_record_runes_cenotaph_mint_per_block(1);
 
-        // Get the counter values
-        let mut mfs = monitoring.runes_etching_operations.collect();
+        // Record total operations
+        monitoring.metrics_record_runes_etching_total(2);
+        monitoring.metrics_record_runes_mint_total(3);
+        monitoring.metrics_record_runes_edict_total(1);
+        monitoring.metrics_record_runes_cenotaph_etching_total(1);
+        monitoring.metrics_record_runes_cenotaph_mint_total(1);
+
+        // Get the per-block gauge values
+        let mut mfs = monitoring.runes_etching_operations_per_block.collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
+        let gauge = m.get_gauge();
         assert_eq!(
-            counter.get_value(),
+            gauge.get_value(),
             2.0,
-            "Should have recorded 2 etching operations"
+            "Should have recorded 2 etching operations in current block"
         );
 
-        mfs = monitoring.runes_mint_operations.collect();
+        mfs = monitoring.runes_mint_operations_per_block.collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
+        let gauge = m.get_gauge();
         assert_eq!(
-            counter.get_value(),
+            gauge.get_value(),
             3.0,
-            "Should have recorded 3 mint operations"
+            "Should have recorded 3 mint operations in current block"
         );
 
-        mfs = monitoring.runes_burn_operations.collect();
+        mfs = monitoring.runes_edict_operations_per_block.collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
+        let gauge = m.get_gauge();
         assert_eq!(
-            counter.get_value(),
+            gauge.get_value(),
             1.0,
-            "Should have recorded 1 burn operation"
+            "Should have recorded 1 edict operation in current block"
         );
 
-        mfs = monitoring.runes_transfer_operations.collect();
+        mfs = monitoring
+            .runes_cenotaph_etching_operations_per_block
+            .collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
+        let gauge = m.get_gauge();
         assert_eq!(
-            counter.get_value(),
+            gauge.get_value(),
             1.0,
-            "Should have recorded 1 transfer operation"
+            "Should have recorded 1 cenotaph etching operation in current block"
+        );
+
+        mfs = monitoring
+            .runes_cenotaph_mint_operations_per_block
+            .collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            1.0,
+            "Should have recorded 1 cenotaph mint operation in current block"
+        );
+
+        // Get the total gauge values
+        mfs = monitoring.runes_etching_operations_total.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            2.0,
+            "Should have recorded 2 total etching operations"
+        );
+
+        mfs = monitoring.runes_mint_operations_total.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            3.0,
+            "Should have recorded 3 total mint operations"
+        );
+
+        mfs = monitoring.runes_edict_operations_total.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            1.0,
+            "Should have recorded 1 total edict operation"
+        );
+
+        mfs = monitoring.runes_cenotaph_etching_operations_total.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            1.0,
+            "Should have recorded 1 total cenotaph etching operation"
+        );
+
+        mfs = monitoring.runes_cenotaph_mint_operations_total.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            1.0,
+            "Should have recorded 1 total cenotaph mint operation"
         );
     }
 

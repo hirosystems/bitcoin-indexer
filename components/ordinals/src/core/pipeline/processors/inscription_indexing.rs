@@ -165,16 +165,16 @@ pub async fn index_block(
         prometheus.metrics_record_inscription_computation_time(
             computation_start.elapsed().as_millis() as f64,
         );
-        augment_block_with_transfers(
+
+        if let Err(e) = augment_block_with_transfers(
             block,
             &ord_tx,
             ctx,
             &mut reveals_count,
             &mut transfers_count,
         )
-        .await?;
-
-        if let Err(e) = augment_block_with_transfers(block, &ord_tx, ctx).await {
+        .await
+        {
             return Err(format!("Failed to augment block with transfers: {}", e));
         }
 

@@ -29,7 +29,6 @@ async fn index_unverified_brc20_transfers(
     brc20_cache: &mut Brc20MemoryCache,
     brc20_db_tx: &Transaction<'_>,
     ctx: &Context,
-    monitoring: &PrometheusMonitoring,
 ) -> Result<Vec<(usize, Brc20Operation)>, String> {
     if transfers.is_empty() {
         return Ok(vec![]);
@@ -65,7 +64,6 @@ async fn index_unverified_brc20_transfers(
                 brc20_db_tx,
             )
             .await?;
-        monitoring.metrics_record_brc20_transfer_send();
         try_debug!(
             ctx,
             "BRC-20 transfer_send {} {} ({} -> {}) at block {}",
@@ -101,10 +99,10 @@ pub async fn index_block_and_insert_brc20_operations(
     let mut verified_brc20_transfers = vec![];
 
     // Track counts of each operation type
-    let mut deploy_count = 0;
-    let mut mint_count = 0;
-    let mut transfer_count = 0;
-    let mut transfer_send_count = 0;
+    let mut deploy_count: u64 = 0;
+    let mut mint_count: u64 = 0;
+    let mut transfer_count: u64 = 0;
+    let mut transfer_send_count: u64 = 0;
 
     // Check every transaction in the block. Look for BRC-20 operations.
     for (tx_index, tx) in block.transactions.iter_mut().enumerate() {
@@ -127,7 +125,7 @@ pub async fn index_block_and_insert_brc20_operations(
                         ctx,
                     )
                     .await?;
-                    transfer_send_count += brc20_transfers.len();
+                    transfer_send_count += brc20_transfers.len() as u64;
                     verified_brc20_transfers.append(&mut brc20_transfers);
                     unverified_ordinal_transfers.clear();
                     // Then continue with the new operation.
@@ -166,7 +164,6 @@ pub async fn index_block_and_insert_brc20_operations(
                                 &tx.transaction_identifier,
                                 tx_index as u64,
                             )?;
-                            monitoring.metrics_record_brc20_deploy();
                             try_debug!(
                                 ctx,
                                 "BRC-20 deploy {tick} ({address}) at block {block_height}",
@@ -199,7 +196,6 @@ pub async fn index_block_and_insert_brc20_operations(
                                     brc20_db_tx,
                                 )
                                 .await?;
-                            monitoring.metrics_record_brc20_mint();
                             try_debug!(
                                 ctx,
                                 "BRC-20 mint {tick} {amount} ({address}) at block {block_height}",
@@ -233,7 +229,6 @@ pub async fn index_block_and_insert_brc20_operations(
                                     brc20_db_tx,
                                 )
                                 .await?;
-                            monitoring.metrics_record_brc20_transfer();
                             try_debug!(
                                 ctx,
                                 "BRC-20 transfer {tick} {amount} ({address}) at block {block_height}",
@@ -265,7 +260,7 @@ pub async fn index_block_and_insert_brc20_operations(
         ctx,
     )
     .await?;
-    transfer_send_count += final_transfers.len();
+    transfer_send_count += final_transfers.len() as u64;
     verified_brc20_transfers.append(&mut final_transfers);
     for (tx_index, verified_transfer) in verified_brc20_transfers.into_iter() {
         block
@@ -280,6 +275,16 @@ pub async fn index_block_and_insert_brc20_operations(
 
     // Log completion of BRC-20 indexing with metrics
     let elapsed = stopwatch.elapsed();
+
+    monitoring.metrics_record_brc20_deploy_per_block(deploy_count);
+    monitoring.metrics_record_brc20_mint_per_block(mint_count);
+    monitoring.metrics_record_brc20_transfer_per_block(transfer_count);
+    monitoring.metrics_record_brc20_transfer_send_per_block(transfer_send_count);
+
+    monitoring.metrics_record_brc20_deploy_total(deploy_count);
+    monitoring.metrics_record_brc20_mint_total(mint_count);
+    monitoring.metrics_record_brc20_transfer_total(transfer_count);
+    monitoring.metrics_record_brc20_transfer_send_total(transfer_send_count);
 
     try_info!(
         ctx,

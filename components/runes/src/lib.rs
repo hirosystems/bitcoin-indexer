@@ -129,6 +129,20 @@ pub async fn start_runes_indexer(
             });
         }
     }
+
+    // Initialize metrics with current state
+    let mut pg_client = pg_connect(config, false, ctx).await;
+    let max_rune_number = db::pg_get_max_rune_number(&pg_client, ctx).await;
+    let chain_tip = db::get_chain_tip(&mut pg_client, ctx)
+        .await
+        .unwrap_or(BlockIdentifier {
+            index: get_rune_genesis_block_height(config.bitcoind.network) - 1,
+            hash: "0x0000000000000000000000000000000000000000000000000000000000000000".into(),
+        });
+    prometheus
+        .initialize(max_rune_number as u64, chain_tip.index, config, ctx)
+        .await?;
+
     start_bitcoin_indexer(
         &indexer,
         get_rune_genesis_block_height(config.bitcoind.network),

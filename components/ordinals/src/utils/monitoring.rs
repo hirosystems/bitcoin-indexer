@@ -4,13 +4,15 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server,
 };
+use postgres::{pg_begin, pg_pool_client};
 use prometheus::{
-    core::{AtomicF64, AtomicU64, GenericCounter, GenericGauge},
+    core::{AtomicU64, GenericCounter, GenericGauge},
     Encoder, Histogram, HistogramOpts, Registry, TextEncoder,
 };
 
+use crate::PgConnectionPools;
+
 type UInt64Gauge = GenericGauge<AtomicU64>;
-type F64Gauge = GenericGauge<AtomicF64>;
 type U64Counter = GenericCounter<AtomicU64>;
 
 #[derive(Debug, Clone)]
@@ -18,25 +20,35 @@ pub struct PrometheusMonitoring {
     // Existing metrics
     pub last_indexed_block_height: UInt64Gauge,
     pub last_indexed_inscription_number: UInt64Gauge,
+    pub last_indexed_cursed_inscription_number: UInt64Gauge,
 
     // Performance metrics
+    // TODO: prometheus update if necessary
     pub block_processing_time: Histogram,
     pub inscription_parsing_time: Histogram,
     pub inscription_computation_time: Histogram,
     pub inscription_db_write_time: Histogram,
 
     // Volumetric metrics
+    // TODO: prometheus update if necessary
     pub inscriptions_per_block: Histogram,
     pub brc20_operations_per_block: Histogram,
 
     // Health metrics
+    // TODO: prometheus update if necessary
     pub chain_tip_distance: UInt64Gauge,
 
-    // BRC-20 specific metrics
-    pub brc20_deploy_operations: U64Counter,
-    pub brc20_mint_operations: U64Counter,
-    pub brc20_transfer_operations: U64Counter,
-    pub brc20_transfer_send_operations: U64Counter,
+    // BRC-20 specific metrics per block
+    pub brc20_deploy_operations_per_block: UInt64Gauge,
+    pub brc20_mint_operations_per_block: UInt64Gauge,
+    pub brc20_transfer_operations_per_block: UInt64Gauge,
+    pub brc20_transfer_send_operations_per_block: UInt64Gauge,
+
+    // BRC-20 specific metrics total
+    pub brc20_deploy_operations_total: UInt64Gauge,
+    pub brc20_mint_operations_total: UInt64Gauge,
+    pub brc20_transfer_operations_total: UInt64Gauge,
+    pub brc20_transfer_send_operations_total: UInt64Gauge,
 
     // Registry
     pub registry: Registry,
@@ -52,7 +64,7 @@ impl PrometheusMonitoring {
     pub fn new() -> PrometheusMonitoring {
         let registry = Registry::new();
 
-        // Existing metrics
+        // Inscriptions metrics
         let last_indexed_block_height = Self::create_and_register_uint64_gauge(
             &registry,
             "last_indexed_block_height",
@@ -62,6 +74,11 @@ impl PrometheusMonitoring {
             &registry,
             "last_indexed_inscription_number",
             "The latest indexed inscription number.",
+        );
+        let last_indexed_cursed_inscription_number = Self::create_and_register_uint64_gauge(
+            &registry,
+            "last_indexed_cursed_inscription_number",
+            "The latest indexed cursed inscription number.",
         );
 
         // Performance metrics
@@ -117,31 +134,54 @@ impl PrometheusMonitoring {
             "Distance in blocks from the Bitcoin chain tip",
         );
 
-        // BRC-20 specific metrics
-        let brc20_deploy_operations = Self::create_and_register_counter(
+        // BRC-20 specific metrics per block
+        let brc20_deploy_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
-            "brc20_deploy_operations",
-            "Count of BRC-20 deploy operations processed",
+            "brc20_deploy_operations_per_block",
+            "Count of BRC-20 deploy operations processed per block",
         );
-        let brc20_mint_operations = Self::create_and_register_counter(
+        let brc20_mint_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
-            "brc20_mint_operations",
-            "Count of BRC-20 mint operations processed",
+            "brc20_mint_operations_per_block",
+            "Count of BRC-20 mint operations processed per block",
         );
-        let brc20_transfer_operations = Self::create_and_register_counter(
+        let brc20_transfer_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
-            "brc20_transfer_operations",
-            "Count of BRC-20 transfer operations processed",
+            "brc20_transfer_operations_per_block",
+            "Count of BRC-20 transfer operations processed per block",
         );
-        let brc20_transfer_send_operations = Self::create_and_register_counter(
+        let brc20_transfer_send_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
-            "brc20_transfer_send_operations",
-            "Count of BRC-20 transfer send operations processed",
+            "brc20_transfer_send_operations_per_block",
+            "Count of BRC-20 transfer send operations processed per block",
+        );
+
+        // BRC-20 specific metrics in total
+        let brc20_deploy_operations_total = Self::create_and_register_uint64_gauge(
+            &registry,
+            "brc20_deploy_operations_total",
+            "Count of BRC-20 deploy operations processed in total",
+        );
+        let brc20_mint_operations_total = Self::create_and_register_uint64_gauge(
+            &registry,
+            "brc20_mint_operations_total",
+            "Count of BRC-20 mint operations processed in total",
+        );
+        let brc20_transfer_operations_total = Self::create_and_register_uint64_gauge(
+            &registry,
+            "brc20_transfer_operations_total",
+            "Count of BRC-20 transfer operations processed in total",
+        );
+        let brc20_transfer_send_operations_total = Self::create_and_register_uint64_gauge(
+            &registry,
+            "brc20_transfer_send_operations_total",
+            "Count of BRC-20 transfer send operations processed in total",
         );
 
         PrometheusMonitoring {
             last_indexed_block_height,
             last_indexed_inscription_number,
+            last_indexed_cursed_inscription_number,
             block_processing_time,
             inscription_parsing_time,
             inscription_computation_time,
@@ -149,10 +189,14 @@ impl PrometheusMonitoring {
             inscriptions_per_block,
             brc20_operations_per_block,
             chain_tip_distance,
-            brc20_deploy_operations,
-            brc20_mint_operations,
-            brc20_transfer_operations,
-            brc20_transfer_send_operations,
+            brc20_deploy_operations_per_block,
+            brc20_mint_operations_per_block,
+            brc20_transfer_operations_per_block,
+            brc20_transfer_send_operations_per_block,
+            brc20_deploy_operations_total,
+            brc20_mint_operations_total,
+            brc20_transfer_operations_total,
+            brc20_transfer_send_operations_total,
             registry,
         }
     }
@@ -163,12 +207,6 @@ impl PrometheusMonitoring {
         help: &str,
     ) -> UInt64Gauge {
         let g = UInt64Gauge::new(name, help).unwrap();
-        registry.register(Box::new(g.clone())).unwrap();
-        g
-    }
-
-    pub fn create_and_register_f64_gauge(registry: &Registry, name: &str, help: &str) -> F64Gauge {
-        let g = F64Gauge::new(name, help).unwrap();
         registry.register(Box::new(g.clone())).unwrap();
         g
     }
@@ -190,16 +228,101 @@ impl PrometheusMonitoring {
         h
     }
 
-    pub fn initialize(&self, max_inscription_number: u64, block_height: u64) {
+    pub async fn initialize(
+        &self,
+        max_inscription_number: u64,
+        block_height: u64,
+        pg_pools: &PgConnectionPools,
+    ) -> Result<(), String> {
         self.metrics_block_indexed(block_height);
         self.metrics_inscription_indexed(max_inscription_number);
-        // TODO: add inital values for metrics here
+        self.metrics_record_brc20_deploy_per_block(0);
+        self.metrics_record_brc20_mint_per_block(0);
+        self.metrics_record_brc20_transfer_per_block(0);
+        self.metrics_record_brc20_transfer_send_per_block(0);
+
+        // Read initial values from the database for inscriptions
+        let mut ord_client = pg_pool_client(&pg_pools.ordinals).await?;
+        let ord_tx = pg_begin(&mut ord_client).await?;
+        let row = ord_tx
+            .query_opt(
+                "SELECT 
+                    COALESCE(MAX(CASE WHEN type = 'blessed' THEN count END), 0) AS blessed,
+                    COALESCE(MAX(CASE WHEN type = 'cursed' THEN count END), 0) AS cursed
+                FROM counts_by_type",
+                &[],
+            )
+            .await
+            .map_err(|e| format!("Failed to query counts_by_type: {}", e))?;
+
+        if let Some(row) = row {
+            let blessed: i32 = row.get("blessed");
+            let cursed: i32 = row.get("cursed");
+
+            // Set the total counts
+            self.metrics_inscription_indexed(blessed as u64);
+            self.metrics_cursed_inscription_indexed(cursed as u64);
+        }
+        ord_tx
+            .commit()
+            .await
+            .map_err(|e| format!("Failed to commit transaction: {}", e))?;
+
+        // Read initial values from the database for BRC-20
+        if let Some(brc20_pool) = &pg_pools.brc20 {
+            let mut brc20_client = pg_pool_client(brc20_pool).await?;
+            let brc20_tx = pg_begin(&mut brc20_client).await?;
+
+            // Get counts from counts_by_operation table
+            let row = brc20_tx
+                .query_opt(
+                    "SELECT 
+                        COALESCE(MAX(CASE WHEN operation = 'deploy' THEN count END), 0) AS deploy,
+                        COALESCE(MAX(CASE WHEN operation = 'mint' THEN count END), 0) AS mint,
+                        COALESCE(MAX(CASE WHEN operation = 'transfer' THEN count END), 0) AS transfer,
+                        COALESCE(MAX(CASE WHEN operation = 'transfer_send' THEN count END), 0) AS transfer_send
+                    FROM counts_by_operation",
+                    &[],
+                )
+                .await
+                .map_err(|e| format!("Failed to query counts_by_operation: {}", e))?;
+
+            if let Some(row) = row {
+                let deploys: i32 = row.get("deploy");
+                let mints: i32 = row.get("mint");
+                let transfers: i32 = row.get("transfer");
+                let transfer_sends: i32 = row.get("transfer_send");
+
+                // Set the total counts
+                self.metrics_record_brc20_deploy_total(deploys as u64);
+                self.metrics_record_brc20_mint_total(mints as u64);
+                self.metrics_record_brc20_transfer_total(transfers as u64);
+                self.metrics_record_brc20_transfer_send_total(transfer_sends as u64);
+            }
+
+            brc20_tx
+                .commit()
+                .await
+                .map_err(|e| format!("Failed to commit transaction: {}", e))?;
+        }
+
+        // TODO: add initialization for histograms
+
+        Ok(())
     }
 
     pub fn metrics_inscription_indexed(&self, inscription_number: u64) {
         let highest_appended = self.last_indexed_inscription_number.get();
         if inscription_number > highest_appended {
             self.last_indexed_inscription_number.set(inscription_number);
+        }
+    }
+
+    pub fn metrics_cursed_inscription_indexed(&self, cursed_inscription_number: u64) {
+        let highest_appended = self.last_indexed_cursed_inscription_number.get();
+        if cursed_inscription_number > highest_appended {
+            self.last_indexed_cursed_inscription_number
+                .set(cursed_inscription_number);
         }
     }
 
@@ -232,7 +355,7 @@ impl PrometheusMonitoring {
         self.inscription_db_write_time.observe(elapsed_ms);
     }
 
-    // Volumetric metrics methods
+    // Volumetric metrics methods - TODO: add initialize value
     pub fn metrics_record_inscriptions_in_block(&self, count: u64) {
         self.inscriptions_per_block.observe(count as f64);
     }
@@ -241,21 +364,40 @@ impl PrometheusMonitoring {
         self.brc20_operations_per_block.observe(count as f64);
     }
 
-    // BRC-20 specific metrics methods
-    pub fn metrics_record_brc20_deploy(&self) {
-        self.brc20_deploy_operations.inc();
+    // BRC-20 specific metrics methods per block
+    pub fn metrics_record_brc20_deploy_per_block(&self, deploy_count: u64) {
+        self.brc20_deploy_operations_per_block.set(deploy_count);
     }
 
-    pub fn metrics_record_brc20_mint(&self) {
-        self.brc20_mint_operations.inc();
+    pub fn metrics_record_brc20_mint_per_block(&self, mint_count: u64) {
+        self.brc20_mint_operations_per_block.set(mint_count);
     }
 
-    pub fn metrics_record_brc20_transfer(&self) {
-        self.brc20_transfer_operations.inc();
+    pub fn metrics_record_brc20_transfer_per_block(&self, transfer_count: u64) {
+        self.brc20_transfer_operations_per_block.set(transfer_count);
     }
 
-    pub fn metrics_record_brc20_transfer_send(&self) {
-        self.brc20_transfer_send_operations.inc();
+    pub fn metrics_record_brc20_transfer_send_per_block(&self, transfer_send_count: u64) {
+        self.brc20_transfer_send_operations_per_block
+            .set(transfer_send_count);
+    }
+
+    // BRC-20 specific metrics methods in total
+    pub fn metrics_record_brc20_deploy_total(&self, deploy_count: u64) {
+        self.brc20_deploy_operations_total.add(deploy_count);
+    }
+
+    pub fn metrics_record_brc20_mint_total(&self, mint_count: u64) {
+        self.brc20_mint_operations_total.add(mint_count);
+    }
+
+    pub fn metrics_record_brc20_transfer_total(&self, transfer_count: u64) {
+        self.brc20_transfer_operations_total.add(transfer_count);
+    }
+
+    pub fn metrics_record_brc20_transfer_send_total(&self, transfer_send_count: u64) {
+        self.brc20_transfer_send_operations_total
+            .add(transfer_send_count);
     }
 }
 
@@ -339,9 +481,10 @@ mod tests {
         let start_time = Instant::now();
 
         // Simulate some processing time with a more reliable method
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(10_000));
 
-        monitoring.metrics_record_block_processing_time(start_time.elapsed().as_millis() as f64);
+        let elapsed = start_time.elapsed();
+        monitoring.metrics_record_block_processing_time(elapsed.as_millis() as f64);
 
         // Get the histogram values directly
         let mut mfs = monitoring.block_processing_time.collect();
@@ -361,8 +504,8 @@ mod tests {
         // Verify the observation value is within reasonable bounds
         let actual_time = proto_histogram.get_sample_sum();
         assert!(
-            actual_time >= 95.0 && actual_time <= 105.0,
-            "Observation should be within reasonable bounds (95-105ms)"
+            actual_time >= 9_500.0 && actual_time <= 10_500.0,
+            "Observation should be within reasonable bounds (9.5-10.5 seconds)"
         );
     }
 
@@ -639,23 +782,42 @@ mod tests {
     fn test_inscription_indexed() {
         let monitoring = PrometheusMonitoring::new();
 
-        // Record rune indexing
+        // Record regular inscription indexing
         monitoring.metrics_inscription_indexed(50);
         monitoring.metrics_inscription_indexed(100);
+        monitoring.metrics_inscription_indexed(75);
 
-        // Get the counter value
+        // Record cursed inscription indexing
+        monitoring.metrics_cursed_inscription_indexed(10);
+        monitoring.metrics_cursed_inscription_indexed(20);
+        monitoring.metrics_cursed_inscription_indexed(15);
+
+        // Get the regular inscription number gauge
         let mut mfs = monitoring.last_indexed_inscription_number.collect();
         assert_eq!(mfs.len(), 1);
-
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
         let gauge = m.get_gauge();
 
-        // Verify the total count (50 + 100 = 150)
+        // Verify the highest regular inscription number
         assert_eq!(
             gauge.get_value(),
             100.0,
-            "Highest inscription number indexed should be 100"
+            "Highest regular inscription number indexed should be 100"
+        );
+
+        // Get the cursed inscription number gauge
+        let mut mfs = monitoring.last_indexed_cursed_inscription_number.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+
+        // Verify the highest cursed inscription number
+        assert_eq!(
+            gauge.get_value(),
+            20.0,
+            "Highest cursed inscription number indexed should be 20"
         );
     }
 
@@ -664,55 +826,54 @@ mod tests {
         let monitoring = PrometheusMonitoring::new();
 
         // Record different types of BRC-20 operations
-        monitoring.metrics_record_brc20_deploy();
-        monitoring.metrics_record_brc20_deploy();
-        monitoring.metrics_record_brc20_mint();
-        monitoring.metrics_record_brc20_mint();
-        monitoring.metrics_record_brc20_mint();
-        monitoring.metrics_record_brc20_transfer();
-        monitoring.metrics_record_brc20_transfer_send();
+        monitoring.metrics_record_brc20_deploy_per_block(2);
+        monitoring.metrics_record_brc20_mint_per_block(3);
+        monitoring.metrics_record_brc20_transfer_per_block(1);
+        monitoring.metrics_record_brc20_transfer_send_per_block(1);
 
         // Get the counter values
-        let mut mfs = monitoring.brc20_deploy_operations.collect();
+        let mut mfs = monitoring.brc20_deploy_operations_per_block.collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
+        let gauge = m.get_gauge();
         assert_eq!(
-            counter.get_value(),
+            gauge.get_value(),
             2.0,
             "Should have recorded 2 deploy operations"
         );
 
-        mfs = monitoring.brc20_mint_operations.collect();
+        mfs = monitoring.brc20_mint_operations_per_block.collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
+        let gauge = m.get_gauge();
         assert_eq!(
-            counter.get_value(),
+            gauge.get_value(),
             3.0,
             "Should have recorded 3 mint operations"
         );
 
-        mfs = monitoring.brc20_transfer_operations.collect();
+        mfs = monitoring.brc20_transfer_operations_per_block.collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
+        let gauge = m.get_gauge();
         assert_eq!(
-            counter.get_value(),
+            gauge.get_value(),
             1.0,
             "Should have recorded 1 transfer operation"
         );
 
-        mfs = monitoring.brc20_transfer_send_operations.collect();
+        mfs = monitoring
+            .brc20_transfer_send_operations_per_block
+            .collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
+        let gauge = m.get_gauge();
         assert_eq!(
-            counter.get_value(),
+            gauge.get_value(),
             1.0,
             "Should have recorded 1 transfer send operation"
         );
