@@ -58,7 +58,7 @@ export const BlockRoutes: FastifyPluginCallback<
         request.params.block,
         offset,
         limit,
-        operationType ? operationType : undefined
+        operationType
       );
       await reply.send({
         limit,
