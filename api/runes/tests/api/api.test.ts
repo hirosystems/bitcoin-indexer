@@ -1,5 +1,6 @@
 import { ENV } from '../../src/env';
 import { PgStore } from '../../src/pg/pg-store';
+import { DbLedgerEntry, DbLedgerOperation } from '../../src/pg/types';
 import {
   insertDbLedgerEntry,
   insertRune,
@@ -108,43 +109,98 @@ describe('Endpoints', () => {
       expect(response.statusCode).toBe(400);
     });
   });
-  describe('Transactions', () => {
-    test('shows details', async () => {
-      const expected = {
-        limit: 20,
-        offset: 0,
-        results: [
-          {
-            address: '0',
-            amount: '0',
-            location: {
-              block_hash: '0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5',
-              block_height: 840000,
-              output: '2bb85f4b004be6da54f766c17c1e855187327112c231ef2ff35ebad0ea67c69e:0',
-              timestamp: 0,
-              tx_id: '2bb85f4b004be6da54f766c17c1e855187327112c231ef2ff35ebad0ea67c69e',
-              tx_index: 0,
-              vout: 0,
-            },
-            operation: 'etching',
-            receiver_address: '0',
-            rune: {
-              id: '1:1',
-              name: 'Sample Rune',
-              number: 1,
-              spaced_name: 'Sample•Rune',
-            },
-          },
-        ],
-        total: 1,
+  describe('Blocks', () => {
+    test('shows block activity with operation type filtering', async () => {
+      // Insert multiple ledger entries with different operation types
+      const mintEntry: DbLedgerEntry = {
+        ...ledgerEntry,
+        operation: 'mint' as const,
+        tx_index: 1,
       };
-      const txid = ledgerEntry.tx_id;
-      const response = await fastify.inject({
+      const burnEntry: DbLedgerEntry = {
+        ...ledgerEntry,
+        operation: 'burn' as const,
+        tx_index: 2,
+      };
+      const sendEntry: DbLedgerEntry = {
+        ...ledgerEntry,
+        operation: 'send' as const,
+        tx_index: 3,
+      };
+      const receiveEntry: DbLedgerEntry = {
+        ...ledgerEntry,
+        operation: 'receive' as const,
+        tx_index: 4,
+      };
+
+      await insertDbLedgerEntry(db, mintEntry, 1);
+      await insertDbLedgerEntry(db, burnEntry, 2);
+      await insertDbLedgerEntry(db, sendEntry, 3);
+      await insertDbLedgerEntry(db, receiveEntry, 4);
+
+      // Test getting all activities (including the etching from beforeEach)
+      const allResponse = await fastify.inject({
         method: 'GET',
-        url: '/runes/v1/transactions/' + txid + '/activity',
+        url: `/runes/v1/blocks/${ledgerEntry.block_height}/activity`,
       });
-      expect(response.statusCode).toBe(200);
-      expect(response.json()).toStrictEqual(expected);
+      expect(allResponse.statusCode).toBe(200);
+      const allJson = allResponse.json();
+      const allOperations = allJson.results
+        .map((r: { operation: DbLedgerOperation }) => r.operation)
+        .sort();
+      expect(allOperations).toEqual(['burn', 'etching', 'mint', 'receive', 'send']);
+      expect(allJson.total).toBe(5);
+
+      // Test filtering by each operation type
+      const operations: DbLedgerOperation[] = ['etching', 'mint', 'burn', 'send', 'receive'];
+
+      for (const operation of operations) {
+        const response = await fastify.inject({
+          method: 'GET',
+          url: `/runes/v1/blocks/${ledgerEntry.block_height}/activity?operation_type=${operation}`,
+        });
+        expect(response.statusCode).toBe(200);
+        const json = response.json();
+        expect(json.results).toHaveLength(1);
+        expect(json.results[0].operation).toBe(operation);
+      }
     });
+  });
+  test('shows details for a transaction', async () => {
+    const expected = {
+      limit: 20,
+      offset: 0,
+      results: [
+        {
+          address: '0',
+          amount: '0',
+          location: {
+            block_hash: '0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5',
+            block_height: 840000,
+            output: '2bb85f4b004be6da54f766c17c1e855187327112c231ef2ff35ebad0ea67c69e:0',
+            timestamp: 0,
+            tx_id: '2bb85f4b004be6da54f766c17c1e855187327112c231ef2ff35ebad0ea67c69e',
+            tx_index: 0,
+            vout: 0,
+          },
+          operation: 'etching',
+          receiver_address: '0',
+          rune: {
+            id: '1:1',
+            name: 'Sample Rune',
+            number: 1,
+            spaced_name: 'Sample•Rune',
+          },
+        },
+      ],
+      total: 1,
+    };
+    const txid = ledgerEntry.tx_id;
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/runes/v1/transactions/' + txid + '/activity',
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toStrictEqual(expected);
   });
 });
