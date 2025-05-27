@@ -34,8 +34,8 @@ fxhash = "0.2.1"
 anyhow = { version = "1.0.56", features = ["backtrace"] }
 progressing = '3'
 futures = "0.3.28"
-rocksdb = { version = "0.21.0", default-features = false, features = [
-    "snappy",
+rocksdb = { version = "0.23.0", default-features = false, features = [
+    "snappy", "bindgen-runtime"
 ] }
 pprof = { version = "0.14.0", features = ["flamegraph"], optional = true }
 hyper = { version = "=0.14.27" }
