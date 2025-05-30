@@ -7,7 +7,7 @@ use std::{
 use bitcoind::{
     indexer::bitcoin::cursor::TransactionBytesCursor,
     try_info, try_warn,
-    types::{BitcoinBlockData, OrdinalOperation, TransactionIdentifier},
+    types::{BitcoinBlockData, TransactionIdentifier},
     utils::Context,
 };
 use config::Config;
@@ -111,9 +111,6 @@ pub async fn index_block(
                 try_warn!(ctx, "Block #{block_height} was already indexed, skipping");
                 return Ok(());
             }
-            // Update chain tip distance metric
-            let distance = chain_tip - block_height;
-            prometheus.metrics_update_chain_tip_distance(distance);
         }
 
         // Parsed BRC20 ops will be deposited here for this block.
@@ -124,15 +121,6 @@ pub async fn index_block(
         parse_inscriptions_in_standardized_block(block, &mut brc20_operation_map, config, ctx);
         prometheus
             .metrics_record_inscription_parsing_time(parsing_start.elapsed().as_millis() as f64);
-
-        // Count inscriptions revealed in this block
-        let inscription_count = block
-            .transactions
-            .iter()
-            .flat_map(|tx| &tx.metadata.ordinal_operations)
-            .filter(|op| matches!(op, OrdinalOperation::InscriptionRevealed(_)))
-            .count() as u64;
-        prometheus.metrics_record_inscriptions_in_block(inscription_count);
 
         // Measure ordinal computation time
         let computation_start = std::time::Instant::now();
@@ -178,6 +166,9 @@ pub async fn index_block(
             return Err(format!("Failed to augment block with transfers: {}", e));
         }
 
+        // Count inscriptions revealed in this block
+        prometheus.metrics_record_inscriptions_per_block(reveals_count as u64);
+
         // Measure database write time
         let inscription_db_write_start = std::time::Instant::now();
         // Write data
@@ -195,7 +186,7 @@ pub async fn index_block(
 
             // Count BRC-20 operations before processing
             let brc20_ops_count = brc20_operation_map.len() as u64;
-            prometheus.metrics_record_brc20_operations_in_block(brc20_ops_count);
+            prometheus.metrics_record_brc20_operations_per_block(brc20_ops_count);
 
             if let Err(e) = index_block_and_insert_brc20_operations(
                 block,
@@ -221,14 +212,25 @@ pub async fn index_block(
                 .await?
                 .unwrap_or(0) as u64,
         );
+        prometheus.metrics_classic_blessed_inscription_indexed(
+            ordinals_pg::get_blessed_count_from_counts_by_type(&ord_tx)
+                .await?
+                .unwrap_or(0) as u64,
+        );
+        prometheus.metrics_classic_cursed_inscription_indexed(
+            ordinals_pg::get_cursed_count_from_counts_by_type(&ord_tx)
+                .await?
+                .unwrap_or(0) as u64,
+        );
+
         if let Err(e) = ord_tx.commit().await {
             return Err(format!("unable to commit ordinals pg transaction: {}", e));
         }
     }
-    // Record overall processing time
-    prometheus.metrics_record_block_processing_time(stopwatch.elapsed().as_millis() as f64);
-    let elapsed = stopwatch.elapsed();
 
+    // Record overall processing time
+    let elapsed = stopwatch.elapsed();
+    prometheus.metrics_record_block_processing_time(elapsed.as_millis() as f64);
     try_info!(
         ctx,
         "Completed inscription indexing for block #{block_height}: found {reveals_count} inscription reveals and {transfers_count} inscription transfers in {elapsed:.0}s",

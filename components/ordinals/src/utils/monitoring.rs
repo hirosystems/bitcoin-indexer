@@ -6,37 +6,31 @@ use hyper::{
 };
 use postgres::{pg_begin, pg_pool_client};
 use prometheus::{
-    core::{AtomicU64, GenericCounter, GenericGauge},
+    core::{AtomicU64, GenericGauge},
     Encoder, Histogram, HistogramOpts, Registry, TextEncoder,
 };
 
-use crate::PgConnectionPools;
+use crate::{db::ordinals_pg, PgConnectionPools};
 
 type UInt64Gauge = GenericGauge<AtomicU64>;
-type U64Counter = GenericCounter<AtomicU64>;
 
 #[derive(Debug, Clone)]
 pub struct PrometheusMonitoring {
-    // Existing metrics
+    // Inscriptions metrics
     pub last_indexed_block_height: UInt64Gauge,
     pub last_indexed_inscription_number: UInt64Gauge,
-    pub last_indexed_cursed_inscription_number: UInt64Gauge,
+    pub last_classic_indexed_blessed_inscription_number: UInt64Gauge,
+    pub last_classic_indexed_cursed_inscription_number: UInt64Gauge,
 
     // Performance metrics
-    // TODO: prometheus update if necessary
     pub block_processing_time: Histogram,
     pub inscription_parsing_time: Histogram,
     pub inscription_computation_time: Histogram,
     pub inscription_db_write_time: Histogram,
 
     // Volumetric metrics
-    // TODO: prometheus update if necessary
     pub inscriptions_per_block: Histogram,
     pub brc20_operations_per_block: Histogram,
-
-    // Health metrics
-    // TODO: prometheus update if necessary
-    pub chain_tip_distance: UInt64Gauge,
 
     // BRC-20 specific metrics per block
     pub brc20_deploy_operations_per_block: UInt64Gauge,
@@ -75,9 +69,17 @@ impl PrometheusMonitoring {
             "last_indexed_inscription_number",
             "The latest indexed inscription number.",
         );
-        let last_indexed_cursed_inscription_number = Self::create_and_register_uint64_gauge(
+
+        let last_classic_indexed_blessed_inscription_number =
+            Self::create_and_register_uint64_gauge(
+                &registry,
+                "last_classic_indexed_blessed_inscription_number",
+                "The latest indexed blessed inscription number.",
+            );
+
+        let last_classic_indexed_cursed_inscription_number = Self::create_and_register_uint64_gauge(
             &registry,
-            "last_indexed_cursed_inscription_number",
+            "last_classic_indexed_cursed_inscription_number",
             "The latest indexed cursed inscription number.",
         );
 
@@ -127,13 +129,6 @@ impl PrometheusMonitoring {
             vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0],
         );
 
-        // Health metrics
-        let chain_tip_distance = Self::create_and_register_uint64_gauge(
-            &registry,
-            "chain_tip_distance",
-            "Distance in blocks from the Bitcoin chain tip",
-        );
-
         // BRC-20 specific metrics per block
         let brc20_deploy_operations_per_block = Self::create_and_register_uint64_gauge(
             &registry,
@@ -181,14 +176,14 @@ impl PrometheusMonitoring {
         PrometheusMonitoring {
             last_indexed_block_height,
             last_indexed_inscription_number,
-            last_indexed_cursed_inscription_number,
+            last_classic_indexed_blessed_inscription_number,
+            last_classic_indexed_cursed_inscription_number,
             block_processing_time,
             inscription_parsing_time,
             inscription_computation_time,
             inscription_db_write_time,
             inscriptions_per_block,
             brc20_operations_per_block,
-            chain_tip_distance,
             brc20_deploy_operations_per_block,
             brc20_mint_operations_per_block,
             brc20_transfer_operations_per_block,
@@ -209,12 +204,6 @@ impl PrometheusMonitoring {
         let g = UInt64Gauge::new(name, help).unwrap();
         registry.register(Box::new(g.clone())).unwrap();
         g
-    }
-
-    pub fn create_and_register_counter(registry: &Registry, name: &str, help: &str) -> U64Counter {
-        let c = U64Counter::new(name, help).unwrap();
-        registry.register(Box::new(c.clone())).unwrap();
-        c
     }
 
     pub fn create_and_register_histogram(
@@ -244,25 +233,18 @@ impl PrometheusMonitoring {
         // Read initial values from the database for inscriptions
         let mut ord_client = pg_pool_client(&pg_pools.ordinals).await?;
         let ord_tx = pg_begin(&mut ord_client).await?;
-        let row = ord_tx
-            .query_opt(
-                "SELECT 
-                    COALESCE(MAX(CASE WHEN type = 'blessed' THEN count END), 0) AS blessed,
-                    COALESCE(MAX(CASE WHEN type = 'cursed' THEN count END), 0) AS cursed
-                FROM counts_by_type",
-                &[],
-            )
-            .await
-            .map_err(|e| format!("Failed to query counts_by_type: {}", e))?;
 
-        if let Some(row) = row {
-            let blessed: i32 = row.get("blessed");
-            let cursed: i32 = row.get("cursed");
+        let blessed_count = ordinals_pg::get_blessed_count_from_counts_by_type(&ord_tx)
+            .await?
+            .unwrap_or(0) as u64;
+        let cursed_count = ordinals_pg::get_cursed_count_from_counts_by_type(&ord_tx)
+            .await?
+            .unwrap_or(0) as u64;
 
-            // Set the total counts
-            self.metrics_inscription_indexed(blessed as u64);
-            self.metrics_cursed_inscription_indexed(cursed as u64);
-        }
+        // Set the total counts
+        self.metrics_classic_blessed_inscription_indexed(blessed_count);
+        self.metrics_classic_cursed_inscription_indexed(cursed_count);
+
         ord_tx
             .commit()
             .await
@@ -306,8 +288,6 @@ impl PrometheusMonitoring {
                 .map_err(|e| format!("Failed to commit transaction: {}", e))?;
         }
 
-        // TODO: add initialization for histograms
-
         Ok(())
     }
 
@@ -318,10 +298,18 @@ impl PrometheusMonitoring {
         }
     }
 
-    pub fn metrics_cursed_inscription_indexed(&self, cursed_inscription_number: u64) {
-        let highest_appended = self.last_indexed_cursed_inscription_number.get();
+    pub fn metrics_classic_blessed_inscription_indexed(&self, blessed_inscription_number: u64) {
+        let highest_appended = self.last_classic_indexed_blessed_inscription_number.get();
+        if blessed_inscription_number > highest_appended {
+            self.last_classic_indexed_blessed_inscription_number
+                .set(blessed_inscription_number);
+        }
+    }
+
+    pub fn metrics_classic_cursed_inscription_indexed(&self, cursed_inscription_number: u64) {
+        let highest_appended = self.last_classic_indexed_cursed_inscription_number.get();
         if cursed_inscription_number > highest_appended {
-            self.last_indexed_cursed_inscription_number
+            self.last_classic_indexed_cursed_inscription_number
                 .set(cursed_inscription_number);
         }
     }
@@ -331,11 +319,6 @@ impl PrometheusMonitoring {
         if block_height > highest_appended {
             self.last_indexed_block_height.set(block_height);
         }
-    }
-
-    // Health metrics methods
-    pub fn metrics_update_chain_tip_distance(&self, distance: u64) {
-        self.chain_tip_distance.set(distance);
     }
 
     // Performance metrics methods
@@ -355,12 +338,11 @@ impl PrometheusMonitoring {
         self.inscription_db_write_time.observe(elapsed_ms);
     }
 
-    // Volumetric metrics methods - TODO: add initialize value
-    pub fn metrics_record_inscriptions_in_block(&self, count: u64) {
+    pub fn metrics_record_inscriptions_per_block(&self, count: u64) {
         self.inscriptions_per_block.observe(count as f64);
     }
 
-    pub fn metrics_record_brc20_operations_in_block(&self, count: u64) {
+    pub fn metrics_record_brc20_operations_per_block(&self, count: u64) {
         self.brc20_operations_per_block.observe(count as f64);
     }
 
@@ -603,12 +585,12 @@ mod tests {
     }
 
     #[test]
-    fn test_inscriptions_in_block() {
+    fn test_inscriptions_per_block() {
         let monitoring = PrometheusMonitoring::new();
 
         // Test with different inscription counts
-        monitoring.metrics_record_inscriptions_in_block(5);
-        monitoring.metrics_record_inscriptions_in_block(10);
+        monitoring.metrics_record_inscriptions_per_block(5);
+        monitoring.metrics_record_inscriptions_per_block(10);
 
         // Get the histogram values directly
         let mut mfs = monitoring.inscriptions_per_block.collect();
@@ -664,8 +646,8 @@ mod tests {
         let monitoring = PrometheusMonitoring::new();
 
         // Test with different BRC-20 operation counts
-        monitoring.metrics_record_brc20_operations_in_block(3);
-        monitoring.metrics_record_brc20_operations_in_block(7);
+        monitoring.metrics_record_brc20_operations_per_block(3);
+        monitoring.metrics_record_brc20_operations_per_block(7);
 
         // Get the histogram values directly
         let mut mfs = monitoring.brc20_operations_per_block.collect();
@@ -735,26 +717,6 @@ mod tests {
     }
 
     #[test]
-    fn test_chain_tip_distance() {
-        let monitoring = PrometheusMonitoring::new();
-
-        // Update chain tip distance
-        monitoring.metrics_update_chain_tip_distance(5);
-        monitoring.metrics_update_chain_tip_distance(10);
-
-        // Get the gauge value
-        let mut mfs = monitoring.chain_tip_distance.collect();
-        assert_eq!(mfs.len(), 1);
-
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let gauge = m.get_gauge();
-
-        // Verify the final value is 10
-        assert_eq!(gauge.get_value(), 10.0, "Chain tip distance should be 10");
-    }
-
-    #[test]
     fn test_block_indexed() {
         let monitoring = PrometheusMonitoring::new();
 
@@ -787,10 +749,15 @@ mod tests {
         monitoring.metrics_inscription_indexed(100);
         monitoring.metrics_inscription_indexed(75);
 
+        // Record blessed inscription indexing
+        monitoring.metrics_classic_blessed_inscription_indexed(1);
+        monitoring.metrics_classic_blessed_inscription_indexed(3);
+        monitoring.metrics_classic_blessed_inscription_indexed(2);
+
         // Record cursed inscription indexing
-        monitoring.metrics_cursed_inscription_indexed(10);
-        monitoring.metrics_cursed_inscription_indexed(20);
-        monitoring.metrics_cursed_inscription_indexed(15);
+        monitoring.metrics_classic_cursed_inscription_indexed(1);
+        monitoring.metrics_classic_cursed_inscription_indexed(3);
+        monitoring.metrics_classic_cursed_inscription_indexed(2);
 
         // Get the regular inscription number gauge
         let mut mfs = monitoring.last_indexed_inscription_number.collect();
@@ -806,8 +773,26 @@ mod tests {
             "Highest regular inscription number indexed should be 100"
         );
 
+        // Get the blessed inscription number gauge
+        let mut mfs = monitoring
+            .last_classic_indexed_blessed_inscription_number
+            .collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+
+        // Verify the highest blessed inscription number
+        assert_eq!(
+            gauge.get_value(),
+            3.0,
+            "Highest blessed inscription number indexed should be 3"
+        );
+
         // Get the cursed inscription number gauge
-        let mut mfs = monitoring.last_indexed_cursed_inscription_number.collect();
+        let mut mfs = monitoring
+            .last_classic_indexed_cursed_inscription_number
+            .collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
@@ -816,8 +801,8 @@ mod tests {
         // Verify the highest cursed inscription number
         assert_eq!(
             gauge.get_value(),
-            20.0,
-            "Highest cursed inscription number indexed should be 20"
+            3.0,
+            "Highest cursed inscription number indexed should be 3"
         );
     }
 
@@ -825,13 +810,31 @@ mod tests {
     fn test_brc20_operations() {
         let monitoring = PrometheusMonitoring::new();
 
-        // Record different types of BRC-20 operations
+        // First block operations
         monitoring.metrics_record_brc20_deploy_per_block(2);
         monitoring.metrics_record_brc20_mint_per_block(3);
         monitoring.metrics_record_brc20_transfer_per_block(1);
         monitoring.metrics_record_brc20_transfer_send_per_block(1);
 
-        // Get the counter values
+        // Record these operations in total
+        monitoring.metrics_record_brc20_deploy_total(2);
+        monitoring.metrics_record_brc20_mint_total(3);
+        monitoring.metrics_record_brc20_transfer_total(1);
+        monitoring.metrics_record_brc20_transfer_send_total(1);
+
+        // Second block operations
+        monitoring.metrics_record_brc20_deploy_per_block(1);
+        monitoring.metrics_record_brc20_mint_per_block(2);
+        monitoring.metrics_record_brc20_transfer_per_block(3);
+        monitoring.metrics_record_brc20_transfer_send_per_block(2);
+
+        // Record these operations in total
+        monitoring.metrics_record_brc20_deploy_total(1);
+        monitoring.metrics_record_brc20_mint_total(2);
+        monitoring.metrics_record_brc20_transfer_total(3);
+        monitoring.metrics_record_brc20_transfer_send_total(2);
+
+        // Test per-block metrics (should show only latest block values)
         let mut mfs = monitoring.brc20_deploy_operations_per_block.collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
@@ -839,8 +842,8 @@ mod tests {
         let gauge = m.get_gauge();
         assert_eq!(
             gauge.get_value(),
-            2.0,
-            "Should have recorded 2 deploy operations"
+            1.0,
+            "Should have recorded 1 deploy operation in latest block"
         );
 
         mfs = monitoring.brc20_mint_operations_per_block.collect();
@@ -850,8 +853,8 @@ mod tests {
         let gauge = m.get_gauge();
         assert_eq!(
             gauge.get_value(),
-            3.0,
-            "Should have recorded 3 mint operations"
+            2.0,
+            "Should have recorded 2 mint operations in latest block"
         );
 
         mfs = monitoring.brc20_transfer_operations_per_block.collect();
@@ -861,8 +864,8 @@ mod tests {
         let gauge = m.get_gauge();
         assert_eq!(
             gauge.get_value(),
-            1.0,
-            "Should have recorded 1 transfer operation"
+            3.0,
+            "Should have recorded 3 transfer operations in latest block"
         );
 
         mfs = monitoring
@@ -874,8 +877,53 @@ mod tests {
         let gauge = m.get_gauge();
         assert_eq!(
             gauge.get_value(),
-            1.0,
-            "Should have recorded 1 transfer send operation"
+            2.0,
+            "Should have recorded 2 transfer send operations in latest block"
+        );
+
+        // Test total metrics (should show cumulative values)
+        mfs = monitoring.brc20_deploy_operations_total.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            3.0,
+            "Should have recorded 3 deploy operations in total"
+        );
+
+        mfs = monitoring.brc20_mint_operations_total.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            5.0,
+            "Should have recorded 5 mint operations in total"
+        );
+
+        mfs = monitoring.brc20_transfer_operations_total.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            4.0,
+            "Should have recorded 4 transfer operations in total"
+        );
+
+        mfs = monitoring.brc20_transfer_send_operations_total.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            3.0,
+            "Should have recorded 3 transfer send operations in total"
         );
     }
 }

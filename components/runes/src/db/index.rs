@@ -13,9 +13,7 @@ use bitcoind::{
 use ordinals_parser::{Artifact, Runestone};
 use tokio_postgres::Client;
 
-use super::{
-    cache::index_cache::IndexCache, get_chain_tip, pg_get_max_rune_number, pg_roll_back_block,
-};
+use super::{cache::index_cache::IndexCache, pg_get_max_rune_number, pg_roll_back_block};
 use crate::{
     db::cache::transaction_location::TransactionLocation, utils::monitoring::PrometheusMonitoring,
 };
@@ -86,12 +84,6 @@ pub async fn index_block(
     let mut cenotaph_etching_count: u64 = 0;
     let mut cenotaph_mint_count: u64 = 0;
     let mut cenotaph_count: u64 = 0;
-
-    // Update chain tip distance
-    if let Some(chain_tip) = get_chain_tip(pg_client, ctx).await {
-        let distance = chain_tip.index - block_height;
-        prometheus.metrics_update_chain_tip_distance(distance);
-    }
 
     let mut db_tx = pg_client
         .transaction()
@@ -200,18 +192,15 @@ pub async fn index_block(
     prometheus.metrics_record_runes_cenotaph_etching_per_block(cenotaph_etching_count);
     prometheus.metrics_record_runes_cenotaph_mint_per_block(cenotaph_mint_count);
 
-    prometheus.metrics_record_runes_etching_total(etching_count);
-    prometheus.metrics_record_runes_edict_total(edict_count);
-    prometheus.metrics_record_runes_mint_total(mint_count);
-    prometheus.metrics_record_runes_cenotaph_total(cenotaph_count);
-    prometheus.metrics_record_runes_cenotaph_etching_total(cenotaph_etching_count);
-    prometheus.metrics_record_runes_cenotaph_mint_total(cenotaph_mint_count);
-
     // Record metrics
     prometheus.metrics_block_indexed(block_height);
     let current_rune_number = pg_get_max_rune_number(pg_client, ctx).await;
     prometheus.metrics_rune_indexed(current_rune_number as u64);
+    prometheus.metrics_record_runes_per_block(etching_count);
+
+    // Record overall processing time
     let elapsed = stopwatch.elapsed();
+    prometheus.metrics_record_block_processing_time(elapsed.as_millis() as f64);
     try_info!(
         ctx,
         "Completed runes indexing for block #{block_height}: found {etching_count} etchings, {mint_count} mints, {edict_count} edicts, and {cenotaph_count} cenotaphs, of which {cenotaph_etching_count} etchings and {cenotaph_mint_count} mints in {elapsed:.0}s",

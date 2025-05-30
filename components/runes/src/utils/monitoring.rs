@@ -18,7 +18,6 @@ type U64Counter = GenericCounter<AtomicU64>;
 
 #[derive(Debug, Clone)]
 pub struct PrometheusMonitoring {
-    // TODO: up
     pub last_indexed_block_height: UInt64Gauge,
     pub last_indexed_rune_number: UInt64Gauge,
 
@@ -29,10 +28,7 @@ pub struct PrometheusMonitoring {
     pub rune_db_write_time: Histogram,
 
     // Volumetric metrics
-    pub runes_per_block: U64Counter,
-
-    // Health metrics
-    pub chain_tip_distance: UInt64Gauge,
+    pub runes_per_block: Histogram,
 
     // Runes specific metrics
     pub runes_etching_operations_per_block: UInt64Gauge,
@@ -41,13 +37,6 @@ pub struct PrometheusMonitoring {
     pub runes_cenotaph_operations_per_block: UInt64Gauge,
     pub runes_cenotaph_etching_operations_per_block: UInt64Gauge,
     pub runes_cenotaph_mint_operations_per_block: UInt64Gauge,
-
-    pub runes_etching_operations_total: UInt64Gauge,
-    pub runes_edict_operations_total: UInt64Gauge,
-    pub runes_mint_operations_total: UInt64Gauge,
-    pub runes_cenotaph_operations_total: UInt64Gauge,
-    pub runes_cenotaph_etching_operations_total: UInt64Gauge,
-    pub runes_cenotaph_mint_operations_total: UInt64Gauge,
 
     // Registry
     pub registry: Registry,
@@ -107,17 +96,11 @@ impl PrometheusMonitoring {
         );
 
         // Volumetric metrics
-        let runes_per_block = Self::create_and_register_counter(
+        let runes_per_block = Self::create_and_register_histogram(
             &registry,
             "runes_per_block",
             "Number of Runes per block",
-        );
-
-        // Health metrics
-        let chain_tip_distance = Self::create_and_register_uint64_gauge(
-            &registry,
-            "runes_chain_tip_distance",
-            "Distance in blocks from the Bitcoin chain tip",
+            vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
         );
 
         // Runes specific metrics per block
@@ -152,38 +135,6 @@ impl PrometheusMonitoring {
             "Number of cenotaph Runes mints processed per block",
         );
 
-        // Runes specific metrics in total
-        let runes_etching_operations_total = Self::create_and_register_uint64_gauge(
-            &registry,
-            "runes_etching_operations_total",
-            "Number of Runes etchings processed in total",
-        );
-        let runes_mint_operations_total = Self::create_and_register_uint64_gauge(
-            &registry,
-            "runes_mint_operations_total",
-            "Number of Runes mints processed in total",
-        );
-        let runes_edict_operations_total = Self::create_and_register_uint64_gauge(
-            &registry,
-            "runes_edict_operations_total",
-            "Number of Runes edicts processed in total",
-        );
-        let runes_cenotaph_operations_total = Self::create_and_register_uint64_gauge(
-            &registry,
-            "runes_cenotaph_operations_total",
-            "Number of cenotaph Runes processed in total",
-        );
-        let runes_cenotaph_etching_operations_total = Self::create_and_register_uint64_gauge(
-            &registry,
-            "runes_cenotaph_etching_operations_total",
-            "Number of cenotaph Runes etchings processed in total",
-        );
-        let runes_cenotaph_mint_operations_total = Self::create_and_register_uint64_gauge(
-            &registry,
-            "runes_cenotaph_mint_operations_total",
-            "Number of cenotaph Runes mints processed in total",
-        );
-
         PrometheusMonitoring {
             last_indexed_block_height,
             last_indexed_rune_number,
@@ -192,19 +143,12 @@ impl PrometheusMonitoring {
             rune_computation_time,
             rune_db_write_time,
             runes_per_block,
-            chain_tip_distance,
             runes_etching_operations_per_block,
             runes_edict_operations_per_block,
             runes_mint_operations_per_block,
             runes_cenotaph_operations_per_block,
             runes_cenotaph_etching_operations_per_block,
             runes_cenotaph_mint_operations_per_block,
-            runes_etching_operations_total,
-            runes_edict_operations_total,
-            runes_mint_operations_total,
-            runes_cenotaph_operations_total,
-            runes_cenotaph_etching_operations_total,
-            runes_cenotaph_mint_operations_total,
             registry,
         }
     }
@@ -267,40 +211,6 @@ impl PrometheusMonitoring {
             .await
             .map_err(|e| format!("Failed to begin transaction: {}", e))?;
 
-        // Get counts from ledger table
-        // TODO: check this table existence
-        let row = runes_tx
-            .query_opt(
-                "SELECT 
-                    COALESCE(SUM(CASE WHEN operation = 'etching' THEN 1 ELSE 0 END), 0) AS etching,
-                    COALESCE(SUM(CASE WHEN operation = 'mint' THEN 1 ELSE 0 END), 0) AS mint,
-                    COALESCE(SUM(CASE WHEN operation = 'edict' THEN 1 ELSE 0 END), 0) AS edict,
-                    COALESCE(SUM(CASE WHEN operation = 'cenotaph' THEN 1 ELSE 0 END), 0) AS cenotaph,
-                    COALESCE(SUM(CASE WHEN operation = 'cenotaph_etching' THEN 1 ELSE 0 END), 0) AS cenotaph_etching,
-                    COALESCE(SUM(CASE WHEN operation = 'cenotaph_mint' THEN 1 ELSE 0 END), 0) AS cenotaph_mint
-                FROM ledger",
-                &[],
-            )
-            .await
-            .map_err(|e| format!("Failed to query ledger: {}", e))?;
-
-        if let Some(row) = row {
-            let etching: i64 = row.get("etching");
-            let mint: i64 = row.get("mint");
-            let edict: i64 = row.get("edict");
-            let cenotaph: i64 = row.get("cenotaph");
-            let cenotaph_etching: i64 = row.get("cenotaph_etching");
-            let cenotaph_mint: i64 = row.get("cenotaph_mint");
-
-            // Set the total counts
-            self.metrics_record_runes_etching_total(etching as u64);
-            self.metrics_record_runes_mint_total(mint as u64);
-            self.metrics_record_runes_edict_total(edict as u64);
-            self.metrics_record_runes_cenotaph_total(cenotaph as u64);
-            self.metrics_record_runes_cenotaph_etching_total(cenotaph_etching as u64);
-            self.metrics_record_runes_cenotaph_mint_total(cenotaph_mint as u64);
-        }
-
         runes_tx
             .commit()
             .await
@@ -341,13 +251,8 @@ impl PrometheusMonitoring {
     }
 
     // Volumetric metrics methods
-    pub fn metrics_record_runes_in_block(&self, count: u64) {
-        self.runes_per_block.inc_by(count);
-    }
-
-    // Health metrics methods
-    pub fn metrics_update_chain_tip_distance(&self, distance: u64) {
-        self.chain_tip_distance.set(distance);
+    pub fn metrics_record_runes_per_block(&self, count: u64) {
+        self.runes_per_block.observe(count as f64);
     }
 
     // Runes specific metrics methods per block
@@ -375,33 +280,6 @@ impl PrometheusMonitoring {
     pub fn metrics_record_runes_cenotaph_mint_per_block(&self, cenotaph_mint_count: u64) {
         self.runes_cenotaph_mint_operations_per_block
             .set(cenotaph_mint_count);
-    }
-
-    // Runes specific metrics methods in total
-    pub fn metrics_record_runes_etching_total(&self, etching_count: u64) {
-        self.runes_etching_operations_total.add(etching_count);
-    }
-
-    pub fn metrics_record_runes_edict_total(&self, edict_count: u64) {
-        self.runes_edict_operations_total.add(edict_count);
-    }
-
-    pub fn metrics_record_runes_mint_total(&self, mint_count: u64) {
-        self.runes_mint_operations_total.add(mint_count);
-    }
-
-    pub fn metrics_record_runes_cenotaph_total(&self, cenotaph_count: u64) {
-        self.runes_cenotaph_operations_total.add(cenotaph_count);
-    }
-
-    pub fn metrics_record_runes_cenotaph_etching_total(&self, cenotaph_etching_count: u64) {
-        self.runes_cenotaph_etching_operations_total
-            .add(cenotaph_etching_count);
-    }
-
-    pub fn metrics_record_runes_cenotaph_mint_total(&self, cenotaph_mint_count: u64) {
-        self.runes_cenotaph_mint_operations_total
-            .add(cenotaph_mint_count);
     }
 }
 
@@ -609,22 +487,55 @@ mod tests {
         let monitoring = PrometheusMonitoring::new();
 
         // Test with different operation counts
-        monitoring.metrics_record_runes_in_block(5);
-        monitoring.metrics_record_runes_in_block(10);
+        monitoring.metrics_record_runes_per_block(5);
+        monitoring.metrics_record_runes_per_block(10);
 
-        // Get the counter value
+        // Get the histogram values directly
         let mut mfs = monitoring.runes_per_block.collect();
         assert_eq!(mfs.len(), 1);
 
         let mf = mfs.pop().unwrap();
         let m = mf.get_metric().first().unwrap();
-        let counter = m.get_counter();
+        let proto_histogram = m.get_histogram();
 
-        // Verify the total count (5 + 10 = 15)
+        // Verify we recorded exactly 2 observations
         assert_eq!(
-            counter.get_value(),
+            proto_histogram.get_sample_count(),
+            2,
+            "Should have recorded 2 observations"
+        );
+
+        // Verify the sum of our observations (5 + 10 = 15)
+        assert_eq!(
+            proto_histogram.get_sample_sum(),
             15.0,
-            "Total operations count should be 15"
+            "Sum of observations should be 15.0"
+        );
+
+        // Verify the values were properly bucketed
+        let buckets = proto_histogram.get_bucket();
+        assert!(!buckets.is_empty(), "Should have bucket data");
+
+        // The value 5 should be in the 5-10 bucket
+        let bucket_5 = buckets
+            .iter()
+            .find(|b| b.get_upper_bound() == 5.0)
+            .expect("Should have 5 bucket");
+        assert_eq!(
+            bucket_5.get_cumulative_count(),
+            1,
+            "First value (5) should be in 5-10 bucket"
+        );
+
+        // The value 10 should be in the 10-25 bucket
+        let bucket_10 = buckets
+            .iter()
+            .find(|b| b.get_upper_bound() == 10.0)
+            .expect("Should have 10 bucket");
+        assert_eq!(
+            bucket_10.get_cumulative_count(),
+            2,
+            "Second value (10) should be in 10-25 bucket"
         );
     }
 
@@ -647,44 +558,17 @@ mod tests {
     }
 
     #[test]
-    fn test_chain_tip_distance() {
+    fn test_runes_operations_per_block() {
         let monitoring = PrometheusMonitoring::new();
 
-        // Update chain tip distance
-        monitoring.metrics_update_chain_tip_distance(5);
-        monitoring.metrics_update_chain_tip_distance(10);
-
-        // Get the gauge value
-        let mut mfs = monitoring.chain_tip_distance.collect();
-        assert_eq!(mfs.len(), 1);
-
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let gauge = m.get_gauge();
-
-        // Verify the final value is 10
-        assert_eq!(gauge.get_value(), 10.0, "Chain tip distance should be 10");
-    }
-
-    #[test]
-    fn test_runes_operations() {
-        let monitoring = PrometheusMonitoring::new();
-
-        // Record different types of Runes operations per block
+        // First block operations
         monitoring.metrics_record_runes_etching_per_block(2);
         monitoring.metrics_record_runes_mint_per_block(3);
         monitoring.metrics_record_runes_edict_per_block(1);
         monitoring.metrics_record_runes_cenotaph_etching_per_block(1);
         monitoring.metrics_record_runes_cenotaph_mint_per_block(1);
 
-        // Record total operations
-        monitoring.metrics_record_runes_etching_total(2);
-        monitoring.metrics_record_runes_mint_total(3);
-        monitoring.metrics_record_runes_edict_total(1);
-        monitoring.metrics_record_runes_cenotaph_etching_total(1);
-        monitoring.metrics_record_runes_cenotaph_mint_total(1);
-
-        // Get the per-block gauge values
+        // Verify first block values
         let mut mfs = monitoring.runes_etching_operations_per_block.collect();
         assert_eq!(mfs.len(), 1);
         let mf = mfs.pop().unwrap();
@@ -693,7 +577,78 @@ mod tests {
         assert_eq!(
             gauge.get_value(),
             2.0,
-            "Should have recorded 2 etching operations in current block"
+            "Should have recorded 2 etching operations in first block"
+        );
+
+        // Verify first block mint operations
+        mfs = monitoring.runes_mint_operations_per_block.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            3.0,
+            "Should have recorded 3 mint operations in first block"
+        );
+
+        // Verify first block edict operations
+        mfs = monitoring.runes_edict_operations_per_block.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            1.0,
+            "Should have recorded 1 edict operation in first block"
+        );
+
+        // Verify first block cenotaph etching operations
+        mfs = monitoring
+            .runes_cenotaph_etching_operations_per_block
+            .collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            1.0,
+            "Should have recorded 1 cenotaph etching operation in first block"
+        );
+
+        // Verify first block cenotaph mint operations
+        mfs = monitoring
+            .runes_cenotaph_mint_operations_per_block
+            .collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            1.0,
+            "Should have recorded 1 cenotaph mint operation in first block"
+        );
+
+        // Second block operations (different values)
+        monitoring.metrics_record_runes_etching_per_block(4);
+        monitoring.metrics_record_runes_mint_per_block(1);
+        monitoring.metrics_record_runes_edict_per_block(3);
+        monitoring.metrics_record_runes_cenotaph_etching_per_block(2);
+        monitoring.metrics_record_runes_cenotaph_mint_per_block(0);
+
+        // Verify second block values (should overwrite first block values)
+        mfs = monitoring.runes_etching_operations_per_block.collect();
+        assert_eq!(mfs.len(), 1);
+        let mf = mfs.pop().unwrap();
+        let m = mf.get_metric().first().unwrap();
+        let gauge = m.get_gauge();
+        assert_eq!(
+            gauge.get_value(),
+            4.0,
+            "Should have recorded 4 etching operations in second block"
         );
 
         mfs = monitoring.runes_mint_operations_per_block.collect();
@@ -703,8 +658,8 @@ mod tests {
         let gauge = m.get_gauge();
         assert_eq!(
             gauge.get_value(),
-            3.0,
-            "Should have recorded 3 mint operations in current block"
+            1.0,
+            "Should have recorded 1 mint operation in second block"
         );
 
         mfs = monitoring.runes_edict_operations_per_block.collect();
@@ -714,8 +669,8 @@ mod tests {
         let gauge = m.get_gauge();
         assert_eq!(
             gauge.get_value(),
-            1.0,
-            "Should have recorded 1 edict operation in current block"
+            3.0,
+            "Should have recorded 3 edict operations in second block"
         );
 
         mfs = monitoring
@@ -727,8 +682,8 @@ mod tests {
         let gauge = m.get_gauge();
         assert_eq!(
             gauge.get_value(),
-            1.0,
-            "Should have recorded 1 cenotaph etching operation in current block"
+            2.0,
+            "Should have recorded 2 cenotaph etching operations in second block"
         );
 
         mfs = monitoring
@@ -740,64 +695,8 @@ mod tests {
         let gauge = m.get_gauge();
         assert_eq!(
             gauge.get_value(),
-            1.0,
-            "Should have recorded 1 cenotaph mint operation in current block"
-        );
-
-        // Get the total gauge values
-        mfs = monitoring.runes_etching_operations_total.collect();
-        assert_eq!(mfs.len(), 1);
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let gauge = m.get_gauge();
-        assert_eq!(
-            gauge.get_value(),
-            2.0,
-            "Should have recorded 2 total etching operations"
-        );
-
-        mfs = monitoring.runes_mint_operations_total.collect();
-        assert_eq!(mfs.len(), 1);
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let gauge = m.get_gauge();
-        assert_eq!(
-            gauge.get_value(),
-            3.0,
-            "Should have recorded 3 total mint operations"
-        );
-
-        mfs = monitoring.runes_edict_operations_total.collect();
-        assert_eq!(mfs.len(), 1);
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let gauge = m.get_gauge();
-        assert_eq!(
-            gauge.get_value(),
-            1.0,
-            "Should have recorded 1 total edict operation"
-        );
-
-        mfs = monitoring.runes_cenotaph_etching_operations_total.collect();
-        assert_eq!(mfs.len(), 1);
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let gauge = m.get_gauge();
-        assert_eq!(
-            gauge.get_value(),
-            1.0,
-            "Should have recorded 1 total cenotaph etching operation"
-        );
-
-        mfs = monitoring.runes_cenotaph_mint_operations_total.collect();
-        assert_eq!(mfs.len(), 1);
-        let mf = mfs.pop().unwrap();
-        let m = mf.get_metric().first().unwrap();
-        let gauge = m.get_gauge();
-        assert_eq!(
-            gauge.get_value(),
-            1.0,
-            "Should have recorded 1 total cenotaph mint operation"
+            0.0,
+            "Should have recorded 0 cenotaph mint operations in second block"
         );
     }
 
