@@ -144,7 +144,7 @@ impl IndexCache {
         cenotaph: &Cenotaph,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
-        cenotaphs_counter: &mut usize,
+        cenotaphs_counter: &mut u64,
     ) {
         try_debug!(ctx, "{:?} {}", cenotaph, self.tx_cache.location);
         let entries = self.tx_cache.apply_cenotaph_input_burn(cenotaph);
@@ -157,7 +157,7 @@ impl IndexCache {
         etching: &Etching,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
-        etchings_counter: &mut usize,
+        etchings_counter: &mut u64,
     ) {
         let (rune_id, db_rune, entry) = self.tx_cache.apply_etching(etching, self.next_rune_number);
         try_debug!(
@@ -179,7 +179,7 @@ impl IndexCache {
         rune: &Rune,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
-        cenotaph_etchings_counter: &mut usize,
+        cenotaph_etchings_counter: &mut u64,
     ) {
         let (rune_id, db_rune, entry) = self
             .tx_cache
@@ -203,7 +203,7 @@ impl IndexCache {
         rune_id: &RuneId,
         db_tx: &mut Transaction<'_>,
         ctx: &Context,
-        mints_counter: &mut usize,
+        mints_counter: &mut u64,
     ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(rune_id, db_tx, ctx).await else {
             try_warn!(
@@ -236,7 +236,7 @@ impl IndexCache {
         rune_id: &RuneId,
         db_tx: &mut Transaction<'_>,
         ctx: &Context,
-        cenotaph_mints_counter: &mut usize,
+        cenotaph_mints_counter: &mut u64,
     ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(rune_id, db_tx, ctx).await else {
             try_warn!(
@@ -269,7 +269,7 @@ impl IndexCache {
         edict: &Edict,
         db_tx: &mut Transaction<'_>,
         ctx: &Context,
-        edicts_number: &mut usize,
+        edicts_number: &mut u64,
     ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(&edict.id, db_tx, ctx).await else {
             try_warn!(
