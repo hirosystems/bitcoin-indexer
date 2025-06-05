@@ -476,5 +476,4 @@ pub async fn start_bitcoin_indexer(
     Ok(())
 }
 
-#[cfg(test)]
 pub mod tests;

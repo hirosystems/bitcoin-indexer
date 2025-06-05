@@ -47,7 +47,7 @@ pub fn generate_test_bitcoin_block(
             hash: format!("0x{}", hex::encode(&hash[..])),
         },
         parent_block_identifier,
-        timestamp: 0,
+        timestamp: 1712982301, // Set a valid timestamp (April 13, 2024)
         transactions,
         metadata: BitcoinBlockMetadata {
             network: crate::types::BitcoinNetwork::Regtest,

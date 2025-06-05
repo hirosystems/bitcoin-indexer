@@ -6,6 +6,7 @@ use bitcoin::{
     Amount, Network, ScriptBuf, Transaction,
 };
 use bitcoind::{
+    indexer::tests::helpers::bitcoin_blocks::generate_test_bitcoin_block,
     try_info,
     types::{BitcoinBlockData, BitcoinTransactionData},
     utils::Context,
@@ -63,6 +64,14 @@ fn bitcoin_tx_from_chainhook_tx(
         tx.metadata.outputs.len() as u32,
     )
 }
+
+// TODO: unit test for this and fabricate a block BitcoinBlockData that has these 2 txs and run it through the index_block function
+// 1st option
+// see what comes out as the message
+// see what comes out with each runestone
+// it fails if i get 2 etched runes in the same block
+// it works only if i get 1 etched rune, the first one which is valid, in the same block
+// try 2-3 variations of this (order wise)
 
 /// Index a Bitcoin block for runes data.
 pub async fn index_block(
@@ -226,4 +235,66 @@ pub async fn roll_back_block(pg_client: &mut Client, block_height: u64, ctx: &Co
         "Block {block_height} rolled back in {elapsed:.4}s",
         elapsed = stopwatch.elapsed().as_secs_f32()
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use bitcoind::{
+        indexer::tests::helpers::{
+            bitcoin_blocks::generate_test_bitcoin_block,
+            transactions::{
+                generate_test_tx_runes_etch_invalid, generate_test_tx_runes_etch_valid,
+            },
+        },
+        utils::Context,
+    };
+
+    use super::*;
+    use crate::db::pg_test_client;
+
+    #[tokio::test]
+    async fn test_rune_transaction_indexing() -> Result<(), String> {
+        // Setup database connection
+        let ctx = Context::empty();
+        let mut pg_client = pg_test_client(true, &ctx).await;
+        let prometheus = PrometheusMonitoring::new();
+
+        let result = {
+            // Create test transactions
+            let tx1 = generate_test_tx_runes_etch_invalid();
+
+            // TODO: should be invalid to have 2 runes with the same name
+            let tx2 = generate_test_tx_runes_etch_valid();
+
+            // Create a test block with these transactions
+            let mut block = generate_test_bitcoin_block(
+                0,      // fork_id
+                840000, // block_height (genesis block for runes)
+                vec![tx1, tx2],
+                None, // parent block
+            );
+
+            // Create an index cache
+            let config = config::Config::test_default();
+            let mut index_cache = IndexCache::new(&config, &mut pg_client, &ctx).await;
+
+            // Index the block
+            index_block(
+                &mut pg_client,
+                &mut index_cache,
+                &mut block,
+                &prometheus,
+                &ctx,
+            )
+            .await;
+
+            // Verify the etching operation was counted
+            let etching_count = prometheus.runes_etching_operations_per_block.get();
+            assert_eq!(etching_count, 1, "Expected 1 etching operation");
+
+            Ok(())
+        };
+
+        result
+    }
 }
