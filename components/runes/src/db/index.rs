@@ -6,7 +6,6 @@ use bitcoin::{
     Amount, Network, ScriptBuf, Transaction,
 };
 use bitcoind::{
-    indexer::tests::helpers::bitcoin_blocks::generate_test_bitcoin_block,
     try_info,
     types::{BitcoinBlockData, BitcoinTransactionData},
     utils::Context,
