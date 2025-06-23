@@ -2,7 +2,7 @@ use std::{collections::HashMap, num::NonZeroUsize, str::FromStr};
 
 use bitcoin::{Network, ScriptBuf};
 use bitcoind::{try_debug, try_warn, types::bitcoin::TxIn, utils::Context};
-use config::Config;
+use config::{BitcoindConfig, Config};
 use lru::LruCache;
 use ordinals_parser::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
 use tokio_postgres::{Client, Transaction};
@@ -12,7 +12,7 @@ use super::{
     transaction_location::TransactionLocation, utils::move_block_output_cache_to_output_cache,
 };
 use crate::db::{
-    cache::utils::input_rune_balances_from_tx_inputs,
+    cache::{rune_validation::tx_commits_to_rune, utils::input_rune_balances_from_tx_inputs},
     models::{
         db_balance_change::DbBalanceChange, db_ledger_entry::DbLedgerEntry,
         db_ledger_operation::DbLedgerOperation, db_rune::DbRune, db_supply_change::DbSupplyChange,
@@ -158,8 +158,40 @@ impl IndexCache {
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
         etchings_counter: &mut u64,
+        config: &BitcoindConfig,
+        bitcoin_tx: &bitcoin::Transaction,
     ) {
         let (rune_id, db_rune, entry) = self.tx_cache.apply_etching(etching, self.next_rune_number);
+
+        // Get the rune from the etching
+        let rune = etching.rune.unwrap_or_else(|| {
+            Rune::reserved(
+                self.tx_cache.location.block_height,
+                self.tx_cache.location.tx_index,
+            )
+        });
+
+        if rune.is_reserved() {
+            try_debug!(ctx, "Invalid rune for etching, reserved rune {}", rune);
+            return;
+        }
+
+        // Validate rune commitment
+        let is_valid_commitment = tx_commits_to_rune(
+            config,
+            ctx,
+            bitcoin_tx,
+            &rune,
+            self.tx_cache.location.block_height as u32,
+        )
+        .await
+        .unwrap_or(false);
+
+        if !is_valid_commitment {
+            try_debug!(ctx, "Invalid rune commitment for etching {}", rune);
+            return; // Skip invalid etchings
+        }
+
         try_debug!(
             ctx,
             "Etching {spaced_name} ({id}) {location}",

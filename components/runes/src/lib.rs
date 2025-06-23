@@ -26,6 +26,7 @@ async fn new_runes_indexer_runloop(
     let (commands_tx, commands_rx) = crossbeam_channel::unbounded::<IndexerCommand>();
 
     let config_moved = config.clone();
+    let bitcoin_config_moved = config.bitcoind.clone();
     let ctx_moved = ctx.clone();
     let prometheus_moved = prometheus.clone();
     let handle: JoinHandle<()> = hiro_system_kit::thread_named("runes_indexer")
@@ -60,6 +61,7 @@ async fn new_runes_indexer_runloop(
                                         block,
                                         &prometheus_moved,
                                         &ctx_moved,
+                                        &bitcoin_config_moved,
                                     )
                                     .await;
                                 }

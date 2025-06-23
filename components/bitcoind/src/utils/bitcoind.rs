@@ -1,6 +1,10 @@
 use std::{thread::sleep, time::Duration};
 
-use bitcoincore_rpc::{Auth, Client, RpcApi};
+use bitcoincore_rpc::{
+    bitcoin::{BlockHash, Txid},
+    Auth, Client, RpcApi,
+};
+use bitcoincore_rpc_json::GetRawTransactionResult;
 use config::BitcoindConfig;
 
 use crate::{try_error, try_info, types::BlockIdentifier, utils::Context};
@@ -32,6 +36,58 @@ pub fn bitcoind_get_chain_tip(config: &BitcoindConfig, ctx: &Context) -> BlockId
                 };
             }
             Err(e) => {
+                try_error!(
+                    ctx,
+                    "bitcoind: Unable to get block height: {}",
+                    e.to_string()
+                );
+                sleep(Duration::from_secs(1));
+            }
+        };
+    }
+}
+
+pub fn bitcoind_get_block_height(
+    config: &BitcoindConfig,
+    ctx: &Context,
+    blockhash: &BlockHash,
+) -> u32 {
+    let bitcoin_rpc = bitcoind_get_client(config, ctx);
+    loop {
+        match bitcoin_rpc.get_block_header_info(blockhash) {
+            Ok(result) => {
+                return result.height.try_into().unwrap();
+            }
+            Err(e) => {
+                try_error!(
+                    ctx,
+                    "bitcoind: Unable to get block header info: {}",
+                    e.to_string()
+                );
+                sleep(Duration::from_secs(1));
+            }
+        };
+    }
+}
+
+pub fn bitcoin_get_raw_transaction(
+    config: &BitcoindConfig,
+    ctx: &Context,
+    txid: &Txid,
+) -> Option<GetRawTransactionResult> {
+    let bitcoin_rpc = bitcoind_get_client(config, ctx);
+    // TODO: add test
+    let mut tries = 0;
+    loop {
+        match bitcoin_rpc.get_raw_transaction_info(txid, None) {
+            Ok(result) => {
+                return Some(result);
+            }
+            Err(e) => {
+                tries += 1;
+                if tries > 10 {
+                    return None;
+                }
                 try_error!(
                     ctx,
                     "bitcoind: Unable to get block height: {}",
