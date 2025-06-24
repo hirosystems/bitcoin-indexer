@@ -166,13 +166,14 @@ impl IndexCache {
 
         // Get the rune from the etching
         let rune = etching.rune.unwrap_or_else(|| {
+            // If no rune name is provided, generate the rune's reserved name
             Rune::reserved(
                 self.tx_cache.location.block_height,
                 self.tx_cache.location.tx_index,
             )
         });
 
-        // Only check if reserved when a rune name is explicitly provided
+        // Only check if rune name is reserved when a rune name is explicitly provided
         if let Some(provided_rune) = etching.rune {
             if provided_rune.is_reserved() {
                 try_debug!(
