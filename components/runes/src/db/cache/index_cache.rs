@@ -171,9 +171,16 @@ impl IndexCache {
             )
         });
 
-        if rune.is_reserved() {
-            try_debug!(ctx, "Invalid rune for etching, reserved rune {}", rune);
-            return;
+        // Only check if reserved when a rune name is explicitly provided
+        if let Some(provided_rune) = etching.rune {
+            if provided_rune.is_reserved() {
+                try_debug!(
+                    ctx,
+                    "Invalid rune for etching, reserved rune {}",
+                    provided_rune
+                );
+                return;
+            }
         }
 
         // Validate rune commitment
