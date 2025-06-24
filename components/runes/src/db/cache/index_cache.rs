@@ -160,6 +160,7 @@ impl IndexCache {
         etchings_counter: &mut u64,
         config: &BitcoindConfig,
         bitcoin_tx: &bitcoin::Transaction,
+        inputs_counter: &mut u64,
     ) {
         let (rune_id, db_rune, entry) = self.tx_cache.apply_etching(etching, self.next_rune_number);
 
@@ -190,6 +191,7 @@ impl IndexCache {
             bitcoin_tx,
             &rune,
             self.tx_cache.location.block_height as u32,
+            inputs_counter,
         )
         .await
         .unwrap_or(false);

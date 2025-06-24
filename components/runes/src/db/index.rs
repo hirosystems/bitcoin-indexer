@@ -86,6 +86,7 @@ pub async fn index_block(
     let mut cenotaph_etching_count: u64 = 0;
     let mut cenotaph_mint_count: u64 = 0;
     let mut cenotaph_count: u64 = 0;
+    let mut inputs_count: u64 = 0;
 
     let mut db_tx = pg_client
         .transaction()
@@ -135,6 +136,7 @@ pub async fn index_block(
                                 &mut etching_count,
                                 bitcoin_config,
                                 &transaction,
+                                &mut inputs_count,
                             )
                             .await;
                     }
@@ -200,6 +202,7 @@ pub async fn index_block(
     prometheus.metrics_record_runes_cenotaph_per_block(cenotaph_count);
     prometheus.metrics_record_runes_cenotaph_etching_per_block(cenotaph_etching_count);
     prometheus.metrics_record_runes_cenotaph_mint_per_block(cenotaph_mint_count);
+    prometheus.metrics_record_runes_etching_inputs_checked_per_block(inputs_count);
 
     // Record metrics
     prometheus.metrics_block_indexed(block_height);
