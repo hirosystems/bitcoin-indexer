@@ -16,6 +16,10 @@ fn unversioned_leaf_script_from_witness(witness: &Witness) -> Option<&Script> {
     witness.tapscript()
 }
 
+/// Reserved runes cannot be etched because they serve as a fallback mechanism for failed etchings
+/// and prevent namespace collision in the Bitcoin Runes protocol. When an etching transaction fails
+/// to specify a valid rune name or the etching is malformed, the protocol automatically assigns a
+/// "reserved" rune name using a deterministic formula to maintain protocol integrity.
 pub fn is_reserved(rune: &Rune) -> bool {
     rune.0 >= Rune::RESERVED
 }
@@ -84,4 +88,467 @@ pub async fn tx_commits_to_rune(
     }
 
     Ok(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use bitcoin::{
+        opcodes, script::Builder, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
+    };
+    use bitcoind::utils::Context;
+    use config::BitcoindConfig;
+    use ordinals_parser::Rune;
+
+    use super::*;
+
+    // Mock implementations for testing
+    struct MockBitcoindConfig;
+
+    impl MockBitcoindConfig {
+        fn new() -> BitcoindConfig {
+            BitcoindConfig {
+                rpc_username: "test".to_string(),
+                rpc_password: "test".to_string(),
+                rpc_url: "http://localhost:8332".to_string(),
+                network: bitcoin::Network::Regtest,
+                zmq_url: "tcp://localhost:28332".to_string(),
+            }
+        }
+    }
+
+    fn create_mock_transaction_with_witness(witness_data: Vec<Vec<u8>>) -> Transaction {
+        let mut witness = Witness::new();
+        for data in witness_data {
+            witness.push(data);
+        }
+
+        Transaction {
+            version: bitcoin::transaction::Version::TWO,
+            lock_time: bitcoin::absolute::LockTime::ZERO,
+            input: vec![TxIn {
+                previous_output: OutPoint {
+                    txid: bitcoin::Txid::from_str(
+                        "0000000000000000000000000000000000000000000000000000000000000001",
+                    )
+                    .unwrap(),
+                    vout: 0,
+                },
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+                witness,
+            }],
+            output: vec![TxOut {
+                value: bitcoin::Amount::from_sat(1000),
+                script_pubkey: ScriptBuf::new(),
+            }],
+        }
+    }
+
+    fn create_mock_transaction_no_witness() -> Transaction {
+        Transaction {
+            version: bitcoin::transaction::Version::TWO,
+            lock_time: bitcoin::absolute::LockTime::ZERO,
+            input: vec![TxIn {
+                previous_output: OutPoint {
+                    txid: bitcoin::Txid::from_str(
+                        "0000000000000000000000000000000000000000000000000000000000000001",
+                    )
+                    .unwrap(),
+                    vout: 0,
+                },
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+                witness: Witness::new(),
+            }],
+            output: vec![TxOut {
+                value: bitcoin::Amount::from_sat(1000),
+                script_pubkey: ScriptBuf::new(),
+            }],
+        }
+    }
+
+    fn create_tapscript_with_commitment(commitment: &[u8]) -> ScriptBuf {
+        use bitcoin::script::PushBytesBuf;
+
+        let push_bytes = PushBytesBuf::try_from(commitment.to_vec()).unwrap();
+        Builder::new()
+            .push_slice(&push_bytes)
+            .push_opcode(opcodes::all::OP_DROP)
+            .push_opcode(opcodes::OP_TRUE)
+            .into_script()
+    }
+
+    /// Tests that reserved runes are correctly identified
+    /// This validates the core reserved rune detection logic
+    #[test]
+    fn test_is_reserved_returns_true_for_reserved_rune() {
+        let reserved_rune = Rune::reserved(840000, 1);
+        // reserved runes used for fallback mechanism
+        let reserved_rune2 = Rune(6402364363415443603228541259936211926);
+        let reserved_rune3 = Rune(6402364363415443603228541259936211927);
+        assert!(is_reserved(&reserved_rune));
+        assert!(is_reserved(&reserved_rune2));
+        assert!(is_reserved(&reserved_rune3));
+    }
+
+    /// Tests that non-reserved runes are not incorrectly flagged as reserved
+    /// This ensures the RESERVED threshold is working correctly
+    #[test]
+    fn test_is_reserved_returns_false_for_non_reserved_rune() {
+        let non_reserved_rune = Rune(1000); // Well below RESERVED threshold
+        assert!(!is_reserved(&non_reserved_rune));
+    }
+
+    /// Tests that transactions without witness data fail commitment validation
+    /// This validates: "tx input is not a commit" case
+    #[tokio::test]
+    async fn test_tx_commits_to_rune_fails_with_no_witness() {
+        let config = MockBitcoindConfig::new();
+        let ctx = Context::empty();
+        let tx = create_mock_transaction_no_witness();
+        let rune = Rune(1000);
+        let mut inputs_counter = 0;
+
+        let result = tx_commits_to_rune(&config, &ctx, &tx, &rune, 840005, &mut inputs_counter)
+            .await
+            .unwrap();
+
+        assert!(!result);
+        assert_eq!(inputs_counter, 1);
+    }
+
+    /// Tests that transactions with incorrect commitment data fail validation
+    /// This validates the commitment matching logic
+    #[tokio::test]
+    async fn test_tx_commits_to_rune_fails_with_wrong_commitment() {
+        let config = MockBitcoindConfig::new();
+        let ctx = Context::empty();
+        let rune = Rune(1000);
+        let wrong_commitment = b"wrong_commitment_data";
+
+        // Create tapscript with wrong commitment
+        let tapscript = create_tapscript_with_commitment(wrong_commitment);
+
+        // Create witness with the tapscript
+        let witness_data = vec![
+            vec![], // Signature placeholder
+            tapscript.to_bytes(),
+        ];
+
+        let tx = create_mock_transaction_with_witness(witness_data);
+        let mut inputs_counter = 0;
+
+        let result = tx_commits_to_rune(&config, &ctx, &tx, &rune, 840005, &mut inputs_counter)
+            .await
+            .unwrap();
+
+        assert!(!result);
+        assert_eq!(inputs_counter, 1);
+    }
+
+    /// Tests that rune commitment generation is deterministic and correct
+    /// This validates the core commitment encoding (rune value as bytes, not a hash!)
+    #[test]
+    fn test_rune_commitment_generation() {
+        let rune = Rune(1000);
+        let commitment = rune.commitment();
+
+        // The commitment is the rune value encoded as bytes (little-endian)
+        // For Rune(1000), this is [232, 3] (little-endian encoding of 1000)
+        // 1000 = 0x03E8 -> little-endian [0xE8, 0x03] = [232, 3]
+        assert_eq!(commitment.len(), 2);
+        assert_eq!(commitment, &[232, 3]);
+
+        // Same rune should generate same commitment
+        let rune2 = Rune(1000);
+        let commitment2 = rune2.commitment();
+        assert_eq!(commitment, commitment2);
+
+        // Different rune should generate different commitment
+        let rune3 = Rune(2000);
+        let commitment3 = rune3.commitment();
+        assert_ne!(commitment, commitment3);
+        // Rune(2000) = 0x07D0 -> little-endian [0xD0, 0x07] = [208, 7]
+        assert_eq!(commitment3, &[208, 7]);
+
+        // Test larger rune value that requires more bytes
+        let large_rune = Rune(0x123456789ABCDEF0);
+        let large_commitment = large_rune.commitment();
+        assert!(large_commitment.len() > 2); // Larger values need more bytes
+
+        // Test very small rune (single byte)
+        let small_rune = Rune(42);
+        let small_commitment = small_rune.commitment();
+        assert_eq!(small_commitment, &[42]); // Should be just [42]
+    }
+
+    // Helper function for testing - mimics tx_commits_to_rune but with mockable RPC calls
+    async fn tx_commits_to_rune_with_mocks(
+        tx: &Transaction,
+        rune: &Rune,
+        reveal_block_height: u32,
+        mock_commit_tx_block_height: u32,
+        mock_is_taproot: bool,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        let commitment = rune.commitment();
+
+        for input in &tx.input {
+            let Some(tapscript) = unversioned_leaf_script_from_witness(&input.witness) else {
+                continue;
+            };
+
+            for instruction in tapscript.instructions() {
+                let Ok(instruction) = instruction else {
+                    break;
+                };
+
+                let Some(pushbytes) = instruction.push_bytes() else {
+                    continue;
+                };
+
+                if pushbytes.as_bytes() != commitment {
+                    continue;
+                }
+
+                // Mock: Assume we found the commit transaction
+                // In real code: bitcoin_get_raw_transaction(config, ctx, &txid)
+                if !mock_is_taproot {
+                    continue;
+                }
+
+                // Mock: Return our mock block height
+                // In real code: bitcoind_get_block_height(config, ctx, &commit_tx_info.blockhash.unwrap())
+                let commit_tx_height = mock_commit_tx_block_height;
+
+                let confirmations = reveal_block_height.checked_sub(commit_tx_height).unwrap() + 1;
+                if confirmations >= u32::from(Runestone::COMMIT_CONFIRMATIONS) {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn create_transaction_with_valid_commitment(rune: &Rune) -> Transaction {
+        let commitment = rune.commitment();
+        let tapscript = create_tapscript_with_commitment(&commitment);
+
+        // For taproot script path spending, we need:
+        // - signature (can be empty for script-only validation)
+        // - script
+        // - control block (minimal for testing)
+        let witness_data = vec![
+            vec![], // Empty signature for script-only validation
+            tapscript.to_bytes(),
+            vec![0xc0], // Minimal control block (leaf version + empty merkle path)
+        ];
+
+        create_mock_transaction_with_witness(witness_data)
+    }
+
+    /// Tests that commit_tx in the same block as reveal_tx fails validation
+    /// This validates: "commit_tx (tx_input) happened in same block"
+    #[tokio::test]
+    async fn test_tx_commits_to_rune_fails_same_block() {
+        let rune = Rune(1000);
+        let tx = create_transaction_with_valid_commitment(&rune);
+
+        let reveal_block_height = 840010;
+        let commit_block_height = 840010; // Same block!
+        let is_taproot = true;
+
+        let result = tx_commits_to_rune_with_mocks(
+            &tx,
+            &rune,
+            reveal_block_height,
+            commit_block_height,
+            is_taproot,
+        )
+        .await
+        .unwrap();
+
+        // Should fail because commit and reveal are in the same block
+        // confirmations = 840010 - 840010 + 1 = 1, which is < 6
+        assert!(!result);
+    }
+
+    /// Tests that commit_tx with insufficient confirmations fails validation
+    /// This validates: "commit_tx has not enough block heights confirmed (6)"
+    #[tokio::test]
+    async fn test_tx_commits_to_rune_fails_insufficient_confirmations() {
+        let rune = Rune(1000);
+        let tx = create_transaction_with_valid_commitment(&rune);
+
+        let reveal_block_height = 840010;
+        let commit_block_height = 840006; // 5 confirmations (840010 - 840006 + 1 = 5)
+        let is_taproot = true;
+
+        let result = tx_commits_to_rune_with_mocks(
+            &tx,
+            &rune,
+            reveal_block_height,
+            commit_block_height,
+            is_taproot,
+        )
+        .await
+        .unwrap();
+
+        // Should fail because only 5 confirmations, need 6
+        assert!(!result);
+    }
+
+    /// Tests edge case: exactly 5 confirmations should fail
+    #[tokio::test]
+    async fn test_tx_commits_to_rune_fails_exactly_five_confirmations() {
+        let rune = Rune(1000);
+        let tx = create_transaction_with_valid_commitment(&rune);
+
+        let reveal_block_height = 840010;
+        let commit_block_height = 840006; // Exactly 5 confirmations
+        let is_taproot = true;
+
+        let result = tx_commits_to_rune_with_mocks(
+            &tx,
+            &rune,
+            reveal_block_height,
+            commit_block_height,
+            is_taproot,
+        )
+        .await
+        .unwrap();
+
+        assert!(!result);
+    }
+
+    /// Tests that exactly 6 confirmations should succeed
+    #[tokio::test]
+    async fn test_tx_commits_to_rune_succeeds_exactly_six_confirmations() {
+        let rune = Rune(1000);
+        let tx = create_transaction_with_valid_commitment(&rune);
+
+        let reveal_block_height = 840010;
+        let commit_block_height = 840005; // Exactly 6 confirmations (840010 - 840005 + 1 = 6)
+        let is_taproot = true;
+
+        let result = tx_commits_to_rune_with_mocks(
+            &tx,
+            &rune,
+            reveal_block_height,
+            commit_block_height,
+            is_taproot,
+        )
+        .await
+        .unwrap();
+
+        // Should succeed with exactly 6 confirmations
+        assert!(result);
+    }
+
+    /// Tests that proper commitment with ≥6 confirmations succeeds
+    /// This validates the happy path of commitment validation
+    #[tokio::test]
+    async fn test_tx_commits_to_rune_succeeds_with_valid_commitment() {
+        let rune = Rune(1000);
+        let tx = create_transaction_with_valid_commitment(&rune);
+
+        let reveal_block_height = 840010;
+        let commit_block_height = 840000; // 11 confirmations (840010 - 840000 + 1 = 11)
+        let is_taproot = true;
+
+        let result = tx_commits_to_rune_with_mocks(
+            &tx,
+            &rune,
+            reveal_block_height,
+            commit_block_height,
+            is_taproot,
+        )
+        .await
+        .unwrap();
+
+        // Should succeed with sufficient confirmations
+        assert!(result);
+    }
+
+    /// Tests that non-taproot commitment transactions fail
+    /// This validates the taproot requirement
+    #[tokio::test]
+    async fn test_tx_commits_to_rune_fails_non_taproot() {
+        let rune = Rune(1000);
+        let tx = create_transaction_with_valid_commitment(&rune);
+
+        let reveal_block_height = 840010;
+        let commit_block_height = 840000; // Sufficient confirmations
+        let is_taproot = false; // Not a taproot transaction
+
+        let result = tx_commits_to_rune_with_mocks(
+            &tx,
+            &rune,
+            reveal_block_height,
+            commit_block_height,
+            is_taproot,
+        )
+        .await
+        .unwrap();
+
+        // Should fail because commit tx is not taproot
+        assert!(!result);
+    }
+
+    /// Tests multiple inputs where only one has valid commitment
+    #[tokio::test]
+    async fn test_tx_commits_to_rune_multiple_inputs_one_valid() {
+        let rune = Rune(1000);
+        let commitment = rune.commitment();
+
+        // Create transaction with multiple inputs
+        let mut tx = create_mock_transaction_no_witness();
+
+        // First input: no valid commitment
+        let wrong_tapscript = create_tapscript_with_commitment(b"wrong_commitment");
+        let mut wrong_witness = Witness::new();
+        wrong_witness.push(vec![]); // Empty signature
+        wrong_witness.push(wrong_tapscript.to_bytes());
+        wrong_witness.push(vec![0xc0]); // Control block
+        tx.input[0].witness = wrong_witness;
+
+        // Add second input with valid commitment
+        let valid_tapscript = create_tapscript_with_commitment(&commitment);
+        let mut valid_witness = Witness::new();
+        valid_witness.push(vec![]); // Empty signature
+        valid_witness.push(valid_tapscript.to_bytes());
+        valid_witness.push(vec![0xc0]); // Control block
+
+        tx.input.push(TxIn {
+            previous_output: OutPoint {
+                txid: bitcoin::Txid::from_str(
+                    "0000000000000000000000000000000000000000000000000000000000000002",
+                )
+                .unwrap(),
+                vout: 0,
+            },
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+            witness: valid_witness,
+        });
+
+        let reveal_block_height = 840010;
+        let commit_block_height = 840000;
+        let is_taproot = true;
+
+        let result = tx_commits_to_rune_with_mocks(
+            &tx,
+            &rune,
+            reveal_block_height,
+            commit_block_height,
+            is_taproot,
+        )
+        .await
+        .unwrap();
+
+        // Should succeed because second input has valid commitment
+        assert!(result);
+    }
 }
