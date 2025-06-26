@@ -24,7 +24,36 @@ pub fn is_reserved(rune: &Rune) -> bool {
     rune.0 >= Rune::RESERVED
 }
 
-pub async fn tx_commits_to_rune(
+/// Validates that a rune etching transaction has a proper commitment transaction.
+///
+/// The Bitcoin Runes protocol requires a two-step "commit-reveal" process for etching new runes:
+/// 1. **Commit**: A transaction includes the rune's commitment bytes in a tapscript
+/// 2. **Reveal**: A subsequent transaction (this one) actually performs the etching
+///
+/// This function validates the reveal transaction by checking that:
+/// - At least one input spends from a taproot output that contains the rune's commitment
+/// - The commitment transaction was confirmed at least 6 blocks before the reveal
+/// - The commitment appears in a valid tapscript witness
+///
+/// # Arguments
+/// * `config` - Bitcoin node configuration for RPC calls
+/// * `ctx` - Logging and error context
+/// * `tx` - The reveal transaction attempting to etch the rune
+/// * `rune` - The rune being etched (used to generate expected commitment bytes)
+/// * `reveal_block_height` - Block height where this reveal transaction appears
+/// * `inputs_counter` - Mutable counter tracking total inputs processed (for metrics)
+///
+/// # Returns
+/// * `Ok(true)` - Valid commitment found with sufficient confirmations
+/// * `Ok(false)` - No valid commitment found or insufficient confirmations
+/// * `Err(_)` - Error accessing blockchain data or parsing scripts
+///
+/// # Validation Rules
+/// - Commitment must appear in tapscript witness data
+/// - The spent output must be a P2TR (taproot) output
+/// - At least 6 block confirmations between commit and reveal
+/// - Commitment bytes must exactly match `rune.commitment()`
+pub async fn rune_etching_has_valid_commit(
     config: &BitcoindConfig,
     ctx: &Context,
     tx: &Transaction,
@@ -34,17 +63,16 @@ pub async fn tx_commits_to_rune(
 ) -> Result<bool, Box<dyn std::error::Error>> {
     let commitment = rune.commitment();
 
+    // Check each input for valid commitment (the commitment could be in any input)
     for input in &tx.input {
         *inputs_counter += 1;
-        // extracting a tapscript does not indicate that the input being spent
-        // was actually a taproot output. this is checked below, when we load the
-        // output's entry from the database
+        // Extract tapscript from witness data (note: this doesn't guarantee the spent output is taproot)
         let Some(tapscript) = unversioned_leaf_script_from_witness(&input.witness) else {
             continue;
         };
 
         for instruction in tapscript.instructions() {
-            // ignore errors, since the extracted script may not be valid
+            // Skip invalid script instructions
             let Ok(instruction) = instruction else {
                 break;
             };
@@ -53,6 +81,7 @@ pub async fn tx_commits_to_rune(
                 continue;
             };
 
+            // Check if this instruction pushes the expected commitment bytes
             if pushbytes.as_bytes() != commitment {
                 continue;
             }
@@ -61,6 +90,7 @@ pub async fn tx_commits_to_rune(
                 bitcoincore_rpc::bitcoin::Txid::from_str(&input.previous_output.txid.to_string())
                     .unwrap();
 
+            // Fetch the commit transaction to validate taproot output and get block height
             let Some(commit_tx_info) = bitcoin_get_raw_transaction(config, ctx, &txid) else {
                 panic!(
                     "can't get input transaction: {}",
@@ -68,6 +98,7 @@ pub async fn tx_commits_to_rune(
                 );
             };
 
+            // Verify the spent output is a taproot (P2TR) output
             let taproot = commit_tx_info.vout[input.previous_output.vout as usize]
                 .script_pub_key
                 .script()?
@@ -77,9 +108,11 @@ pub async fn tx_commits_to_rune(
                 continue;
             }
 
+            // Get commit transaction's block height to check confirmation count
             let commit_tx_height =
                 bitcoind_get_block_height(config, ctx, &commit_tx_info.blockhash.unwrap());
 
+            // Calculate confirmations and check minimum requirement (6 blocks)
             let confirmations = reveal_block_height.checked_sub(commit_tx_height).unwrap() + 1;
             if confirmations >= u32::from(Runestone::COMMIT_CONFIRMATIONS) {
                 return Ok(true);
@@ -185,7 +218,7 @@ mod tests {
     #[test]
     fn test_is_reserved_returns_true_for_reserved_rune() {
         let reserved_rune = Rune::reserved(840000, 1);
-        // reserved runes used for fallback mechanism
+        // Additional reserved runes for testing
         let reserved_rune2 = Rune(6402364363415443603228541259936211926);
         let reserved_rune3 = Rune(6402364363415443603228541259936211927);
         assert!(is_reserved(&reserved_rune));
@@ -211,9 +244,10 @@ mod tests {
         let rune = Rune(1000);
         let mut inputs_counter = 0;
 
-        let result = tx_commits_to_rune(&config, &ctx, &tx, &rune, 840005, &mut inputs_counter)
-            .await
-            .unwrap();
+        let result =
+            rune_etching_has_valid_commit(&config, &ctx, &tx, &rune, 840005, &mut inputs_counter)
+                .await
+                .unwrap();
 
         assert!(!result);
         assert_eq!(inputs_counter, 1);
@@ -240,9 +274,10 @@ mod tests {
         let tx = create_mock_transaction_with_witness(witness_data);
         let mut inputs_counter = 0;
 
-        let result = tx_commits_to_rune(&config, &ctx, &tx, &rune, 840005, &mut inputs_counter)
-            .await
-            .unwrap();
+        let result =
+            rune_etching_has_valid_commit(&config, &ctx, &tx, &rune, 840005, &mut inputs_counter)
+                .await
+                .unwrap();
 
         assert!(!result);
         assert_eq!(inputs_counter, 1);

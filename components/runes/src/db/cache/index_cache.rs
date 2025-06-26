@@ -12,7 +12,9 @@ use super::{
     transaction_location::TransactionLocation, utils::move_block_output_cache_to_output_cache,
 };
 use crate::db::{
-    cache::{rune_validation::tx_commits_to_rune, utils::input_rune_balances_from_tx_inputs},
+    cache::{
+        rune_validation::rune_etching_has_valid_commit, utils::input_rune_balances_from_tx_inputs,
+    },
     models::{
         db_balance_change::DbBalanceChange, db_ledger_entry::DbLedgerEntry,
         db_ledger_operation::DbLedgerOperation, db_rune::DbRune, db_supply_change::DbSupplyChange,
@@ -186,7 +188,7 @@ impl IndexCache {
         }
 
         // Validate rune commitment
-        let is_valid_commitment = tx_commits_to_rune(
+        let is_valid_commitment = rune_etching_has_valid_commit(
             config,
             ctx,
             bitcoin_tx,
