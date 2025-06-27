@@ -2,14 +2,6 @@
  * @jest-environment node
  */
 
-// Set environment variables before any modules are imported
-process.env.RUNES_PGHOST = process.env.RUNES_PGHOST || 'localhost';
-process.env.RUNES_PGPORT = process.env.RUNES_PGPORT || '5432';
-process.env.RUNES_PGUSER = process.env.RUNES_PGUSER || 'test';
-process.env.RUNES_PGPASSWORD = process.env.RUNES_PGPASSWORD || 'test';
-process.env.RUNES_PGDATABASE = process.env.RUNES_PGDATABASE || 'test';
-process.env.API_RESULTS_MAX_LIMIT = process.env.API_RESULTS_MAX_LIMIT || '100';
-
 import { PgStore } from '../../src/pg/pg-store';
 import { DbLedgerEntry } from '../../src/pg/types';
 import {
@@ -31,6 +23,16 @@ describe('Configurable Limit Tests', () => {
 
   const rune = sampleRune('1:1', 'Test Rune');
   const baseEntry = sampleLedgerEntry(rune.id);
+
+  beforeAll(() => {
+    // Set environment variables before any modules are imported
+    process.env.RUNES_PGHOST = process.env.RUNES_PGHOST || 'localhost';
+    process.env.RUNES_PGPORT = process.env.RUNES_PGPORT || '5432';
+    process.env.RUNES_PGUSER = process.env.RUNES_PGUSER || 'test';
+    process.env.RUNES_PGPASSWORD = process.env.RUNES_PGPASSWORD || 'test';
+    process.env.RUNES_PGDATABASE = process.env.RUNES_PGDATABASE || 'test';
+    process.env.API_RESULTS_MAX_LIMIT = process.env.API_RESULTS_MAX_LIMIT || '100';
+  });
 
   beforeEach(async () => {
     db = await PgStore.connect();
