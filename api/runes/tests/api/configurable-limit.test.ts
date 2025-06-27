@@ -1,5 +1,5 @@
 /**
- * @jest-environment node
+ * \@jest-environment node
  */
 
 import { PgStore } from '../../src/pg/pg-store';
