@@ -9,11 +9,11 @@ const schema = Type.Object({
   /** Port in which to serve the Admin RPC interface */
   ADMIN_RPC_PORT: Type.Number({ default: 3001, minimum: 0, maximum: 65535 }),
 
-  RUNES_PGHOST: Type.String({ default: 'localhost' }),
+  RUNES_PGHOST: Type.String(),
   RUNES_PGPORT: Type.Number({ default: 5432, minimum: 0, maximum: 65535 }),
-  RUNES_PGUSER: Type.String({ default: 'postgres' }),
-  RUNES_PGPASSWORD: Type.String({ default: 'password' }),
-  RUNES_PGDATABASE: Type.String({ default: 'postgres' }),
+  RUNES_PGUSER: Type.String(),
+  RUNES_PGPASSWORD: Type.String(),
+  RUNES_PGDATABASE: Type.String(),
 
   /** Limit to how many concurrent connections can be created */
   PG_CONNECTION_POOL_MAX: Type.Number({ default: 10 }),
