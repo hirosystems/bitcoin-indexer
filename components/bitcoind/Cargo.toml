@@ -23,7 +23,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 tokio = { workspace = true }
 base58 = "0.2.0"
-crossbeam-channel = "0.5.6"
+crossbeam-channel = "0.5.15"
 hex = "0.4.3"
 zmq = "0.10.0"
 lazy_static = "1.4.0"
