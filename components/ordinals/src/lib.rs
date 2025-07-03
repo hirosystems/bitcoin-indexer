@@ -19,11 +19,11 @@ use bitcoind::{
 use config::Config;
 use db::{
     blocks::{self, find_last_block_inserted, open_blocks_db_with_retry},
-    migrate_dbs,
+    migrate_dbs, ordinals_pg,
 };
 use deadpool_postgres::Pool;
 use postgres::{pg_pool, pg_pool_client};
-use utils::monitoring::PrometheusMonitoring;
+use utils::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring};
 
 #[macro_use]
 extern crate serde_derive;
@@ -215,8 +215,38 @@ pub async fn start_ordinals_indexer(
     ctx: &Context,
 ) -> Result<(), String> {
     migrate_dbs(config, ctx).await?;
+    let prometheus = PrometheusMonitoring::new();
+    let pg_pools = pg_pools(config);
 
-    let indexer = new_ordinals_indexer_runloop(&PrometheusMonitoring::new(), config, ctx).await?;
+    // Initialize metrics with current state
+    let max_inscription_number = {
+        let ord_client = pg_pool_client(&pg_pools.ordinals).await?;
+        ordinals_pg::get_highest_inscription_number(&ord_client)
+            .await?
+            .unwrap_or(0) as u64
+    };
+    let chain_tip = get_chain_tip(config).await?;
+    prometheus
+        .initialize(max_inscription_number, chain_tip.index, &pg_pools)
+        .await?;
+
+    let indexer = new_ordinals_indexer_runloop(&prometheus, config, ctx).await?;
+
+    if let Some(metrics) = &config.metrics {
+        if metrics.enabled {
+            let registry_moved = prometheus.registry.clone();
+            let ctx_cloned = ctx.clone();
+            let port = metrics.prometheus_port;
+            let _ = std::thread::spawn(move || {
+                hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
+                    port,
+                    registry_moved,
+                    ctx_cloned,
+                ));
+            });
+        }
+    }
+
     start_bitcoin_indexer(
         &indexer,
         first_inscription_height(config),

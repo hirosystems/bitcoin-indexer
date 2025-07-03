@@ -16,7 +16,10 @@ use super::{
     parser::ParsedBrc20Operation,
     verifier::{verify_brc20_operation, verify_brc20_transfers, VerifiedBrc20Operation},
 };
-use crate::core::meta_protocols::brc20::u128_amount_to_decimals_str;
+use crate::{
+    core::meta_protocols::brc20::u128_amount_to_decimals_str,
+    utils::monitoring::PrometheusMonitoring,
+};
 
 /// Index ordinal transfers in a single Bitcoin block looking for BRC-20 transfers.
 async fn index_unverified_brc20_transfers(
@@ -81,6 +84,7 @@ pub async fn index_block_and_insert_brc20_operations(
     brc20_cache: &mut Brc20MemoryCache,
     brc20_db_tx: &Transaction<'_>,
     ctx: &Context,
+    monitoring: &PrometheusMonitoring,
 ) -> Result<(), String> {
     if block.block_identifier.index < brc20_activation_height(&block.metadata.network) {
         return Ok(());
@@ -95,10 +99,10 @@ pub async fn index_block_and_insert_brc20_operations(
     let mut verified_brc20_transfers = vec![];
 
     // Track counts of each operation type
-    let mut deploy_count = 0;
-    let mut mint_count = 0;
-    let mut transfer_count = 0;
-    let mut transfer_send_count = 0;
+    let mut deploy_count: u64 = 0;
+    let mut mint_count: u64 = 0;
+    let mut transfer_count: u64 = 0;
+    let mut transfer_send_count: u64 = 0;
 
     // Check every transaction in the block. Look for BRC-20 operations.
     for (tx_index, tx) in block.transactions.iter_mut().enumerate() {
@@ -121,7 +125,7 @@ pub async fn index_block_and_insert_brc20_operations(
                         ctx,
                     )
                     .await?;
-                    transfer_send_count += brc20_transfers.len();
+                    transfer_send_count += brc20_transfers.len() as u64;
                     verified_brc20_transfers.append(&mut brc20_transfers);
                     unverified_ordinal_transfers.clear();
                     // Then continue with the new operation.
@@ -256,9 +260,8 @@ pub async fn index_block_and_insert_brc20_operations(
         ctx,
     )
     .await?;
-    transfer_send_count += final_transfers.len();
+    transfer_send_count += final_transfers.len() as u64;
     verified_brc20_transfers.append(&mut final_transfers);
-
     for (tx_index, verified_transfer) in verified_brc20_transfers.into_iter() {
         block
             .transactions
@@ -272,6 +275,16 @@ pub async fn index_block_and_insert_brc20_operations(
 
     // Log completion of BRC-20 indexing with metrics
     let elapsed = stopwatch.elapsed();
+
+    monitoring.metrics_record_brc20_deploy_per_block(deploy_count);
+    monitoring.metrics_record_brc20_mint_per_block(mint_count);
+    monitoring.metrics_record_brc20_transfer_per_block(transfer_count);
+    monitoring.metrics_record_brc20_transfer_send_per_block(transfer_send_count);
+
+    monitoring.metrics_record_brc20_deploy_total(deploy_count);
+    monitoring.metrics_record_brc20_mint_total(mint_count);
+    monitoring.metrics_record_brc20_transfer_total(transfer_count);
+    monitoring.metrics_record_brc20_transfer_send_total(transfer_send_count);
 
     try_info!(
         ctx,
@@ -306,6 +319,7 @@ mod test {
             test_builders::{TestBlockBuilder, TestTransactionBuilder},
         },
         db::{pg_reset_db, pg_test_connection, pg_test_connection_pool},
+        utils::monitoring::PrometheusMonitoring,
     };
 
     #[tokio::test]
@@ -401,6 +415,7 @@ mod test {
                 )
                 .build();
             let mut cache = Brc20MemoryCache::new(10);
+            let monitoring = PrometheusMonitoring::new();
 
             let result = index_block_and_insert_brc20_operations(
                 &mut block,
@@ -408,6 +423,7 @@ mod test {
                 &mut cache,
                 &client,
                 &ctx,
+                &monitoring,
             )
             .await;
 
