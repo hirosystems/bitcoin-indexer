@@ -28,6 +28,21 @@ export const BlockRoutes: FastifyPluginCallback<
         querystring: Type.Object({
           offset: Optional(OffsetSchema),
           limit: Optional(LimitSchema),
+          operation_type: Optional(
+            Type.Union(
+              [
+                Type.Literal('etching'),
+                Type.Literal('mint'),
+                Type.Literal('burn'),
+                Type.Literal('send'),
+                Type.Literal('receive'),
+              ],
+              {
+                title: 'OperationType',
+                description: 'Filter activities by operation type',
+              }
+            )
+          ),
         }),
         response: {
           200: PaginatedResponse(ActivityResponseSchema, 'Paginated activity response'),
@@ -37,7 +52,14 @@ export const BlockRoutes: FastifyPluginCallback<
     async (request, reply) => {
       const offset = request.query.offset ?? 0;
       const limit = request.query.limit ?? 20;
-      const results = await fastify.db.getBlockActivity(request.params.block, offset, limit);
+      const operationType = request.query.operation_type;
+
+      const results = await fastify.db.getBlockActivity(
+        request.params.block,
+        offset,
+        limit,
+        operationType
+      );
       await reply.send({
         limit,
         offset,

@@ -26,6 +26,8 @@ deadpool-postgres = { workspace = true }
 refinery = { workspace = true }
 num-traits = "0.2.14"
 maplit = "1.0.2"
+prometheus = { workspace = true }
+hyper = { version = "0.14", features = ["full"] }
 
 [dev-dependencies]
 test-case = "3.1.0"
