@@ -1,17 +1,17 @@
-use {
-    super::{inscription::Inscription, tag::Tag},
-    bitcoin::{
-        blockdata::{
-            opcodes,
-            script::{
-                Instruction::{self, Op, PushBytes},
-                Instructions,
-            },
+use std::{collections::BTreeMap, iter::Peekable};
+
+use bitcoin::{
+    blockdata::{
+        opcodes,
+        script::{
+            Instruction::{self, Op, PushBytes},
+            Instructions,
         },
-        script, Script, Transaction,
     },
-    std::{collections::BTreeMap, iter::Peekable},
+    script, Script, Transaction,
 };
+
+use super::{inscription::Inscription, tag::Tag};
 
 pub(crate) const PROTOCOL_ID: [u8; 3] = *b"ord";
 pub(crate) const BODY_TAG: [u8; 0] = [];

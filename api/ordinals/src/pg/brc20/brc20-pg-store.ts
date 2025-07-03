@@ -6,6 +6,7 @@ import {
   DbBrc20Holder,
   DbBrc20Token,
   DbBrc20TokenWithSupply,
+  DbBrc20TransferableInscription,
 } from './types';
 import { Brc20TokenOrderBy } from '../../api/schemas';
 import { objRemoveUndefinedValues } from '../helpers';
@@ -88,13 +89,13 @@ export class Brc20PgStore extends BasePgStore {
     const results = await this.sql<(DbBrc20Balance & { total: number })[]>`
       SELECT
         b.ticker, (SELECT decimals FROM tokens WHERE ticker = b.ticker) AS decimals,
-        b.avail_balance, b.trans_balance, b.total_balance, COUNT(*) OVER() as total
+        b.avail_balance, b.trans_balance, b.total_balance, COUNT(*) OVER() AS total
       ${
         args.block_height
           ? this.sql`
               FROM balances_history b
               INNER JOIN (
-                SELECT ticker, address, MAX(block_height) as max_block_height
+                SELECT ticker, address, MAX(block_height) AS max_block_height
                 FROM balances_history
                 WHERE address = ${args.address} AND block_height <= ${args.block_height}
                 GROUP BY ticker, address
@@ -115,6 +116,40 @@ export class Brc20PgStore extends BasePgStore {
       LIMIT ${args.limit}
       OFFSET ${args.offset}
     `;
+    return {
+      total: results[0]?.total ?? 0,
+      results: results ?? [],
+    };
+  }
+
+  async getTransferableInscriptions(
+    args: {
+      address: string;
+      ticker?: string[];
+    } & DbInscriptionIndexPaging
+  ): Promise<DbPaginatedResult<DbBrc20TransferableInscription>> {
+    const results = await this.sql<(DbBrc20TransferableInscription & { total: number })[]>`
+      SELECT
+        o1.inscription_number, o1.inscription_id, o1.ordinal_number, o1.amount, o1.ticker, COUNT(*) OVER() AS total
+      FROM operations AS o1
+      WHERE o1.operation = 'transfer'
+      AND o1.address = ${args.address}
+      ${
+        args.ticker
+          ? this.sql`AND LOWER(o1.ticker) IN (${args.ticker.map(t => t.toLowerCase())})`
+          : this.sql``
+      }
+      AND NOT EXISTS (
+          SELECT 1 
+          FROM operations o2
+          WHERE o2.inscription_id = o1.inscription_id 
+          AND o2.operation = 'transfer_send'
+      )
+      ORDER BY o1.block_height DESC, o1.tx_index DESC
+      LIMIT ${args.limit}
+      OFFSET ${args.offset}
+    `;
+
     return {
       total: results[0]?.total ?? 0,
       results: results ?? [],

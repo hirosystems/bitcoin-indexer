@@ -4,62 +4,56 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'chainhook-postgres'",
+      "name": "run: ordinals service",
       "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=chainhook-postgres"],
+        "args": ["build", "--bin=bitcoin-indexer", "--package=cli"],
         "filter": {
-          "name": "chainhook-postgres",
-          "kind": "lib"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "run: ordhook service",
-      "cargo": {
-        "args": ["build", "--bin=ordhook", "--package=ordhook-cli"],
-        "filter": {
-          "name": "ordhook",
+          "name": "bitcoin-indexer",
           "kind": "bin"
         }
       },
       "args": [
+        "ordinals",
         "service",
         "start",
-        "--config-path=${workspaceFolder}/.vscode/ordhook.toml",
+        "--config-path=${workspaceFolder}/.vscode/Indexer.toml"
       ],
       "cwd": "${workspaceFolder}"
     },
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in executable 'ordhook'",
+      "name": "run: runes service",
       "cargo": {
-        "args": ["test", "--no-run", "--bin=ordhook", "--package=ordhook-cli"],
+        "args": ["build", "--bin=bitcoin-indexer", "--package=cli"],
         "filter": {
-          "name": "ordhook",
+          "name": "bitcoin-indexer",
           "kind": "bin"
         }
       },
-      "args": [],
+      "args": [
+        "runes",
+        "service",
+        "start",
+        "--config-path=${workspaceFolder}/.vscode/Indexer.toml"
+      ],
       "cwd": "${workspaceFolder}"
     },
     {
-      "type": "lldb",
+      "type": "node",
       "request": "launch",
-      "name": "Debug unit tests in library 'ordhook'",
-      "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=ordhook"],
-        "filter": {
-          "name": "ordhook",
-          "kind": "lib"
-        }
+      "name": "run: ordinals-api",
+      "cwd": "${workspaceFolder}/api/ordinals",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "args": ["${workspaceFolder}/api/ordinals/src/index.ts"],
+      "outputCapture": "std",
+      "internalConsoleOptions": "openOnSessionStart",
+      "envFile": "${workspaceFolder}/api/ordinals/.env",
+      "env": {
+        "NODE_ENV": "development",
+        "TS_NODE_SKIP_IGNORE": "true"
       },
-      "args": [],
-      "cwd": "${workspaceFolder}"
+      "killBehavior": "polite"
     },
     {
       "type": "node",
@@ -67,11 +61,7 @@
       "name": "test: ordinals-api",
       "program": "${workspaceFolder}/api/ordinals/node_modules/jest/bin/jest",
       "cwd": "${workspaceFolder}/api/ordinals/",
-      "args": [
-        "--testTimeout=3600000",
-        "--runInBand",
-        "--no-cache"
-      ],
+      "args": ["--testTimeout=3600000", "--runInBand", "--no-cache"],
       "outputCapture": "std",
       "console": "integratedTerminal",
       "preLaunchTask": "npm: testenv:run",
@@ -79,8 +69,8 @@
       "env": {
         "PGHOST": "localhost",
         "PGUSER": "postgres",
-        "PGPASSWORD": "postgres",
-      },
+        "PGPASSWORD": "postgres"
+      }
     },
     {
       "type": "node",
@@ -101,8 +91,8 @@
       "env": {
         "PGHOST": "localhost",
         "PGUSER": "postgres",
-        "PGPASSWORD": "postgres",
-      },
+        "PGPASSWORD": "postgres"
+      }
     },
     {
       "type": "node",
@@ -123,8 +113,8 @@
       "env": {
         "PGHOST": "localhost",
         "PGUSER": "postgres",
-        "PGPASSWORD": "postgres",
-      },
+        "PGPASSWORD": "postgres"
+      }
     },
     {
       "type": "node",
@@ -132,11 +122,7 @@
       "name": "test: runes-api",
       "program": "${workspaceFolder}/api/runes/node_modules/jest/bin/jest",
       "cwd": "${workspaceFolder}/api/runes/",
-      "args": [
-        "--testTimeout=3600000",
-        "--runInBand",
-        "--no-cache",
-      ],
+      "args": ["--testTimeout=3600000", "--runInBand", "--no-cache"],
       "outputCapture": "std",
       "console": "integratedTerminal",
       "preLaunchTask": "npm: testenv:run",
@@ -144,8 +130,8 @@
       "env": {
         "PGHOST": "localhost",
         "PGUSER": "postgres",
-        "PGPASSWORD": "postgres",
-      },
-    },
+        "PGPASSWORD": "postgres"
+      }
+    }
   ]
 }

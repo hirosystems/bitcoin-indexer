@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
+
 use self::{ImageRendering::*, Language::*, Media::*};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -62,7 +63,7 @@ pub enum ImageRendering {
 //     }
 //   }
 
-  impl Media {
+impl Media {
     #[rustfmt::skip]
     const TABLE: &'static [(&'static str, Media, &'static [&'static str])] = &[
       ("application/cbor",            Unknown,          &["cbor"]),
@@ -106,61 +107,61 @@ pub enum ImageRendering {
       ("video/webm",                  Video,            &["webm"]),
     ];
 
-//     pub(crate) fn content_type_for_path(
-//       path: &Path,
-//     ) -> Result<(&'static str, BrotliEncoderMode), Error> {
-//       let extension = path
-//         .extension()
-//         .ok_or_else(|| anyhow!("file must have extension"))?
-//         .to_str()
-//         .ok_or_else(|| anyhow!("unrecognized extension"))?;
+    //     pub(crate) fn content_type_for_path(
+    //       path: &Path,
+    //     ) -> Result<(&'static str, BrotliEncoderMode), Error> {
+    //       let extension = path
+    //         .extension()
+    //         .ok_or_else(|| anyhow!("file must have extension"))?
+    //         .to_str()
+    //         .ok_or_else(|| anyhow!("unrecognized extension"))?;
 
-//       let extension = extension.to_lowercase();
+    //       let extension = extension.to_lowercase();
 
-//       if extension == "mp4" {
-//         Media::check_mp4_codec(path)?;
-//       }
+    //       if extension == "mp4" {
+    //         Media::check_mp4_codec(path)?;
+    //       }
 
-//       for (content_type, mode, _, extensions) in Self::TABLE {
-//         if extensions.contains(&extension.as_str()) {
-//           return Ok((*content_type, *mode));
-//         }
-//       }
+    //       for (content_type, mode, _, extensions) in Self::TABLE {
+    //         if extensions.contains(&extension.as_str()) {
+    //           return Ok((*content_type, *mode));
+    //         }
+    //       }
 
-//       let mut extensions = Self::TABLE
-//         .iter()
-//         .flat_map(|(_, _, _, extensions)| extensions.first().cloned())
-//         .collect::<Vec<&str>>();
+    //       let mut extensions = Self::TABLE
+    //         .iter()
+    //         .flat_map(|(_, _, _, extensions)| extensions.first().cloned())
+    //         .collect::<Vec<&str>>();
 
-//       extensions.sort();
+    //       extensions.sort();
 
-//       Err(anyhow!(
-//         "unsupported file extension `.{extension}`, supported extensions: {}",
-//         extensions.join(" "),
-//       ))
-//     }
+    //       Err(anyhow!(
+    //         "unsupported file extension `.{extension}`, supported extensions: {}",
+    //         extensions.join(" "),
+    //       ))
+    //     }
 
-//     pub(crate) fn check_mp4_codec(path: &Path) -> Result<(), Error> {
-//       let f = File::open(path)?;
-//       let size = f.metadata()?.len();
-//       let reader = BufReader::new(f);
+    //     pub(crate) fn check_mp4_codec(path: &Path) -> Result<(), Error> {
+    //       let f = File::open(path)?;
+    //       let size = f.metadata()?.len();
+    //       let reader = BufReader::new(f);
 
-//       let mp4 = Mp4Reader::read_header(reader, size)?;
+    //       let mp4 = Mp4Reader::read_header(reader, size)?;
 
-//       for track in mp4.tracks().values() {
-//         if let TrackType::Video = track.track_type()? {
-//           let media_type = track.media_type()?;
-//           if media_type != MediaType::H264 {
-//             return Err(anyhow!(
-//               "Unsupported video codec, only H.264 is supported in MP4: {media_type}"
-//             ));
-//           }
-//         }
-//       }
+    //       for track in mp4.tracks().values() {
+    //         if let TrackType::Video = track.track_type()? {
+    //           let media_type = track.media_type()?;
+    //           if media_type != MediaType::H264 {
+    //             return Err(anyhow!(
+    //               "Unsupported video codec, only H.264 is supported in MP4: {media_type}"
+    //             ));
+    //           }
+    //         }
+    //       }
 
-//       Ok(())
-//     }
-  }
+    //       Ok(())
+    //     }
+}
 
 impl FromStr for Media {
     type Err = Error;

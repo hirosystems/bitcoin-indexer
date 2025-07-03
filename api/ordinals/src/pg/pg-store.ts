@@ -51,9 +51,9 @@ export class PgStore extends BasePgStore {
     this.counts = new CountsPgStore(this);
   }
 
-  async getChainTipBlockHeight(): Promise<number> {
+  async getChainTipBlockHeight(): Promise<number | undefined> {
     const result = await this.sql<{ block_height: string }[]>`SELECT block_height FROM chain_tip`;
-    return parseInt(result[0].block_height);
+    if (result[0].block_height) return parseInt(result[0].block_height);
   }
 
   async getMaxInscriptionNumber(): Promise<number | undefined> {
@@ -172,7 +172,7 @@ export class PgStore extends BasePgStore {
             i.curse_type,
             i.ordinal_number AS sat_ordinal,
             (
-              SELECT ip.parent_inscription_id
+              SELECT STRING_AGG(ip.parent_inscription_id, ',')
               FROM inscription_parents AS ip
               WHERE ip.inscription_id = i.inscription_id
             ) AS parent_refs,

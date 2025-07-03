@@ -63,3 +63,11 @@ export type DbBrc20Activity = {
   deploy_max: string;
   deploy_limit: string | null;
 };
+
+export type DbBrc20TransferableInscription = {
+  inscription_number: string;
+  inscription_id: string;
+  amount: string;
+  ticker: string;
+  ordinal_number: string;
+};

@@ -64,7 +64,7 @@ impl Chain {
     }
 
     // pub(crate) fn genesis_block(self) -> Block {
-    //     chainhook_sdk::bitcoin::blockdata::constants::genesis_block(self.network())
+    //     bitcoind::bitcoin::blockdata::constants::genesis_block(self.network())
     // }
 
     // pub(crate) fn genesis_coinbase_outpoint(self) -> OutPoint {

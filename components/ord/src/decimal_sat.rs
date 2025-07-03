@@ -2,17 +2,17 @@ use super::{height::Height, sat::Sat};
 
 #[derive(PartialEq, Debug)]
 pub struct DecimalSat {
-  pub height: Height,
-  pub offset: u64,
+    pub height: Height,
+    pub offset: u64,
 }
 
 impl From<Sat> for DecimalSat {
-  fn from(sat: Sat) -> Self {
-    Self {
-      height: sat.height(),
-      offset: sat.third(),
+    fn from(sat: Sat) -> Self {
+        Self {
+            height: sat.height(),
+            offset: sat.third(),
+        }
     }
-  }
 }
 
 // impl Display for DecimalSat {

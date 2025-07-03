@@ -20,7 +20,7 @@ components/chainhook-types-js/dist
 *.rdb
 /Ordhook.toml
 
-cache/
+/cache/
 ./tests
 tmp/
 data
@@ -226,3 +226,4 @@ Cargo.lock
 # Mutation Testing
 mutants.out/
 mutants.out.old/
+.vercel

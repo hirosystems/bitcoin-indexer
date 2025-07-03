@@ -1,0 +1,37 @@
+[package]
+name = "runes"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+bitcoind = { path = "../bitcoind" }
+bitcoin = { workspace = true }
+lru = "0.12.3"
+ordinals-parser = { package = "ordinals", version = "0.0.15" }
+bytes = "1.3"
+config = { path = "../config" }
+serde = "1"
+serde_derive = "1"
+hex = "0.4.3"
+rand = "0.8.5"
+hiro-system-kit = { workspace = true }
+ctrlc = { version = "3.2.2", optional = true }
+crossbeam-channel = "0.5.8"
+clap = { version = "4.3.2", features = ["derive"] }
+clap_generate = { version = "3.0.3" }
+postgres = { path = "../postgres" }
+tokio = { workspace = true }
+tokio-postgres = { workspace = true }
+deadpool-postgres = { workspace = true }
+refinery = { workspace = true }
+num-traits = "0.2.14"
+maplit = "1.0.2"
+prometheus = { workspace = true }
+hyper = { version = "0.14", features = ["full"] }
+
+[dev-dependencies]
+test-case = "3.1.0"
+
+[features]
+debug = ["hiro-system-kit/debug"]
+release = ["hiro-system-kit/release"]
