@@ -2,6 +2,7 @@ import { SwaggerOptions } from '@fastify/swagger';
 import { Nullable, Optional, SERVER_VERSION } from '@hirosystems/api-toolkit';
 import { Static, Type } from '@sinclair/typebox';
 import { TypeCompiler } from '@sinclair/typebox/compiler';
+import { ENV } from '../env';
 
 export const OpenApiSchemaOptions: SwaggerOptions = {
   openapi: {
@@ -50,7 +51,7 @@ export type Offset = Static<typeof OffsetSchema>;
 
 export const LimitSchema = Type.Integer({
   minimum: 1,
-  maximum: 60,
+  maximum: ENV.API_RESULTS_MAX_LIMIT,
   title: 'Limit',
   description: 'Results per page',
 });
