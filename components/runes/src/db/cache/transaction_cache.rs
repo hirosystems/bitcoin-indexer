@@ -1,24 +1,21 @@
-use bitcoin::ScriptBuf;
-use chainhook_sdk::utils::Context;
-use ordinals::{Cenotaph, Edict, Etching, Rune, RuneId};
 use std::{
     collections::{HashMap, VecDeque},
     vec,
 };
 
-use crate::{
-    db::{
-        cache::utils::{is_rune_mintable, new_sequential_ledger_entry},
-        models::{
-            db_ledger_entry::DbLedgerEntry, db_ledger_operation::DbLedgerOperation, db_rune::DbRune,
-        },
-    },
-    try_debug, try_info, try_warn,
-};
+use bitcoin::ScriptBuf;
+use bitcoind::{try_debug, try_warn, utils::Context};
+use ordinals_parser::{Cenotaph, Edict, Etching, Rune, RuneId};
 
 use super::{
     input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation,
     utils::move_rune_balance_to_output,
+};
+use crate::db::{
+    cache::utils::{is_rune_mintable, new_sequential_ledger_entry},
+    models::{
+        db_ledger_entry::DbLedgerEntry, db_ledger_operation::DbLedgerOperation, db_rune::DbRune,
+    },
 };
 
 /// Holds cached data relevant to a single transaction during indexing.
@@ -103,12 +100,11 @@ impl TransactionCache {
             for input in unallocated.iter() {
                 try_debug!(
                     ctx,
-                    "Assign unallocated {} to pointer {:?} {:?} ({}) {}",
-                    rune_id,
-                    self.output_pointer,
-                    input.address,
-                    input.amount,
-                    self.location
+                    "Assign unallocated {rune_id} to pointer {output_pointer:?} {address:?} ({amount}) {location}",
+                    output_pointer = self.output_pointer,
+                    address = &input.address,
+                    amount = input.amount,
+                    location = self.location.to_string()
                 );
             }
             results.extend(move_rune_balance_to_output(
@@ -187,17 +183,20 @@ impl TransactionCache {
         ctx: &Context,
     ) -> Option<DbLedgerEntry> {
         if !is_rune_mintable(db_rune, total_mints, &self.location) {
-            try_debug!(ctx, "Invalid mint {} {}", rune_id, self.location);
+            try_debug!(
+                ctx,
+                "Invalid mint {rune_id} {location}",
+                location = self.location.to_string()
+            );
             return None;
         }
         let terms_amount = db_rune.terms_amount.unwrap();
-        try_info!(
+        try_debug!(
             ctx,
-            "MINT {} ({}) {} {}",
-            rune_id,
-            db_rune.spaced_name,
-            terms_amount.0,
-            self.location
+            "MINT {rune_id} ({spaced_name}) {amount} {location}",
+            spaced_name = &db_rune.spaced_name,
+            amount = terms_amount.0,
+            location = self.location.to_string()
         );
         self.add_input_runes(
             rune_id,
@@ -209,7 +208,7 @@ impl TransactionCache {
         Some(new_sequential_ledger_entry(
             &self.location,
             Some(terms_amount.0),
-            rune_id.clone(),
+            *rune_id,
             None,
             None,
             None,
@@ -226,22 +225,26 @@ impl TransactionCache {
         ctx: &Context,
     ) -> Option<DbLedgerEntry> {
         if !is_rune_mintable(db_rune, total_mints, &self.location) {
-            try_debug!(ctx, "Invalid mint {} {}", rune_id, self.location);
+            try_debug!(
+                ctx,
+                "Invalid mint {rune_id} {location}",
+                location = self.location.to_string()
+            );
             return None;
         }
         let terms_amount = db_rune.terms_amount.unwrap();
-        try_info!(
+        try_debug!(
             ctx,
-            "CENOTAPH MINT {} {} {}",
-            db_rune.spaced_name,
-            terms_amount.0,
-            self.location
+            "CENOTAPH MINT {spaced_name} {amount} {location}",
+            spaced_name = &db_rune.spaced_name,
+            amount = terms_amount.0,
+            location = self.location.to_string()
         );
         // This entry does not go in the input runes, it gets burned immediately.
         Some(new_sequential_ledger_entry(
             &self.location,
             Some(terms_amount.0),
-            rune_id.clone(),
+            *rune_id,
             None,
             None,
             None,
@@ -256,8 +259,8 @@ impl TransactionCache {
             let Some(etching) = self.etching.as_ref() else {
                 try_warn!(
                     ctx,
-                    "Attempted edict for nonexistent rune 0:0 {}",
-                    self.location
+                    "Attempted edict for nonexistent rune 0:0 {location}",
+                    location = self.location.to_string()
                 );
                 return vec![];
             };
@@ -267,11 +270,11 @@ impl TransactionCache {
         };
         // Take all the available inputs for the rune we're trying to move.
         let Some(available_inputs) = self.input_runes.get_mut(&rune_id) else {
-            try_info!(
+            try_debug!(
                 ctx,
-                "No unallocated runes {} remain for edict {}",
-                edict.id,
-                self.location
+                "No unallocated runes {id} remain for edict {location}",
+                id = edict.id.to_string(),
+                location = self.location.to_string()
             );
             return vec![];
         };
@@ -283,13 +286,13 @@ impl TransactionCache {
             .unwrap_or(0);
         // Perform movements.
         let mut results = vec![];
-        if self.eligible_outputs.len() == 0 {
+        if self.eligible_outputs.is_empty() {
             // No eligible outputs means burn.
-            try_info!(
+            try_debug!(
                 ctx,
-                "No eligible outputs for edict on rune {} {}",
-                edict.id,
-                self.location
+                "No eligible outputs for edict on rune {id} {location}",
+                id = edict.id.to_string(),
+                location = self.location.to_string()
             );
             results.extend(move_rune_balance_to_output(
                 &self.location,
@@ -367,12 +370,12 @@ impl TransactionCache {
                     ));
                 }
                 _ => {
-                    try_info!(
+                    try_debug!(
                         ctx,
-                        "Edict for {} attempted move to nonexistent output {}, amount will be burnt {}",
-                        edict.id,
-                        edict.output,
-                        self.location
+                        "Edict for {id} attempted move to nonexistent output {output}, amount will be burnt {location}",
+                        id = edict.id.to_string(),
+                        output = edict.output,
+                        location = self.location.to_string()
                     );
                     results.extend(move_rune_balance_to_output(
                         &self.location,
@@ -391,12 +394,12 @@ impl TransactionCache {
     }
 
     fn add_input_runes(&mut self, rune_id: &RuneId, entry: InputRuneBalance) {
-        if let Some(balance) = self.input_runes.get_mut(&rune_id) {
+        if let Some(balance) = self.input_runes.get_mut(rune_id) {
             balance.push_back(entry);
         } else {
             let mut vec = VecDeque::new();
             vec.push_back(entry);
-            self.input_runes.insert(rune_id.clone(), vec);
+            self.input_runes.insert(*rune_id, vec);
         }
     }
 }
@@ -406,10 +409,11 @@ mod test {
     use std::collections::VecDeque;
 
     use bitcoin::ScriptBuf;
-    use chainhook_sdk::utils::Context;
+    use bitcoind::utils::Context;
     use maplit::hashmap;
-    use ordinals::{Edict, Etching, Rune, Terms};
+    use ordinals_parser::{Edict, Etching, Rune, Terms};
 
+    use super::TransactionCache;
     use crate::db::{
         cache::{
             input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation,
@@ -417,8 +421,6 @@ mod test {
         },
         models::{db_ledger_operation::DbLedgerOperation, db_rune::DbRune},
     };
-
-    use super::TransactionCache;
 
     #[test]
     fn etches_rune() {

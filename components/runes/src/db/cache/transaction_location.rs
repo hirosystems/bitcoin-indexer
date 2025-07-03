@@ -1,7 +1,7 @@
 use std::fmt;
 
 use bitcoin::Network;
-use ordinals::RuneId;
+use ordinals_parser::RuneId;
 
 #[derive(Debug, Clone)]
 pub struct TransactionLocation {

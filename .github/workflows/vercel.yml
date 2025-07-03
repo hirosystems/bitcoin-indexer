@@ -37,6 +37,12 @@ jobs:
 
       - name: Build project artifacts
         run: vercel build ${{ github.ref_name == 'main' && '--prod' || '' }} --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          RUNES_PGHOST: localhost
+          RUNES_PGPORT: 5432
+          RUNES_PGUSER: postgres
+          RUNES_PGPASSWORD: postgres
+          RUNES_PGDATABASE: postgres
 
       - name: Deploy project artifacts to Vercel
         id: deploy

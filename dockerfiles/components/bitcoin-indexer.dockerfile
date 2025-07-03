@@ -1,13 +1,29 @@
 FROM rust:bullseye AS build
 
-ARG GIT_COMMIT='0000000'
-
-ENV GIT_COMMIT=${GIT_COMMIT}
-
 WORKDIR /src
 
-RUN apt-get update && apt-get install -y ca-certificates pkg-config libssl-dev libclang-11-dev libunwind-dev libunwind8 curl gnupg
-RUN rustup update 1.81 && rustup default 1.81
+RUN apt-get update && \
+    apt-get install -y \
+    wget && \
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
+    apt-get update && \
+    apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libunwind-dev \
+    libunwind8 \
+    curl \
+    libsnappy-dev \
+    libgflags-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    liblz4-dev \
+    libzstd-dev \
+    clang-18 \
+    libclang-18-dev \
+    llvm-18-dev
+RUN rustup update 1.85 && rustup default 1.85
 
 RUN mkdir /out
 COPY ./Cargo.toml /src/Cargo.toml
@@ -20,7 +36,30 @@ RUN cp /src/target/release/bitcoin-indexer /out
 
 FROM debian:bullseye-slim
 
-RUN apt-get update && apt-get install -y ca-certificates libssl-dev libclang-11-dev libunwind-dev libunwind8 sqlite3
+# Install runtime dependencies for LLVM/Clang 18 and other necessary libs
+RUN apt-get update && \
+    apt-get install -y \
+    gnupg \
+    ca-certificates \
+    wget && \
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main" >> /etc/apt/sources.list.d/llvm.list && \
+    apt-get update && \
+    apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libunwind-dev \
+    libunwind8 \
+    libsnappy-dev \
+    libgflags-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    liblz4-dev \
+    libzstd-dev \
+    clang-18 \
+    libclang-18-dev \
+    llvm-18-dev
+
 COPY --from=build /out/bitcoin-indexer /bin/bitcoin-indexer
 
 WORKDIR /workspace

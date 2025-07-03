@@ -196,14 +196,14 @@ impl Config {
 
     pub fn assert_ordinals_config(&self) -> Result<(), String> {
         if self.ordinals.is_none() {
-            return Err(format!("Config entry for `ordinals` not found in config file."));
+            return Err("Config entry for `ordinals` not found in config file.".to_string());
         }
         Ok(())
     }
 
     pub fn assert_runes_config(&self) -> Result<(), String> {
         if self.runes.is_none() {
-            return Err(format!("Config entry for `runes` not found in config file."));
+            return Err("Config entry for `runes` not found in config file.".to_string());
         }
         Ok(())
     }

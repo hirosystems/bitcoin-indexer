@@ -8,12 +8,14 @@ edition = "2021"
 name = "bitcoin-indexer"
 path = "src/main.rs"
 
+[lib]
+path = "src/lib.rs"
+
 [dependencies]
 config = { path = "../config" }
-ordhook = { path = "../ordhook-core" }
+ordinals = { path = "../ordinals" }
 runes = { path = "../runes" }
-chainhook-types = { path = "../chainhook-types-rs" }
-chainhook-sdk = { path = "../chainhook-sdk" }
+bitcoind = { path = "../bitcoind" }
 hex = "0.4.3"
 num_cpus = "1.16.0"
 serde = "1"

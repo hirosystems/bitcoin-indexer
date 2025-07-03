@@ -29,7 +29,7 @@ export const StatusRoutes: FastifyPluginCallback<
       const result = await fastify.db.sqlTransaction(async sql => {
         const block_height = await fastify.db.getChainTipBlockHeight();
         return {
-          server_version: `runes-api ${SERVER_VERSION.tag} (${SERVER_VERSION.branch}:${SERVER_VERSION.commit})`,
+          server_version: `bitcoin-indexer-runes-api ${SERVER_VERSION.tag} (${SERVER_VERSION.branch}:${SERVER_VERSION.commit})`,
           status: 'ready',
           block_height: block_height ? parseInt(block_height) : undefined,
         };

@@ -1,29 +1,23 @@
 use std::{collections::HashMap, num::NonZeroUsize, str::FromStr};
 
 use bitcoin::{Network, ScriptBuf};
-use chainhook_sdk::utils::Context;
-use chainhook_types::bitcoin::TxIn;
+use bitcoind::{try_debug, try_warn, types::bitcoin::TxIn, utils::Context};
 use config::Config;
 use lru::LruCache;
-use ordinals::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
+use ordinals_parser::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
 use tokio_postgres::{Client, Transaction};
-
-use crate::{
-    db::{
-        cache::utils::input_rune_balances_from_tx_inputs,
-        models::{
-            db_balance_change::DbBalanceChange, db_ledger_entry::DbLedgerEntry,
-            db_ledger_operation::DbLedgerOperation, db_rune::DbRune,
-            db_supply_change::DbSupplyChange,
-        },
-        pg_get_max_rune_number, pg_get_rune_by_id, pg_get_rune_total_mints,
-    },
-    try_debug, try_info, try_warn,
-};
 
 use super::{
     db_cache::DbCache, input_rune_balance::InputRuneBalance, transaction_cache::TransactionCache,
     transaction_location::TransactionLocation, utils::move_block_output_cache_to_output_cache,
+};
+use crate::db::{
+    cache::utils::input_rune_balances_from_tx_inputs,
+    models::{
+        db_balance_change::DbBalanceChange, db_ledger_entry::DbLedgerEntry,
+        db_ledger_operation::DbLedgerOperation, db_rune::DbRune, db_supply_change::DbSupplyChange,
+    },
+    pg_get_max_rune_number, pg_get_rune_by_id, pg_get_rune_total_mints,
 };
 
 /// Holds rune data across multiple blocks for faster computations. Processes rune events as they happen during transactions and
@@ -104,7 +98,7 @@ impl IndexCache {
             for (rune_id, balances) in input_runes.iter() {
                 try_debug!(ctx, "INPUT {rune_id} {balances:?} {location}");
             }
-            if input_runes.len() > 0 {
+            if !input_runes.is_empty() {
                 try_debug!(
                     ctx,
                     "First output: {first_eligible_output:?}, total_outputs: {total_outputs}"
@@ -150,10 +144,12 @@ impl IndexCache {
         cenotaph: &Cenotaph,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        cenotaphs_counter: &mut u64,
     ) {
         try_debug!(ctx, "{:?} {}", cenotaph, self.tx_cache.location);
         let entries = self.tx_cache.apply_cenotaph_input_burn(cenotaph);
         self.add_ledger_entries_to_db_cache(&entries);
+        *cenotaphs_counter += 1;
     }
 
     pub async fn apply_etching(
@@ -161,19 +157,21 @@ impl IndexCache {
         etching: &Etching,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        etchings_counter: &mut u64,
     ) {
         let (rune_id, db_rune, entry) = self.tx_cache.apply_etching(etching, self.next_rune_number);
-        try_info!(
+        try_debug!(
             ctx,
-            "Etching {} ({}) {}",
-            db_rune.spaced_name,
-            db_rune.id,
-            self.tx_cache.location
+            "Etching {spaced_name} ({id}) {location}",
+            spaced_name = &db_rune.spaced_name,
+            id = &db_rune.id,
+            location = self.tx_cache.location.to_string()
         );
         self.db_cache.runes.push(db_rune.clone());
         self.rune_cache.put(rune_id, db_rune);
         self.add_ledger_entries_to_db_cache(&vec![entry]);
         self.next_rune_number += 1;
+        *etchings_counter += 1;
     }
 
     pub async fn apply_cenotaph_etching(
@@ -181,21 +179,23 @@ impl IndexCache {
         rune: &Rune,
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        cenotaph_etchings_counter: &mut u64,
     ) {
         let (rune_id, db_rune, entry) = self
             .tx_cache
             .apply_cenotaph_etching(rune, self.next_rune_number);
-        try_info!(
+        try_debug!(
             ctx,
-            "Etching cenotaph {} ({}) {}",
-            db_rune.spaced_name,
-            db_rune.id,
-            self.tx_cache.location
+            "Etching cenotaph {spaced_name} ({id}) {location}",
+            spaced_name = &db_rune.spaced_name,
+            id = &db_rune.id,
+            location = self.tx_cache.location.to_string()
         );
         self.db_cache.runes.push(db_rune.clone());
         self.rune_cache.put(rune_id, db_rune);
         self.add_ledger_entries_to_db_cache(&vec![entry]);
         self.next_rune_number += 1;
+        *cenotaph_etchings_counter += 1;
     }
 
     pub async fn apply_mint(
@@ -203,13 +203,13 @@ impl IndexCache {
         rune_id: &RuneId,
         db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        mints_counter: &mut u64,
     ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(rune_id, db_tx, ctx).await else {
             try_warn!(
                 ctx,
-                "Rune {} not found for mint {}",
-                rune_id,
-                self.tx_cache.location
+                "Rune {rune_id} not found for mint {location}",
+                location = self.tx_cache.location.to_string()
             );
             return;
         };
@@ -219,14 +219,15 @@ impl IndexCache {
             .unwrap_or(0);
         if let Some(ledger_entry) = self
             .tx_cache
-            .apply_mint(&rune_id, total_mints, &db_rune, ctx)
+            .apply_mint(rune_id, total_mints, &db_rune, ctx)
         {
             self.add_ledger_entries_to_db_cache(&vec![ledger_entry.clone()]);
             if let Some(total) = self.rune_total_mints_cache.get_mut(rune_id) {
                 *total += 1;
             } else {
-                self.rune_total_mints_cache.put(rune_id.clone(), 1);
+                self.rune_total_mints_cache.put(*rune_id, 1);
             }
+            *mints_counter += 1;
         }
     }
 
@@ -235,13 +236,13 @@ impl IndexCache {
         rune_id: &RuneId,
         db_tx: &mut Transaction<'_>,
         ctx: &Context,
+        cenotaph_mints_counter: &mut u64,
     ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(rune_id, db_tx, ctx).await else {
             try_warn!(
                 ctx,
-                "Rune {} not found for cenotaph mint {}",
-                rune_id,
-                self.tx_cache.location
+                "Rune {rune_id} not found for cenotaph mint {location}",
+                location = self.tx_cache.location.to_string()
             );
             return;
         };
@@ -251,37 +252,45 @@ impl IndexCache {
             .unwrap_or(0);
         if let Some(ledger_entry) =
             self.tx_cache
-                .apply_cenotaph_mint(&rune_id, total_mints, &db_rune, ctx)
+                .apply_cenotaph_mint(rune_id, total_mints, &db_rune, ctx)
         {
             self.add_ledger_entries_to_db_cache(&vec![ledger_entry]);
             if let Some(total) = self.rune_total_mints_cache.get_mut(rune_id) {
                 *total += 1;
             } else {
-                self.rune_total_mints_cache.put(rune_id.clone(), 1);
+                self.rune_total_mints_cache.put(*rune_id, 1);
             }
+            *cenotaph_mints_counter += 1;
         }
     }
 
-    pub async fn apply_edict(&mut self, edict: &Edict, db_tx: &mut Transaction<'_>, ctx: &Context) {
+    pub async fn apply_edict(
+        &mut self,
+        edict: &Edict,
+        db_tx: &mut Transaction<'_>,
+        ctx: &Context,
+        edicts_number: &mut u64,
+    ) {
         let Some(db_rune) = self.get_cached_rune_by_rune_id(&edict.id, db_tx, ctx).await else {
             try_warn!(
                 ctx,
-                "Rune {} not found for edict {}",
-                edict.id,
-                self.tx_cache.location
+                "Rune {id} not found for edict {location}",
+                id = edict.id.to_string(),
+                location = self.tx_cache.location.to_string()
             );
             return;
         };
         let entries = self.tx_cache.apply_edict(edict, ctx);
         for entry in entries.iter() {
-            try_info!(
+            try_debug!(
                 ctx,
-                "Edict {} {} {}",
-                db_rune.spaced_name,
-                entry.amount.unwrap().0,
-                self.tx_cache.location
+                "Edict {spaced_name} {amount} {location}",
+                spaced_name = &db_rune.spaced_name,
+                amount = entry.amount.unwrap().0,
+                location = self.tx_cache.location.to_string()
             );
         }
+        *edicts_number += 1;
         self.add_ledger_entries_to_db_cache(&entries);
     }
 
@@ -295,16 +304,14 @@ impl IndexCache {
         if rune_id.block == 0 && rune_id.tx == 0 {
             return self.tx_cache.etching.clone();
         }
-        if let Some(cached_rune) = self.rune_cache.get(&rune_id) {
+        if let Some(cached_rune) = self.rune_cache.get(rune_id) {
             return Some(cached_rune.clone());
         }
         // Cache miss, look in DB.
         self.db_cache.flush(db_tx, ctx).await;
-        let Some(db_rune) = pg_get_rune_by_id(rune_id, db_tx, ctx).await else {
-            return None;
-        };
-        self.rune_cache.put(rune_id.clone(), db_rune.clone());
-        return Some(db_rune);
+        let db_rune = pg_get_rune_by_id(rune_id, db_tx, ctx).await?;
+        self.rune_cache.put(*rune_id, db_rune.clone());
+        Some(db_rune)
     }
 
     async fn get_cached_rune_total_mints(
@@ -314,23 +321,19 @@ impl IndexCache {
         ctx: &Context,
     ) -> Option<u128> {
         let real_rune_id = if rune_id.block == 0 && rune_id.tx == 0 {
-            let Some(etching) = self.tx_cache.etching.as_ref() else {
-                return None;
-            };
+            let etching = self.tx_cache.etching.as_ref()?;
             RuneId::from_str(etching.id.as_str()).unwrap()
         } else {
-            rune_id.clone()
+            *rune_id
         };
         if let Some(total) = self.rune_total_mints_cache.get(&real_rune_id) {
             return Some(*total);
         }
         // Cache miss, look in DB.
         self.db_cache.flush(db_tx, ctx).await;
-        let Some(total) = pg_get_rune_total_mints(rune_id, db_tx, ctx).await else {
-            return None;
-        };
-        self.rune_total_mints_cache.put(rune_id.clone(), total);
-        return Some(total);
+        let total = pg_get_rune_total_mints(rune_id, db_tx, ctx).await?;
+        self.rune_total_mints_cache.put(*rune_id, total);
+        Some(total)
     }
 
     /// Take ledger entries returned by the `TransactionCache` and add them to the `DbCache`. Update global balances and counters
@@ -348,7 +351,7 @@ impl IndexCache {
                         })
                         .or_insert(DbSupplyChange::from_operation(
                             entry.rune_id.clone(),
-                            entry.block_height.clone(),
+                            entry.block_height,
                         ));
                 }
                 DbLedgerOperation::Mint => {
@@ -362,7 +365,7 @@ impl IndexCache {
                         })
                         .or_insert(DbSupplyChange::from_mint(
                             entry.rune_id.clone(),
-                            entry.block_height.clone(),
+                            entry.block_height,
                             entry.amount.unwrap(),
                         ));
                 }
@@ -377,7 +380,7 @@ impl IndexCache {
                         })
                         .or_insert(DbSupplyChange::from_burn(
                             entry.rune_id.clone(),
-                            entry.block_height.clone(),
+                            entry.block_height,
                             entry.amount.unwrap(),
                         ));
                 }
@@ -388,7 +391,7 @@ impl IndexCache {
                         .and_modify(|i| i.total_operations += 1)
                         .or_insert(DbSupplyChange::from_operation(
                             entry.rune_id.clone(),
-                            entry.block_height.clone(),
+                            entry.block_height,
                         ));
                     if let Some(address) = entry.address.clone() {
                         self.db_cache
@@ -397,7 +400,7 @@ impl IndexCache {
                             .and_modify(|i| i.balance += entry.amount.unwrap())
                             .or_insert(DbBalanceChange::from_operation(
                                 entry.rune_id.clone(),
-                                entry.block_height.clone(),
+                                entry.block_height,
                                 address,
                                 entry.amount.unwrap(),
                             ));
@@ -410,7 +413,7 @@ impl IndexCache {
                         .and_modify(|i| i.total_operations += 1)
                         .or_insert(DbSupplyChange::from_operation(
                             entry.rune_id.clone(),
-                            entry.block_height.clone(),
+                            entry.block_height,
                         ));
                     if let Some(address) = entry.address.clone() {
                         self.db_cache
@@ -419,7 +422,7 @@ impl IndexCache {
                             .and_modify(|i| i.balance += entry.amount.unwrap())
                             .or_insert(DbBalanceChange::from_operation(
                                 entry.rune_id.clone(),
-                                entry.block_height.clone(),
+                                entry.block_height,
                                 address,
                                 entry.amount.unwrap(),
                             ));

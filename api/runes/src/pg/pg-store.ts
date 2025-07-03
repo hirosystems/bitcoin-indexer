@@ -206,9 +206,14 @@ export class PgStore extends BasePgStore {
     return this.getActivity(this.sql`l.tx_id = ${txId}`, this.sql`COUNT(*) OVER()`, offset, limit);
   }
 
-  async getBlockActivity(block: Block, offset: Offset, limit: Limit) {
+  async getBlockActivity(block: Block, offset: Offset, limit: Limit, operationType?: string) {
+    const filter = this.sql`${blockFilter(this.sql, block, 'l')}`;
+    const operationFilter = operationType
+      ? this.sql` AND operation = ${operationType}`
+      : this.sql``;
+
     return this.getActivity(
-      blockFilter(this.sql, block, 'l'),
+      this.sql`${filter}${operationFilter}`,
       this.sql`COUNT(*) OVER()`,
       offset,
       limit

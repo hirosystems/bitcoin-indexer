@@ -1,3 +1,39 @@
+## [3.0.0-beta.11](https://github.com/hirosystems/ordhook/compare/v3.0.0-beta.10...v3.0.0-beta.11) (2025-02-25)
+
+
+### Bug Fixes
+
+* **brc20:** historical token balance ([#444](https://github.com/hirosystems/ordhook/issues/444)) ([41438ac](https://github.com/hirosystems/ordhook/commit/41438aca962ba7f2c4add4df87740fdb6df6de00))
+* display unbound inscription satpoints as all zeros with unbound sequence as offset ([#445](https://github.com/hirosystems/ordhook/issues/445)) ([6815878](https://github.com/hirosystems/ordhook/commit/68158786f06c0a4ad6f56509eaa96012986f7790))
+
+## [3.0.0-beta.10](https://github.com/hirosystems/ordhook/compare/v3.0.0-beta.9...v3.0.0-beta.10) (2025-02-18)
+
+
+### Bug Fixes
+
+* **api:** multiple parent display ([703f98f](https://github.com/hirosystems/ordhook/commit/703f98f77f9797db3e4f4f0e3e14fbdb7c5275f8))
+
+## [3.0.0-beta.9](https://github.com/hirosystems/ordhook/compare/v3.0.0-beta.8...v3.0.0-beta.9) (2025-02-18)
+
+
+### Features
+
+* **api:** add parent_refs field to inscription responses ([#436](https://github.com/hirosystems/ordhook/issues/436)) ([5630644](https://github.com/hirosystems/ordhook/commit/563064413bcc2168f96cb87af4fd6ab51ed36e73))
+
+
+### Bug Fixes
+
+* **api:** show delegate inscription id correctly ([#439](https://github.com/hirosystems/ordhook/issues/439)) ([d4ee264](https://github.com/hirosystems/ordhook/commit/d4ee264ad0bec2749299b60e985927ba87d6f40e))
+* calculate charms correctly when inscription is unbound ([#440](https://github.com/hirosystems/ordhook/issues/440)) ([acfda83](https://github.com/hirosystems/ordhook/commit/acfda83757e5c06977ecf43ca396b7fcd780d71b))
+
+## [3.0.0-beta.8](https://github.com/hirosystems/ordhook/compare/v3.0.0-beta.7...v3.0.0-beta.8) (2025-02-18)
+
+
+### Features
+
+* **api:** return inscription charms in responses ([#435](https://github.com/hirosystems/ordhook/issues/435)) ([a7073da](https://github.com/hirosystems/ordhook/commit/a7073da0b4bb0c61d57284c48c65f73b0491a909))
+* index inscription charms ([#433](https://github.com/hirosystems/ordhook/issues/433)) ([4291eab](https://github.com/hirosystems/ordhook/commit/4291eabba7110ca5d4684f4801e234621e64d96b))
+
 ## [3.0.0-beta.7](https://github.com/hirosystems/ordhook/compare/v3.0.0-beta.6...v3.0.0-beta.7) (2025-02-16)
 
 

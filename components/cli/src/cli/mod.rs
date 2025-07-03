@@ -1,16 +1,10 @@
-use chainhook_sdk::utils::Context;
+use std::{path::PathBuf, process, thread::sleep, time::Duration};
+
+use bitcoind::{try_error, try_info, types::BlockIdentifier, utils::Context};
 use clap::Parser;
 use commands::{Command, ConfigCommand, DatabaseCommand, IndexCommand, Protocol, ServiceCommand};
-use config::generator::generate_toml_config;
-use config::Config;
+use config::{generator::generate_toml_config, Config};
 use hiro_system_kit;
-use ordhook::db::migrate_dbs;
-use ordhook::service::Service;
-use ordhook::try_info;
-use std::path::PathBuf;
-use std::thread::sleep;
-use std::time::Duration;
-use std::{process, u64};
 
 mod commands;
 
@@ -31,7 +25,7 @@ pub fn main() {
     };
 
     if let Err(e) = hiro_system_kit::nestable_block_on(handle_command(opts, &ctx)) {
-        error!(ctx.expect_logger(), "{e}");
+        try_error!(&ctx, "{e}");
         std::thread::sleep(std::time::Duration::from_millis(500));
         process::exit(1);
     }
@@ -48,12 +42,15 @@ fn check_maintenance_mode(ctx: &Context) {
     }
 }
 
-fn confirm_rollback(current_chain_tip: u64, blocks_to_rollback: u32) -> Result<(), String> {
+fn confirm_rollback(
+    current_chain_tip: &BlockIdentifier,
+    blocks_to_rollback: u32,
+) -> Result<(), String> {
     println!("Index chain tip is at #{current_chain_tip}");
     println!(
         "{} blocks will be dropped. New index chain tip will be at #{}. Confirm? [Y/n]",
         blocks_to_rollback,
-        current_chain_tip - blocks_to_rollback as u64
+        current_chain_tip.index - blocks_to_rollback as u64
     );
     let mut buffer = String::new();
     std::io::stdin().read_line(&mut buffer).unwrap();
@@ -71,37 +68,27 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                     check_maintenance_mode(ctx);
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    migrate_dbs(&config, ctx).await?;
-
-                    let mut service = Service::new(&config, ctx);
-                    // TODO(rafaelcr): This only works if there's a rocksdb file already containing blocks previous to the first
-                    // inscription height.
-                    let start_block = service.get_index_chain_tip().await?;
-                    try_info!(ctx, "Index chain tip is at #{start_block}");
-
-                    return service.run(false).await;
+                    ordinals::start_ordinals_indexer(true, &config, ctx).await?
                 }
             },
             Command::Index(index_command) => match index_command {
                 IndexCommand::Sync(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    migrate_dbs(&config, ctx).await?;
-                    let service = Service::new(&config, ctx);
-                    service.catch_up_to_bitcoin_chain_tip().await?;
+                    ordinals::start_ordinals_indexer(false, &config, ctx).await?
                 }
                 IndexCommand::Rollback(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-
-                    let service = Service::new(&config, ctx);
-                    let chain_tip = service.get_index_chain_tip().await?;
-                    confirm_rollback(chain_tip, cmd.blocks)?;
-
-                    let service = Service::new(&config, ctx);
-                    let block_heights: Vec<u64> =
-                        ((chain_tip - cmd.blocks as u64)..=chain_tip).collect();
-                    service.rollback(&block_heights).await?;
+                    let chain_tip = ordinals::get_chain_tip(&config).await?;
+                    confirm_rollback(&chain_tip, cmd.blocks)?;
+                    ordinals::rollback_block_range(
+                        chain_tip.index - cmd.blocks as u64,
+                        chain_tip.index,
+                        &config,
+                        ctx,
+                    )
+                    .await?;
                     println!("{} blocks dropped", cmd.blocks);
                 }
             },
@@ -109,7 +96,7 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                 DatabaseCommand::Migrate(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_ordinals_config()?;
-                    migrate_dbs(&config, ctx).await?;
+                    ordinals::db::migrate_dbs(&config, ctx).await?;
                 }
             },
         },
@@ -119,43 +106,41 @@ async fn handle_command(opts: Protocol, ctx: &Context) -> Result<(), String> {
                     check_maintenance_mode(ctx);
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_runes_config()?;
-                    return runes::service::start_service(&config, ctx).await;
+                    runes::start_runes_indexer(true, &config, ctx).await?
                 }
             },
             Command::Index(index_command) => match index_command {
                 IndexCommand::Sync(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_runes_config()?;
-                    runes::service::catch_up_to_bitcoin_chain_tip(&config, ctx).await?;
+                    runes::start_runes_indexer(false, &config, ctx).await?
                 }
                 IndexCommand::Rollback(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_runes_config()?;
-                    let chain_tip = runes::service::get_index_chain_tip(&config, ctx).await;
-                    confirm_rollback(chain_tip, cmd.blocks)?;
-
-                    let mut pg_client = runes::db::pg_connect(&config, false, &ctx).await;
-                    runes::scan::bitcoin::drop_blocks(
-                        chain_tip - cmd.blocks as u64,
-                        chain_tip,
-                        &mut pg_client,
-                        &ctx,
+                    let chain_tip = runes::get_chain_tip(&config, ctx).await?;
+                    confirm_rollback(&chain_tip, cmd.blocks)?;
+                    runes::rollback_block_range(
+                        chain_tip.index - cmd.blocks as u64,
+                        chain_tip.index,
+                        &config,
+                        ctx,
                     )
-                    .await;
+                    .await?;
+                    println!("{} blocks dropped", cmd.blocks);
                 }
             },
             Command::Database(database_command) => match database_command {
                 DatabaseCommand::Migrate(cmd) => {
                     let config = Config::from_file_path(&cmd.config_path)?;
                     config.assert_runes_config()?;
-                    let _ = runes::db::pg_connect(&config, true, ctx).await;
+                    runes::db::pg_connect(&config, true, ctx).await;
                 }
             },
         },
         Protocol::Config(subcmd) => match subcmd {
             ConfigCommand::New(cmd) => {
-                use std::fs::File;
-                use std::io::Write;
+                use std::{fs::File, io::Write};
                 let network = match (cmd.mainnet, cmd.testnet, cmd.regtest) {
                     (true, false, false) => "mainnet",
                     (false, true, false) => "testnet",

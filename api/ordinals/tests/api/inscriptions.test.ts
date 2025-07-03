@@ -225,7 +225,7 @@ describe('/inscriptions', () => {
       expect(response2.json()).toStrictEqual(expected);
     });
 
-    test('shows inscription with parent', async () => {
+    test('shows inscription with parents', async () => {
       await inscriptionReveal(db.sql, {
         inscription_id: '9f4a9b73b0713c5da01c0a47f97c6c001af9028d6bdd9e264dfacbc4e6790201i0',
         ordinal_number: '257418248345364',
@@ -296,6 +296,10 @@ describe('/inscriptions', () => {
         inscription_id: 'f351d86c6e6cae3c64e297e7463095732f216875bcc1f3c03f950a492bb25421i0',
         parent_inscription_id: '9f4a9b73b0713c5da01c0a47f97c6c001af9028d6bdd9e264dfacbc4e6790201i0',
       });
+      await insertTestInscriptionParent(db.sql, {
+        inscription_id: 'f351d86c6e6cae3c64e297e7463095732f216875bcc1f3c03f950a492bb25421i0',
+        parent_inscription_id: '001eec2c3fb12441057722b099ae22f4d67602e2e7add0bd018132c0b128cde3i0',
+      });
       const response = await fastify.inject({
         method: 'GET',
         url: '/ordinals/v1/inscriptions/f351d86c6e6cae3c64e297e7463095732f216875bcc1f3c03f950a492bb25421i0',
@@ -303,6 +307,7 @@ describe('/inscriptions', () => {
       expect(response.statusCode).toBe(200);
       expect(response.json().parent_refs).toStrictEqual([
         '9f4a9b73b0713c5da01c0a47f97c6c001af9028d6bdd9e264dfacbc4e6790201i0',
+        '001eec2c3fb12441057722b099ae22f4d67602e2e7add0bd018132c0b128cde3i0',
       ]);
     });
 

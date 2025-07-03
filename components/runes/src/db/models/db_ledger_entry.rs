@@ -1,5 +1,5 @@
-use chainhook_postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
-use ordinals::RuneId;
+use ordinals_parser::RuneId;
+use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64};
 use tokio_postgres::Row;
 
 use super::db_ledger_operation::DbLedgerOperation;
@@ -43,10 +43,10 @@ impl DbLedgerEntry {
             tx_index: PgBigIntU32(tx_index),
             event_index: PgBigIntU32(event_index),
             tx_id: tx_id[2..].to_string(),
-            output: output.map(|i| PgBigIntU32(i)),
+            output: output.map(PgBigIntU32),
             address: address.cloned(),
             receiver_address: receiver_address.cloned(),
-            amount: amount.map(|i| PgNumericU128(i)),
+            amount: amount.map(PgNumericU128),
             operation,
             timestamp: PgBigIntU32(timestamp),
         }

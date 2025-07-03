@@ -1,23 +1,18 @@
 use std::collections::{HashMap, VecDeque};
 
 use bitcoin::{Address, ScriptBuf};
-use chainhook_sdk::utils::Context;
-use chainhook_types::bitcoin::TxIn;
+use bitcoind::{try_debug, try_warn, types::bitcoin::TxIn, utils::Context};
 use lru::LruCache;
-use ordinals::RuneId;
+use ordinals_parser::RuneId;
 use tokio_postgres::Transaction;
 
-use crate::{
-    db::{
-        models::{
-            db_ledger_entry::DbLedgerEntry, db_ledger_operation::DbLedgerOperation, db_rune::DbRune,
-        },
-        pg_get_input_rune_balances,
-    },
-    try_info, try_warn,
-};
-
 use super::{input_rune_balance::InputRuneBalance, transaction_location::TransactionLocation};
+use crate::db::{
+    models::{
+        db_ledger_entry::DbLedgerEntry, db_ledger_operation::DbLedgerOperation, db_rune::DbRune,
+    },
+    pg_get_input_rune_balances,
+};
 
 /// Takes all transaction inputs and transforms them into rune balances to be allocated for operations. Looks inside an output LRU
 /// cache and the DB when there are cache misses.
@@ -55,7 +50,7 @@ pub async fn input_rune_balances_from_tx_inputs(
     }
     // Look for cache misses in database. We don't need to `flush` the DB cache here because we've already looked in the current
     // block's output cache.
-    if cache_misses.len() > 0 {
+    if !cache_misses.is_empty() {
         let output_balances = pg_get_input_rune_balances(cache_misses, db_tx, ctx).await;
         indexed_input_runes.extend(output_balances);
     }
@@ -87,9 +82,9 @@ pub fn move_block_output_cache_to_output_cache(
     output_cache: &mut LruCache<(String, u32), HashMap<RuneId, Vec<InputRuneBalance>>>,
 ) {
     for (k, block_output_map) in block_output_cache.iter() {
-        if let Some(v) = output_cache.get_mut(&k) {
+        if let Some(v) = output_cache.get_mut(k) {
             for (rune_id, balances) in block_output_map.iter() {
-                if let Some(rune_balance) = v.get_mut(&rune_id) {
+                if let Some(rune_balance) = v.get_mut(rune_id) {
                     rune_balance.extend(balances.clone());
                 } else {
                     v.insert(*rune_id, balances.clone());
@@ -163,20 +158,15 @@ pub fn move_rune_balance_to_output(
                 Err(e) => {
                     try_warn!(
                         ctx,
-                        "Unable to decode address for output {}, {} {}",
-                        output,
-                        e,
-                        location
+                        "Unable to decode address for output {output}, {e} {location}"
                     );
                     None
                 }
             },
             None => {
-                try_info!(
+                try_debug!(
                     ctx,
-                    "Attempted move to non-eligible output {}, runes will be burnt {}",
-                    output,
-                    location
+                    "Attempted move to non-eligible output {output}, runes will be burnt {location}"
                 );
                 None
             }
@@ -235,14 +225,11 @@ pub fn move_rune_balance_to_output(
             DbLedgerOperation::Receive,
             next_event_index,
         ));
-        try_info!(
+        try_debug!(
             ctx,
-            "{} {} ({}) {} {}",
-            DbLedgerOperation::Receive,
-            rune_id,
-            total_sent,
-            receiver_address.as_ref().unwrap(),
-            location
+            "{operation} {rune_id} ({total_sent}) {address} {location}",
+            operation = DbLedgerOperation::Receive.to_string(),
+            address = receiver_address.as_ref().unwrap(),
         );
     }
     // Add the "send"/"burn" entries.
@@ -257,15 +244,9 @@ pub fn move_rune_balance_to_output(
             operation.clone(),
             next_event_index,
         ));
-        try_info!(
+        try_debug!(
             ctx,
-            "{} {} ({}) {} -> {:?} {}",
-            operation,
-            rune_id,
-            balance_taken,
-            sender_address,
-            receiver_address,
-            location
+            "{operation} {rune_id} ({balance_taken}) {sender_address} -> {receiver_address:?} {location}"
         );
     }
     results
@@ -317,9 +298,9 @@ mod test {
         use std::collections::{HashMap, VecDeque};
 
         use bitcoin::ScriptBuf;
-        use chainhook_sdk::utils::Context;
+        use bitcoind::utils::Context;
         use maplit::hashmap;
-        use ordinals::RuneId;
+        use ordinals_parser::RuneId;
 
         use crate::db::{
             cache::{
@@ -588,7 +569,7 @@ mod test {
     }
 
     mod mint_validation {
-        use chainhook_postgres::types::{PgNumericU128, PgNumericU64};
+        use postgres::types::{PgNumericU128, PgNumericU64};
         use test_case::test_case;
 
         use crate::db::{
@@ -635,7 +616,7 @@ mod test {
     }
 
     mod sequential_ledger_entry {
-        use ordinals::RuneId;
+        use ordinals_parser::RuneId;
 
         use crate::db::{
             cache::{
@@ -687,11 +668,16 @@ mod test {
     mod input_balances {
         use std::num::NonZeroUsize;
 
-        use chainhook_sdk::utils::Context;
-        use chainhook_types::{bitcoin::{OutPoint, TxIn}, TransactionIdentifier};
+        use bitcoind::{
+            types::{
+                bitcoin::{OutPoint, TxIn},
+                TransactionIdentifier,
+            },
+            utils::Context,
+        };
         use lru::LruCache;
         use maplit::hashmap;
-        use ordinals::RuneId;
+        use ordinals_parser::RuneId;
 
         use crate::db::{
             cache::{
@@ -900,7 +886,7 @@ mod test {
 
         use lru::LruCache;
         use maplit::hashmap;
-        use ordinals::RuneId;
+        use ordinals_parser::RuneId;
 
         use crate::db::cache::{
             input_rune_balance::InputRuneBalance, utils::move_block_output_cache_to_output_cache,

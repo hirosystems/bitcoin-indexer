@@ -1,9 +1,9 @@
-use {
-    super::{inscription_id::InscriptionId, media::Media, tag::Tag, *},
-    bitcoin::{constants::MAX_SCRIPT_ELEMENT_SIZE, hashes::Hash, opcodes, script, ScriptBuf, Txid},
-    ciborium::Value,
-    std::{io::Cursor, str},
-};
+use std::{io::Cursor, str};
+
+use bitcoin::{constants::MAX_SCRIPT_ELEMENT_SIZE, hashes::Hash, opcodes, script, ScriptBuf, Txid};
+use ciborium::Value;
+
+use super::{inscription_id::InscriptionId, media::Media, tag::Tag, *};
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Eq, Default)]
 pub struct Inscription {

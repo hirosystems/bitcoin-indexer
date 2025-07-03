@@ -1,5 +1,5 @@
-use chainhook_postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8};
-use ordinals::{Etching, Rune, RuneId, SpacedRune};
+use ordinals_parser::{Etching, Rune, RuneId, SpacedRune};
+use postgres::types::{PgBigIntU32, PgNumericU128, PgNumericU64, PgSmallIntU8};
 use tokio_postgres::Row;
 
 use crate::db::cache::transaction_location::TransactionLocation;
@@ -48,12 +48,12 @@ impl DbRune {
         let mut terms_offset_start = None;
         let mut terms_offset_end = None;
         if let Some(terms) = etching.terms {
-            terms_amount = terms.amount.map(|i| PgNumericU128(i));
-            terms_cap = terms.cap.map(|i| PgNumericU128(i));
-            terms_height_start = terms.height.0.map(|i| PgNumericU64(i));
-            terms_height_end = terms.height.1.map(|i| PgNumericU64(i));
-            terms_offset_start = terms.offset.0.map(|i| PgNumericU64(i));
-            terms_offset_end = terms.offset.1.map(|i| PgNumericU64(i));
+            terms_amount = terms.amount.map(PgNumericU128);
+            terms_cap = terms.cap.map(PgNumericU128);
+            terms_height_start = terms.height.0.map(PgNumericU64);
+            terms_height_end = terms.height.1.map(PgNumericU64);
+            terms_offset_start = terms.offset.0.map(PgNumericU64);
+            terms_offset_end = terms.offset.1.map(PgNumericU64);
         }
         DbRune {
             id: format!("{}:{}", location.block_height, location.tx_index),
@@ -66,11 +66,11 @@ impl DbRune {
             tx_id: location.tx_id[2..].to_string(),
             divisibility: etching
                 .divisibility
-                .map(|i| PgSmallIntU8(i))
+                .map(PgSmallIntU8)
                 .unwrap_or(PgSmallIntU8(0)),
             premine: etching
                 .premine
-                .map(|i| PgNumericU128(i))
+                .map(PgNumericU128)
                 .unwrap_or(PgNumericU128(0)),
             symbol: etching
                 .symbol
@@ -204,11 +204,10 @@ impl DbRune {
 mod test {
     use std::str::FromStr;
 
-    use ordinals::{Etching, SpacedRune, Terms};
-
-    use crate::db::cache::transaction_location::TransactionLocation;
+    use ordinals_parser::{Etching, SpacedRune, Terms};
 
     use super::DbRune;
+    use crate::db::cache::transaction_location::TransactionLocation;
 
     #[test]
     fn test_from_etching() {

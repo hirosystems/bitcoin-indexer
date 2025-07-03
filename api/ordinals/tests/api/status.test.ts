@@ -36,9 +36,8 @@ describe('Status', () => {
     const response = await fastify.inject({ method: 'GET', url: '/ordinals/v1/' });
     const json = response.json();
     expect(json).toStrictEqual({
-      server_version: 'ordinals-api v0.0.1 (test:123456)',
+      server_version: 'bitcoin-indexer-ordinals-api v0.0.1 (test:123456)',
       status: 'ready',
-      block_height: 0,
     });
     const noVersionResponse = await fastify.inject({ method: 'GET', url: '/ordinals/' });
     expect(response.statusCode).toEqual(noVersionResponse.statusCode);
@@ -117,7 +116,7 @@ describe('Status', () => {
     const response = await fastify.inject({ method: 'GET', url: '/ordinals/v1/' });
     const json = response.json();
     expect(json).toStrictEqual({
-      server_version: 'ordinals-api v0.0.1 (test:123456)',
+      server_version: 'bitcoin-indexer-ordinals-api v0.0.1 (test:123456)',
       status: 'ready',
       block_height: 791975,
       max_inscription_number: 0,
