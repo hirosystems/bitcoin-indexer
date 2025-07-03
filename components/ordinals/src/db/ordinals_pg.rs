@@ -118,6 +118,42 @@ pub async fn get_lowest_cursed_classic_inscription_number<T: GenericClient>(
     Ok(min)
 }
 
+pub async fn get_blessed_count_from_counts_by_type<T: GenericClient>(
+    client: &T,
+) -> Result<Option<i64>, String> {
+    let row = client
+        .query_opt(
+            "SELECT count FROM counts_by_type WHERE type = 'blessed'",
+            &[],
+        )
+        .await
+        .map_err(|e| format!("get_blessed_count_from_counts_by_type: {e}"))?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    let count: i32 = row.get("count");
+    let big_count: i64 = count.into();
+    Ok(Some(big_count))
+}
+
+pub async fn get_cursed_count_from_counts_by_type<T: GenericClient>(
+    client: &T,
+) -> Result<Option<i64>, String> {
+    let row = client
+        .query_opt(
+            "SELECT count FROM counts_by_type WHERE type = 'cursed'",
+            &[],
+        )
+        .await
+        .map_err(|e| format!("get_cursed_count_from_counts_by_type: {e}"))?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    let count: i32 = row.get("count");
+    let big_count: i64 = count.into();
+    Ok(Some(big_count))
+}
+
 pub async fn get_highest_unbound_inscription_sequence<T: GenericClient>(
     client: &T,
 ) -> Result<Option<i64>, String> {

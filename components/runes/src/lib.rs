@@ -11,16 +11,23 @@ use db::{
     index::{get_rune_genesis_block_height, index_block, roll_back_block},
     pg_connect,
 };
+use utils::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring};
 
 extern crate serde;
 
 pub mod db;
+pub mod utils;
 
-async fn new_runes_indexer_runloop(config: &Config, ctx: &Context) -> Result<Indexer, String> {
+async fn new_runes_indexer_runloop(
+    prometheus: &PrometheusMonitoring,
+    config: &Config,
+    ctx: &Context,
+) -> Result<Indexer, String> {
     let (commands_tx, commands_rx) = crossbeam_channel::unbounded::<IndexerCommand>();
 
     let config_moved = config.clone();
     let ctx_moved = ctx.clone();
+    let prometheus_moved = prometheus.clone();
     let handle: JoinHandle<()> = hiro_system_kit::thread_named("runes_indexer")
         .spawn(move || {
             future_block_on(&ctx_moved.clone(), async move {
@@ -51,6 +58,7 @@ async fn new_runes_indexer_runloop(config: &Config, ctx: &Context) -> Result<Ind
                                         &mut pg_client,
                                         &mut index_cache,
                                         block,
+                                        &prometheus_moved,
                                         &ctx_moved,
                                     )
                                     .await;
@@ -104,8 +112,37 @@ pub async fn start_runes_indexer(
     ctx: &Context,
 ) -> Result<(), String> {
     pg_connect(config, true, ctx).await;
+    let prometheus = PrometheusMonitoring::new();
+    let indexer = new_runes_indexer_runloop(&prometheus, config, ctx).await?;
 
-    let indexer = new_runes_indexer_runloop(config, ctx).await?;
+    if let Some(metrics) = &config.metrics {
+        if metrics.enabled {
+            let registry_moved = prometheus.registry.clone();
+            let ctx_cloned = ctx.clone();
+            let port = metrics.prometheus_port;
+            let _ = std::thread::spawn(move || {
+                hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
+                    port,
+                    registry_moved,
+                    ctx_cloned,
+                ));
+            });
+        }
+    }
+
+    // Initialize metrics with current state
+    let mut pg_client = pg_connect(config, false, ctx).await;
+    let max_rune_number = db::pg_get_max_rune_number(&pg_client, ctx).await;
+    let chain_tip = db::get_chain_tip(&mut pg_client, ctx)
+        .await
+        .unwrap_or(BlockIdentifier {
+            index: get_rune_genesis_block_height(config.bitcoind.network) - 1,
+            hash: "0x0000000000000000000000000000000000000000000000000000000000000000".into(),
+        });
+    prometheus
+        .initialize(max_rune_number as u64, chain_tip.index, config, ctx)
+        .await?;
+
     start_bitcoin_indexer(
         &indexer,
         get_rune_genesis_block_height(config.bitcoind.network),

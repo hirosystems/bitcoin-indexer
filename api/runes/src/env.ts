@@ -20,6 +20,9 @@ const schema = Type.Object({
   PG_IDLE_TIMEOUT: Type.Number({ default: 30 }),
   PG_MAX_LIFETIME: Type.Number({ default: 60 }),
   PG_STATEMENT_TIMEOUT: Type.Number({ default: 60_000 }),
+
+  /** Maximum number of results allowed per API request */
+  API_RESULTS_MAX_LIMIT: Type.Number({ default: 60, minimum: 1 }),
 });
 type Env = Static<typeof schema>;
 
