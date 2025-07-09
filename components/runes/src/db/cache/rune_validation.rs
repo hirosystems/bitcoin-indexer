@@ -2,13 +2,12 @@ use std::str::FromStr;
 
 use bitcoin::{Script, Transaction, Witness};
 use bitcoind::{
-    bitcoincore_rpc,
+    bitcoincore_rpc::{self, Client as BitcoinRPCClient},
     utils::{
         bitcoind::{bitcoin_get_raw_transaction, bitcoind_get_block_height},
         Context,
     },
 };
-use config::BitcoindConfig;
 use ordinals_parser::{Rune, Runestone};
 
 fn unversioned_leaf_script_from_witness(witness: &Witness) -> Option<&Script> {
@@ -54,7 +53,7 @@ pub fn is_reserved(rune: &Rune) -> bool {
 /// - At least 6 block confirmations between commit and reveal
 /// - Commitment bytes must exactly match `rune.commitment()`
 pub async fn rune_etching_has_valid_commit(
-    config: &BitcoindConfig,
+    bitcoin_client: &BitcoinRPCClient,
     ctx: &Context,
     tx: &Transaction,
     rune: &Rune,
@@ -91,7 +90,8 @@ pub async fn rune_etching_has_valid_commit(
                     .unwrap();
 
             // Fetch the commit transaction to validate taproot output and get block height
-            let Some(commit_tx_info) = bitcoin_get_raw_transaction(config, ctx, &txid) else {
+            let Some(commit_tx_info) = bitcoin_get_raw_transaction(bitcoin_client, ctx, &txid)
+            else {
                 panic!(
                     "can't get input transaction: {}",
                     input.previous_output.txid
@@ -110,7 +110,7 @@ pub async fn rune_etching_has_valid_commit(
 
             // Get commit transaction's block height to check confirmation count
             let commit_tx_height =
-                bitcoind_get_block_height(config, ctx, &commit_tx_info.blockhash.unwrap());
+                bitcoind_get_block_height(bitcoin_client, ctx, &commit_tx_info.blockhash.unwrap());
 
             // Calculate confirmations and check minimum requirement (6 blocks)
             let confirmations = reveal_block_height.checked_sub(commit_tx_height).unwrap() + 1;
@@ -130,7 +130,7 @@ mod tests {
     use bitcoin::{
         opcodes, script::Builder, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
     };
-    use bitcoind::utils::Context;
+    use bitcoind::utils::{bitcoind::bitcoind_get_client, Context};
     use config::BitcoindConfig;
     use ordinals_parser::Rune;
 
@@ -240,14 +240,21 @@ mod tests {
     async fn test_tx_commits_to_rune_fails_with_no_witness() {
         let config = MockBitcoindConfig::new();
         let ctx = Context::empty();
+        let bitcoin_client = bitcoind_get_client(&config, &ctx);
         let tx = create_mock_transaction_no_witness();
         let rune = Rune(1000);
         let mut inputs_counter = 0;
 
-        let result =
-            rune_etching_has_valid_commit(&config, &ctx, &tx, &rune, 840005, &mut inputs_counter)
-                .await
-                .unwrap();
+        let result = rune_etching_has_valid_commit(
+            &bitcoin_client,
+            &ctx,
+            &tx,
+            &rune,
+            840005,
+            &mut inputs_counter,
+        )
+        .await
+        .unwrap();
 
         assert!(!result);
         assert_eq!(inputs_counter, 1);
@@ -259,6 +266,7 @@ mod tests {
     async fn test_tx_commits_to_rune_fails_with_wrong_commitment() {
         let config = MockBitcoindConfig::new();
         let ctx = Context::empty();
+        let bitcoin_client = bitcoind_get_client(&config, &ctx);
         let rune = Rune(1000);
         let wrong_commitment = b"wrong_commitment_data";
 
@@ -274,10 +282,16 @@ mod tests {
         let tx = create_mock_transaction_with_witness(witness_data);
         let mut inputs_counter = 0;
 
-        let result =
-            rune_etching_has_valid_commit(&config, &ctx, &tx, &rune, 840005, &mut inputs_counter)
-                .await
-                .unwrap();
+        let result = rune_etching_has_valid_commit(
+            &bitcoin_client,
+            &ctx,
+            &tx,
+            &rune,
+            840005,
+            &mut inputs_counter,
+        )
+        .await
+        .unwrap();
 
         assert!(!result);
         assert_eq!(inputs_counter, 1);

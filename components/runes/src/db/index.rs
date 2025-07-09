@@ -10,7 +10,6 @@ use bitcoind::{
     types::{BitcoinBlockData, BitcoinTransactionData},
     utils::Context,
 };
-use config::BitcoindConfig;
 use ordinals_parser::{Artifact, Runestone};
 use tokio_postgres::Client;
 
@@ -72,7 +71,6 @@ pub async fn index_block(
     block: &mut BitcoinBlockData,
     prometheus: &PrometheusMonitoring,
     ctx: &Context,
-    bitcoin_config: &BitcoindConfig,
 ) {
     let stopwatch = std::time::Instant::now();
     let block_hash = &block.block_identifier.hash;
@@ -134,7 +132,6 @@ pub async fn index_block(
                                 &mut db_tx,
                                 ctx,
                                 &mut etching_count,
-                                bitcoin_config,
                                 &transaction,
                                 &mut inputs_count,
                             )

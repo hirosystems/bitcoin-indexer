@@ -1,8 +1,13 @@
 use std::{collections::HashMap, num::NonZeroUsize, str::FromStr};
 
 use bitcoin::{Network, ScriptBuf};
-use bitcoind::{try_debug, try_warn, types::bitcoin::TxIn, utils::Context};
-use config::{BitcoindConfig, Config};
+use bitcoind::{
+    bitcoincore_rpc::Client as BitcoinRPCClient,
+    try_debug, try_warn,
+    types::bitcoin::TxIn,
+    utils::{bitcoind::bitcoind_get_client, Context},
+};
+use config::Config;
 use lru::LruCache;
 use ordinals_parser::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
 use tokio_postgres::{Client, Transaction};
@@ -41,12 +46,15 @@ pub struct IndexCache {
     tx_cache: TransactionCache,
     /// Keeps rows that have not yet been inserted in the DB.
     pub db_cache: DbCache,
+    /// Bitcoin RPC client used to validate rune commitments.
+    pub bitcoin_client: BitcoinRPCClient,
 }
 
 impl IndexCache {
     pub async fn new(config: &Config, pg_client: &mut Client, ctx: &Context) -> Self {
         let network = config.bitcoind.network;
         let cap = NonZeroUsize::new(config.runes.as_ref().unwrap().lru_cache_size).unwrap();
+        let bitcoin_client = bitcoind_get_client(&config.bitcoind, ctx);
         IndexCache {
             network,
             next_rune_number: pg_get_max_rune_number(pg_client, ctx).await + 1,
@@ -69,6 +77,7 @@ impl IndexCache {
                 0,
             ),
             db_cache: DbCache::new(),
+            bitcoin_client,
         }
     }
 
@@ -160,7 +169,6 @@ impl IndexCache {
         _db_tx: &mut Transaction<'_>,
         ctx: &Context,
         etchings_counter: &mut u64,
-        config: &BitcoindConfig,
         bitcoin_tx: &bitcoin::Transaction,
         inputs_counter: &mut u64,
     ) {
@@ -189,7 +197,7 @@ impl IndexCache {
 
         // Validate rune commitment
         let is_valid_commitment = rune_etching_has_valid_commit(
-            config,
+            &self.bitcoin_client,
             ctx,
             bitcoin_tx,
             &rune,
