@@ -3,11 +3,13 @@ use std::str::FromStr;
 use bitcoin::{Script, Transaction, Witness};
 use bitcoind::{
     bitcoincore_rpc::{self, Client as BitcoinRPCClient},
+    try_info, try_warn,
     utils::{
-        bitcoind::{bitcoin_get_raw_transaction, bitcoind_get_block_height},
+        bitcoind::{bitcoin_get_raw_transaction, bitcoind_get_block_height, bitcoind_get_client},
         Context,
     },
 };
+use config::BitcoindConfig;
 use ordinals_parser::{Rune, Runestone};
 
 fn unversioned_leaf_script_from_witness(witness: &Witness) -> Option<&Script> {
@@ -52,14 +54,14 @@ pub fn is_reserved(rune: &Rune) -> bool {
 /// - The spent output must be a P2TR (taproot) output
 /// - At least 6 block confirmations between commit and reveal
 /// - Commitment bytes must exactly match `rune.commitment()`
-pub async fn rune_etching_has_valid_commit(
+async fn rune_etching_has_valid_commit(
     bitcoin_client: &BitcoinRPCClient,
     ctx: &Context,
     tx: &Transaction,
     rune: &Rune,
     reveal_block_height: u32,
     inputs_counter: &mut u64,
-) -> Result<bool, Box<dyn std::error::Error>> {
+) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     let commitment = rune.commitment();
 
     // Check each input for valid commitment (the commitment could be in any input)
@@ -121,6 +123,87 @@ pub async fn rune_etching_has_valid_commit(
     }
 
     Ok(false)
+}
+
+/// Validates that a rune etching transaction has a proper commitment transaction with automatic reconnection.
+///
+/// This function wraps the core validation logic with connection error handling. If a connection
+/// error is detected, it will attempt to reconnect the Bitcoin RPC client and retry the validation.
+pub async fn rune_etching_has_valid_commit_with_reconnect(
+    bitcoin_client: &mut BitcoinRPCClient,
+    config: &BitcoindConfig,
+    ctx: &Context,
+    tx: &Transaction,
+    rune: &Rune,
+    reveal_block_height: u32,
+    inputs_counter: &mut u64,
+) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    match rune_etching_has_valid_commit(
+        bitcoin_client,
+        ctx,
+        tx,
+        rune,
+        reveal_block_height,
+        inputs_counter,
+    )
+    .await
+    {
+        Ok(result) => Ok(result),
+        Err(error) => {
+            // Check if this is a connection error
+            if is_connection_error(&error) {
+                try_warn!(ctx, "Bitcoin RPC connection error detected: {}", error);
+                try_info!(ctx, "Attempting to reconnect Bitcoin RPC client...");
+
+                // Create a new client connection
+                *bitcoin_client = bitcoind_get_client(config, ctx);
+                try_info!(
+                    ctx,
+                    "Bitcoin RPC client reconnected, retrying validation..."
+                );
+
+                // Retry the validation with the new connection
+                rune_etching_has_valid_commit(
+                    bitcoin_client,
+                    ctx,
+                    tx,
+                    rune,
+                    reveal_block_height,
+                    inputs_counter,
+                )
+                .await
+            } else {
+                // Not a connection error, propagate the original error
+                Err(error)
+            }
+        }
+    }
+}
+
+/// Checks if an error indicates a connection issue that requires reconnection
+#[allow(clippy::borrowed_box)]
+fn is_connection_error(error: &Box<dyn std::error::Error + Send + Sync>) -> bool {
+    let error_msg = error.to_string().to_lowercase();
+
+    // Check for common connection-related error patterns
+    error_msg.contains("connection refused") ||
+    error_msg.contains("connection reset") ||
+    error_msg.contains("connection closed") ||
+    error_msg.contains("connection timeout") ||
+    error_msg.contains("connection aborted") ||
+    error_msg.contains("broken pipe") ||
+    error_msg.contains("network unreachable") ||
+    error_msg.contains("host unreachable") ||
+    error_msg.contains("timed out") ||
+    error_msg.contains("could not connect") ||
+    error_msg.contains("transport error") ||
+    error_msg.contains("rpc_client_not_connected") ||
+    error_msg.contains("no connection available") ||
+    error_msg.contains("io error") ||
+    error_msg.contains("transport is disconnected") ||
+    // Bitcoin Core specific RPC errors
+    error_msg.contains("rpc_client_not_connected") ||
+    error_msg.contains("work queue depth exceeded")
 }
 
 #[cfg(test)]
@@ -240,13 +323,13 @@ mod tests {
     async fn test_tx_commits_to_rune_fails_with_no_witness() {
         let config = MockBitcoindConfig::new();
         let ctx = Context::empty();
-        let bitcoin_client = bitcoind_get_client(&config, &ctx);
+        let mut bitcoin_client = bitcoind_get_client(&config, &ctx);
         let tx = create_mock_transaction_no_witness();
         let rune = Rune(1000);
         let mut inputs_counter = 0;
 
         let result = rune_etching_has_valid_commit(
-            &bitcoin_client,
+            &mut bitcoin_client,
             &ctx,
             &tx,
             &rune,
@@ -266,7 +349,7 @@ mod tests {
     async fn test_tx_commits_to_rune_fails_with_wrong_commitment() {
         let config = MockBitcoindConfig::new();
         let ctx = Context::empty();
-        let bitcoin_client = bitcoind_get_client(&config, &ctx);
+        let mut bitcoin_client = bitcoind_get_client(&config, &ctx);
         let rune = Rune(1000);
         let wrong_commitment = b"wrong_commitment_data";
 
@@ -283,7 +366,7 @@ mod tests {
         let mut inputs_counter = 0;
 
         let result = rune_etching_has_valid_commit(
-            &bitcoin_client,
+            &mut bitcoin_client,
             &ctx,
             &tx,
             &rune,
@@ -340,7 +423,7 @@ mod tests {
         reveal_block_height: u32,
         mock_commit_tx_block_height: u32,
         mock_is_taproot: bool,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let commitment = rune.commitment();
 
         for input in &tx.input {

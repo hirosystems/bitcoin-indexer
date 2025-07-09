@@ -7,7 +7,7 @@ use bitcoind::{
     types::bitcoin::TxIn,
     utils::{bitcoind::bitcoind_get_client, Context},
 };
-use config::Config;
+use config::{BitcoindConfig, Config};
 use lru::LruCache;
 use ordinals_parser::{Cenotaph, Edict, Etching, Rune, RuneId, Runestone};
 use tokio_postgres::{Client, Transaction};
@@ -18,7 +18,8 @@ use super::{
 };
 use crate::db::{
     cache::{
-        rune_validation::rune_etching_has_valid_commit, utils::input_rune_balances_from_tx_inputs,
+        rune_validation::rune_etching_has_valid_commit_with_reconnect,
+        utils::input_rune_balances_from_tx_inputs,
     },
     models::{
         db_balance_change::DbBalanceChange, db_ledger_entry::DbLedgerEntry,
@@ -48,6 +49,8 @@ pub struct IndexCache {
     pub db_cache: DbCache,
     /// Bitcoin RPC client used to validate rune commitments.
     pub bitcoin_client: BitcoinRPCClient,
+    /// Bitcoin RPC client configuration.
+    bitcoin_client_config: BitcoindConfig,
 }
 
 impl IndexCache {
@@ -78,6 +81,7 @@ impl IndexCache {
             ),
             db_cache: DbCache::new(),
             bitcoin_client,
+            bitcoin_client_config: config.bitcoind.clone(),
         }
     }
 
@@ -196,8 +200,9 @@ impl IndexCache {
         }
 
         // Validate rune commitment
-        let is_valid_commitment = rune_etching_has_valid_commit(
-            &self.bitcoin_client,
+        let is_valid_commitment = rune_etching_has_valid_commit_with_reconnect(
+            &mut self.bitcoin_client,
+            &self.bitcoin_client_config,
             ctx,
             bitcoin_tx,
             &rune,
