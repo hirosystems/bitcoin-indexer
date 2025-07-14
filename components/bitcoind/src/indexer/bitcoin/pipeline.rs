@@ -36,7 +36,18 @@ pub async fn start_block_download_pipeline(
 ) -> Result<(), String> {
     let number_of_blocks_to_process = blocks.len() as u64;
 
-    let (block_compressed_tx, block_compressed_rx) = crossbeam_channel::bounded(speed);
+    // Use memory-based channel capacity instead of fixed speed
+    let max_blocks_in_memory = config.resources.get_max_blocks_in_memory();
+    let channel_capacity = max_blocks_in_memory.min(speed * 10); // Don't exceed reasonable channel limits
+
+    try_info!(
+        ctx,
+        "Pipeline configured with {} blocks channel capacity (~{:.1}GB memory limit)",
+        channel_capacity,
+        channel_capacity as f64 * 3.5 / 1024.0
+    );
+
+    let (block_compressed_tx, block_compressed_rx) = crossbeam_channel::bounded(channel_capacity);
 
     let moved_config = config.bitcoind.clone();
     let moved_ctx = ctx.clone();
@@ -81,6 +92,7 @@ pub async fn start_block_download_pipeline(
 
     let moved_ctx: Context = ctx.clone();
     let moved_bitcoin_network = config.bitcoind.network;
+    let moved_channel_capacity = channel_capacity;
 
     let mut tx_thread_pool = vec![];
     let mut rx_thread_pool = vec![];
@@ -185,6 +197,7 @@ pub async fn start_block_download_pipeline(
                 let mut ooo_compacted_blocks = vec![];
                 for (block_height, block_opt, compacted_block) in new_blocks.into_iter() {
                     if let Some(block) = block_opt {
+                        // Accept all downloaded blocks - memory is managed by channel capacity
                         inbox.insert(block_height, (block, compacted_block));
                     } else if let Some(compacted_block) = compacted_block {
                         ooo_compacted_blocks.push((block_height, compacted_block));
@@ -241,6 +254,7 @@ pub async fn start_block_download_pipeline(
             .expect("unable to retrieve block")
             .expect("unable to deserialize block");
 
+        // Send to worker thread for processing - this will wait if the worker queues are full
         loop {
             let res = tx_thread_pool[round_robin_worker_thread_index].send(Some(block.clone()));
             round_robin_worker_thread_index = (round_robin_worker_thread_index + 1)
@@ -251,7 +265,23 @@ pub async fn start_block_download_pipeline(
             sleep(Duration::from_millis(500));
         }
 
+        // Wait until there's space in the channel before downloading the next block
         if let Some(block_height) = block_heights.pop_front() {
+            // Wait if channel is getting full
+            while block_compressed_tx.len() >= moved_channel_capacity * 9 / 10 {
+                // Wait when 90% full
+                try_debug!(
+                    ctx,
+                    "Channel is {}% full ({}/{}), waiting before downloading block {}",
+                    (block_compressed_tx.len() * 100) / moved_channel_capacity,
+                    block_compressed_tx.len(),
+                    moved_channel_capacity,
+                    block_height
+                );
+                sleep(Duration::from_millis(1000));
+            }
+
+            try_debug!(ctx, "Downloading block {}", block_height);
             let config = moved_config.clone();
             let ctx = ctx.clone();
             let http_client = moved_http_client.clone();

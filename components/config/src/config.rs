@@ -10,6 +10,7 @@ pub const DEFAULT_MEMORY_AVAILABLE: usize = 8;
 pub const DEFAULT_BITCOIND_RPC_THREADS: usize = 4;
 pub const DEFAULT_BITCOIND_RPC_TIMEOUT: u32 = 15;
 pub const DEFAULT_LRU_CACHE_SIZE: usize = 50_000;
+pub const DEFAULT_MAX_BLOCKS_IN_MEMORY_GB: f64 = 10.0; // 10GB default limit for blocks in memory
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -84,6 +85,7 @@ pub struct ResourcesConfig {
     pub memory_available: usize,
     pub bitcoind_rpc_threads: usize,
     pub bitcoind_rpc_timeout: u32,
+    pub max_blocks_in_memory_gb: f64, // Maximum GB of RAM to use for storing downloaded blocks
 }
 
 impl ResourcesConfig {
@@ -92,6 +94,14 @@ impl ResourcesConfig {
         // feeding the thread pool and eventually another thread for
         // handling the "reduce" step.
         self.cpu_core_available.saturating_sub(2).max(1)
+    }
+
+    /// Calculate maximum number of blocks that can be stored in memory
+    /// Assumes average block size of 3.5MB (blocks can range from 1-4MB)
+    pub fn get_max_blocks_in_memory(&self) -> usize {
+        const AVERAGE_BLOCK_SIZE_MB: f64 = 3.5;
+        let max_blocks = (self.max_blocks_in_memory_gb * 1024.0) / AVERAGE_BLOCK_SIZE_MB;
+        max_blocks.floor() as usize
     }
 }
 
@@ -117,6 +127,7 @@ impl Config {
                 ulimit: DEFAULT_ULIMIT,
                 bitcoind_rpc_threads: DEFAULT_BITCOIND_RPC_THREADS,
                 bitcoind_rpc_timeout: DEFAULT_BITCOIND_RPC_TIMEOUT,
+                max_blocks_in_memory_gb: DEFAULT_MAX_BLOCKS_IN_MEMORY_GB,
             },
             bitcoind: BitcoindConfig {
                 rpc_url: "http://0.0.0.0:18443".into(),
@@ -175,6 +186,7 @@ impl Config {
         config.storage.working_dir = "tmp".to_string();
         config.resources.bitcoind_rpc_threads = 1;
         config.resources.cpu_core_available = 1;
+        config.resources.max_blocks_in_memory_gb = 1.0; // Lower limit for tests
         config
     }
 
