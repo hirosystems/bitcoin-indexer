@@ -1,3 +1,10 @@
+## [3.0.2](https://github.com/hirosystems/bitcoin-indexer/compare/v3.0.1...v3.0.2) (2025-07-16)
+
+
+### Bug Fixes
+
+* **runes:** add balance_changes table index to optimize balance inserts ([#553](https://github.com/hirosystems/bitcoin-indexer/issues/553)) ([c9164aa](https://github.com/hirosystems/bitcoin-indexer/commit/c9164aaecb379c7e04809fed56285a7cdedc330b))
+
 ## [3.0.1](https://github.com/hirosystems/bitcoin-indexer/compare/v3.0.0...v3.0.1) (2025-03-20)
 
 
